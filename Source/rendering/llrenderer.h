@@ -132,7 +132,7 @@ private:
 		uint32_t width = 0;
 		uint32_t height = 0;
 		bool fullscreen = false;
-		HWND hwnd{};
+		//HWND hwnd{};
 		uint32_t colorBytes = 0;
 	} m_outputSurface;
 };

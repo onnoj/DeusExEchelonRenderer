@@ -14,6 +14,7 @@
 
 bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen)
 {
+	check(IsWindow(hWnd));
 	GLog->Log(L"Initializing LLRenderer");
 	HRESULT hr{};
 	if (m_API == nullptr)
@@ -24,7 +25,7 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 	}
 	
 	m_outputSurface.colorBytes = pColorBytes;
-	m_outputSurface.hwnd = hWnd;
+	//m_outputSurface.hwnd = hWnd;
 	if (pFullscreen)
 	{
 		auto res = FindClosestResolution(pWidth, pHeight);
@@ -72,6 +73,10 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 		return false;
 	}
 	if (hr == D3DERR_NOTAVAILABLE)
+	{
+		return false;
+	}
+	if (hr == D3DERR_INVALIDCALL)
 	{
 		return false;
 	}
@@ -123,7 +128,6 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 void LowlevelRenderer::Shutdown()
 {
 	//Don't actually destroy these resources.. we'll just reset the device..
-#if 0
 	for (auto& bg : m_bufferedGeo)
 	{
 		bg.second.resourceAgeTracker->erase(bg.first);
@@ -152,7 +156,7 @@ void LowlevelRenderer::Shutdown()
 		m_DepthStencilSurface = nullptr;
 	}
 
-
+#if 0
 	if (m_Device)
 	{
 		m_Device->Release();
@@ -298,7 +302,7 @@ void LowlevelRenderer::RenderLight(int32_t index, const D3DLIGHT9& pLight)
 	static const int maxLightsPerCall = [&]() {
 		D3DCAPS9 caps{};
 		m_Device->GetDeviceCaps(&caps);
-		return caps.MaxActiveLights;
+		return (caps.MaxActiveLights > 0) ? caps.MaxActiveLights : 8;
 	}();;
 	static int idx = 0;
 	idx %= maxLightsPerCall;
@@ -468,7 +472,7 @@ void LowlevelRenderer::EndFrame()
 	{
 		m_IsInFrame = false;
 		Shutdown();
-		Initialize(m_outputSurface.hwnd, m_outputSurface.width, m_outputSurface.height, m_outputSurface.colorBytes, m_outputSurface.fullscreen);
+		Initialize((HWND)GRenderDevice->Viewport->GetWindow(), m_outputSurface.width, m_outputSurface.height, m_outputSurface.colorBytes, m_outputSurface.fullscreen);
 		return;
 	}
 	check(SUCCEEDED(res));
@@ -485,10 +489,10 @@ bool LowlevelRenderer::ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint3
 	m_outputSurface.width = pWidth;
 	m_outputSurface.height = pHeight;
 	m_outputSurface.fullscreen = pFullScreen;
-	if (surfaceChanged)
+	if (surfaceChanged && m_Device != nullptr)
 	{
 		Shutdown();
-		Initialize(m_outputSurface.hwnd, pWidth, pHeight, m_outputSurface.colorBytes, pFullScreen);
+		Initialize((HWND)GRenderDevice->Viewport->GetWindow(), pWidth, pHeight, m_outputSurface.colorBytes, pFullScreen);
 	}
 	if (m_Device)
 	{

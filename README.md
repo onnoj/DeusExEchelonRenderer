@@ -36,7 +36,7 @@ Thanks to Marijn Kentie and others, there are various modern open-source rendere
 While taking inspiration from those renderers, this renderer is written from scratch with the goal to provide render calls in the most compatible way with RTX Remix.
 
 ## Features
-
+- **Switch from RH to LH coordinates**: When exporting from the game, the lights have their x coordinates inverted. In-game, this is working correctly. Could be a bug in RTX Remix, so changing coordinate systems might be a fast workaround.
 - **Real-time lighting**: The renderer uses the 'real' lights from the map data and passes them on to RTX Remix.
 - - **Note about Spotlights support**: At the time of writing, spotlights do not update properly (they accumulate over multiple frames) in RTX Remix. This is however working in the latest _development_ builds of RTX Remix, but be wary of dragons.
 - **Stable Geometry**: The level geometry is stable, meaning that from RTX Remix's perspective, walking around the world doesn't cause the geometry to change. This greatly reduces flickering. The exception are things that move (like doors).

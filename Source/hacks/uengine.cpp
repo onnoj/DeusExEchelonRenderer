@@ -82,6 +82,9 @@ void InstallUGameEngineHacks()
     *origFuncPtr = (*origFuncMap)[funcDescriptor.first];
     UGameEngineDetours.push_back(std::move(ptr));
   }
+
+  //Force directinput on, otherwise we're not able to interact with the RTX menu.
+  GConfig->SetBool(L"WinDrv.WindowsClient", L"UseDirectInput", TRUE);
 }
 
 void UninstallUGameEngineHacks()

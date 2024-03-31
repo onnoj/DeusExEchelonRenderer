@@ -61,7 +61,7 @@ jobs:
       if: ${{startsWith(github.ref, 'refs/tags/v') }}
       run: |
           cd dist
-          mkdir rtx-remix\DeusExEchelonRenderer\mods
+          mkdir rtx-remix\mods\DeusExEchelonRenderer
           copy "${{ github.workspace }}\temp\DeusEx\package\*" rtx-remix\mods\DeusExEchelonRenderer\
           7z a "..\DeusExEchelonRenderer-${{  github.ref_name }}.zip" *
     

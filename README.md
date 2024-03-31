@@ -8,7 +8,7 @@ Welcome to the Deus Ex Echelon Renderer; a fixed-function rendering pipeline int
 2. Grab the latest release of the renderer, extract it in the game's system folder as well.
 3. If you haven't already, grab [Deus Exe](https://kentie.net/article/dxguide/), again, Deus Ex's System folder.
 4. Start the game, select the "Echelon Renderer" from the list of renderers. If you use Deus Exe, for the best performance, set "FPS Limit" to 0.
-5. Have fun!
+5. Have fun! (Use alt+x to set a graphics preset)
 
 ## For developers: How to build
 

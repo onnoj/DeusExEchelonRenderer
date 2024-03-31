@@ -1,0 +1,20 @@
+[submodule "EXTERNAL/imgui"]
+	path = EXTERNAL/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking
+[submodule "EXTERNAL/fmt"]
+	path = EXTERNAL/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "EXTERNAL/murmurhash"]
+	path = EXTERNAL/murmurhash
+	url = https://github.com/aappleby/smhasher.git
+[submodule "EXTERNAL/PolyHook_2_0"]
+	path = EXTERNAL/PolyHook_2_0
+	url = https://github.com/stevemk14ebr/PolyHook_2_0.git
+[submodule "EXTERNAL/xxHash"]
+	path = EXTERNAL/xxHash
+	url = https://github.com/Cyan4973/xxHash.git
+[submodule "EXTERNAL/SDL2"]
+	path = EXTERNAL/SDL2
+	url = https://github.com/libsdl-org/SDL.git
+	branch = SDL2

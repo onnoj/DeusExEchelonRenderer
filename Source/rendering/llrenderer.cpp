@@ -481,10 +481,15 @@ Set resolution and windowed/fullscreen.
 bool LowlevelRenderer::ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight, bool pFullScreen)
 {	
 	assert(pWidth != 0 && pHeight != 0);
+	bool surfaceChanged = (m_outputSurface.width != pWidth) || (m_outputSurface.height != pHeight);
 	m_outputSurface.width = pWidth;
 	m_outputSurface.height = pHeight;
 	m_outputSurface.fullscreen = pFullScreen;
-
+	if (surfaceChanged)
+	{
+		Shutdown();
+		Initialize(m_outputSurface.hwnd, pWidth, pHeight, m_outputSurface.colorBytes, pFullScreen);
+	}
 	if (m_Device)
 	{
 		return ValidateViewport(pWidth, pHeight, pWidth, pHeight);

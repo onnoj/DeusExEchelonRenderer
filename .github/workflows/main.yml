@@ -62,7 +62,7 @@ jobs:
       run: |
           cd dist
           mkdir rtx-remix\DeusExEchelonRenderer\mods
-          copy "${{ github.workspace }}\temp\DeusEx\package\*" rtx-remix\DeusExEchelonRenderer\mods\
+          copy "${{ github.workspace }}\temp\DeusEx\package\*" rtx-remix\mods\DeusExEchelonRenderer\
           7z a "..\DeusExEchelonRenderer-${{  github.ref_name }}.zip" *
     
     - name: upload binaries to release

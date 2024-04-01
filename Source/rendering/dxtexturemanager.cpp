@@ -79,7 +79,7 @@ DeusExD3D9TextureHandle TextureManager::ProcessTexture(UnrealPolyFlags pFlags, F
       const auto pixelsPerBlock = 8;
       handle->format = D3DFMT_DXT1;
       handle->textureDataPtr = textureMip0->DataPtr;
-      handle->textureDataPitch = max(1, ((textureMip0->USize * pixelsPerBlock) / blockSize));
+      handle->textureDataPitch = textureMip0->USize / 2;//max(1, ((textureMip0->USize * pixelsPerBlock) / blockSize));
       handle->md.width += pUETextureInfo->USize % blockSize;
       handle->md.height += pUETextureInfo->VSize % blockSize;
     } break;

@@ -20,6 +20,12 @@ void InstallRTXConfigPatches()
     std::filesystem::path modulePath(modulePathString);
     auto moduleDir = modulePath.parent_path();
 
+    constexpr std::tuple<wchar_t*, wchar_t*> defaultConfigOptions[] = {
+      {L"d3d9.maxEnabledLights", L"65000"},
+      {L"rtx.suppressLightKeeping", L"True"},
+    };
+    bool hasOptions[std::size(defaultConfigOptions)]{false};
+
     auto rtxConfFile = modulePath.replace_filename("rtx.conf");
     if (std::filesystem::exists(rtxConfFile))
     {
@@ -29,7 +35,6 @@ void InstallRTXConfigPatches()
         return;
       }
 
-      bool foundMaxLights = false;
       auto wholeFile = std::wstring(std::istreambuf_iterator<wchar_t>(rtxConfig), std::istreambuf_iterator<wchar_t>());
       rtxConfig.seekg(std::ios_base::beg);
 
@@ -39,16 +44,34 @@ void InstallRTXConfigPatches()
       {
         lines.push_back(line);
         std::transform(line.begin(), line.end(), line.begin(),[](unsigned char c){ return std::tolower(c); });
-        if (line.find(L"d3d9.maxenabledlights") != -1)
+        for (int i = 0; i < std::size(defaultConfigOptions); i++)
         {
-          foundMaxLights = true;
+          std::wstring key = std::get<0>(defaultConfigOptions[i]);
+          std::wstring lowercaseKey = key;
+          std::transform(lowercaseKey.begin(), lowercaseKey.end(), lowercaseKey.begin(),[](unsigned char c){ return std::tolower(c); });
+
+          if (line.find(lowercaseKey) != -1)
+          {
+            hasOptions[i] = true;
+          }
         }
       }
       rtxConfig.close();
 
-      if (!foundMaxLights)
+      bool shouldRewrite = false;
+      for (int i = 0; i < std::size(defaultConfigOptions); i++)
       {
-        lines.push_back(L"d3d9.maxEnabledLights = 65000");
+        if (!hasOptions[i])
+        {
+          std::wstring key = std::get<0>(defaultConfigOptions[i]);
+          std::wstring value = std::get<1>(defaultConfigOptions[i]);
+          lines.push_back(key + L" = " + value);
+          shouldRewrite = true;
+        }
+      }
+
+      if (shouldRewrite)
+      {
         std::wofstream rtxConfig(rtxConfFile.native(), std::ios_base::out | std::ios_base::trunc);
         if (rtxConfig.is_open())
         {

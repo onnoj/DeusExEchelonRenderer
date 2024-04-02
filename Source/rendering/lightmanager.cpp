@@ -78,9 +78,15 @@ void LightManager::Render(FSceneNode* Frame)
 
 			D3DLIGHT9 d3dLight{};
 			ZeroMemory(&d3dLight, sizeof(d3dLight));
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+			d3dLight.Position.x = -pos.X;
+			d3dLight.Position.y = pos.Y;
+			d3dLight.Position.z = pos.Z;
+#else
 			d3dLight.Position.x = pos.X;
 			d3dLight.Position.y = pos.Y;
 			d3dLight.Position.z = pos.Z;
+#endif
 			d3dLight.Diffuse.r = floatColor.X;
 			d3dLight.Diffuse.g = floatColor.Y;
 			d3dLight.Diffuse.b = floatColor.Z;
@@ -154,9 +160,15 @@ void LightManager::Render(FSceneNode* Frame)
 		auto fwd = -(Frame->Coords.XAxis ^ Frame->Coords.YAxis);
 		D3DLIGHT9 d3dLight{};
 		ZeroMemory(&d3dLight, sizeof(d3dLight));
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+		d3dLight.Position.x = -Frame->Coords.Origin.X;
+		d3dLight.Position.y = Frame->Coords.Origin.Y;
+		d3dLight.Position.z = Frame->Coords.Origin.Z;
+#else
 		d3dLight.Position.x = Frame->Coords.Origin.X;
 		d3dLight.Position.y = Frame->Coords.Origin.Y;
 		d3dLight.Position.z = Frame->Coords.Origin.Z;
+#endif
 		d3dLight.Diffuse.r = 0.7f;
 		d3dLight.Diffuse.g = 0.7f;
 		d3dLight.Diffuse.b = 1.0f;
@@ -165,7 +177,11 @@ void LightManager::Render(FSceneNode* Frame)
 		//d3dLight.Diffuse.r *= (d3dLight.Range);
 		//d3dLight.Diffuse.g *= (d3dLight.Range);
 		//d3dLight.Diffuse.b *= (d3dLight.Range);
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+		d3dLight.Direction = { -fwd.X, fwd.Y, fwd.Z };
+#else
 		d3dLight.Direction = { fwd.X, fwd.Y, fwd.Z };
+#endif
 		d3dLight.Theta = 1.0f;
 		d3dLight.Phi = 1.0f;
 		m_LLRenderer->RenderLight((uint32_t)ReservedSlots::jcDentonLight, d3dLight);

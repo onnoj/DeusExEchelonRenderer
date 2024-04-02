@@ -323,14 +323,7 @@ void LowlevelRenderer::FlushLights()
 {
 	if (m_CanFlushLights)
 	{
-		//static D3DXMATRIX wm = []() { D3DXMATRIX m; D3DXMatrixIdentity(&m); return m; }();
-		//static D3DXMATRIX vm = []() { D3DXMATRIX m; D3DXMatrixIdentity(&m); return m; }();
-		//static D3DXMATRIX pm = []() { D3DXMATRIX m; D3DXMatrixIdentity(&m); return m; }();
-
 		HRESULT res = S_OK;
-		//res = m_Device->SetTransform(D3DTS_WORLD, &wm);  check(SUCCEEDED(res));
-		//res = m_Device->SetTransform(D3DTS_VIEW, &vm);  check(SUCCEEDED(res));
-		//res = m_Device->SetTransform(D3DTS_PROJECTION, &pm);  check(SUCCEEDED(res));
 		res = m_Device->SetStreamSource(0, m_fakeLightBuffer, 0, sizeof(float) * 3 * 3); check(SUCCEEDED(res));
 		res = m_Device->SetIndices(nullptr); check(SUCCEEDED(res));
 		res = m_Device->SetFVF(D3DFVF_XYZ); check(SUCCEEDED(res));

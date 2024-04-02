@@ -177,12 +177,29 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 	//Render real-time lights
 	m_LightManager.Render(Frame);
 
+#if 0
+	//axis widget
+	assert(Frame->Parent == nullptr);
+	FColor color[3] = {FColor(255,0,0), FColor(0,255,0), FColor(0,0,255)};
+	FVector axis[3] = { {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+	auto widgetPos = Frame->Coords.Origin - ((Frame->Coords.XAxis ^ Frame->Coords.YAxis) * 50.0f);
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+	widgetPos.X *= -1.0f;
+#endif
+	for (int i = 0; i < 3; i++)
+	{
+		Draw3DLine(Frame, widgetPos, widgetPos + (10.0f*axis[i]), color[i]);
+	}
+#endif
+
 	//Render debug crap:
 	if (m_DebugMesh.primitiveCount > 0)
 	{
 		m_LLRenderer->PushDeviceState();
 		m_LLRenderer->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
+		m_LLRenderer->SetRenderState(D3DRS_ALPHATESTENABLE, 0);
 		m_LLRenderer->SetRenderState(D3DRS_ZENABLE, 0);
+		m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 1);
 		m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG0, D3DTA_DIFFUSE);
 		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
@@ -203,36 +220,39 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 	};
 
 	//Render Remix warning screen
-	m_LLRenderer->PushDeviceState();
+	if (!IsDebuggerPresent())
 	{
-		D3DXMATRIX wm; D3DXMatrixIdentity(&wm);
-		D3DXMATRIX wmi; D3DXMatrixIdentity(&wmi);
-		D3DXMATRIX identity; D3DXMatrixIdentity(&identity);
-		
-		FVector newOrigin = Frame->Coords.Origin - ((Frame->Coords.XAxis ^ Frame->Coords.YAxis)*1.0f);
-
-		FCoords coords = Frame->Coords;
-		coords.Origin = newOrigin;
-		coords.XAxis = Frame->Coords.XAxis;
-		coords.YAxis = Frame->Coords.YAxis * -1.0f;
-		coords.ZAxis = Frame->Coords.ZAxis;
-		GetWorldMatrix(Frame, coords, &wm, &wmi);
-		
-		D3DXMatrixTranslation(&wm, newOrigin.X, newOrigin.Y, newOrigin.Z);
-			
-		StaticMeshesVertexBuffer buffer;
-		buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
-		buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
-		buffer.push_back({ { -1.0f,  1.0f, 0.0f },  {0.0f, 0.0f} });
-		buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
-		buffer.push_back({ {  1.0f,	-1.0f, 0.0f },  {1.0f, 1.0f} });
-		buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
-		if (m_TextureManager.BindTexture(PF_Unlit, m_TextureManager.GetFakeTexture()))
+		m_LLRenderer->PushDeviceState();
 		{
-			m_LLRenderer->SetRenderState(D3DRS_ZENABLE, 0);
-			m_LLRenderer->RenderTriangleList(wmi, buffer.data(), 2, buffer.size(), 0, 0);
+			D3DXMATRIX wm; D3DXMatrixIdentity(&wm);
+			D3DXMATRIX wmi; D3DXMatrixIdentity(&wmi);
+			D3DXMATRIX identity; D3DXMatrixIdentity(&identity);
+
+			FVector newOrigin = Frame->Coords.Origin - ((Frame->Coords.XAxis ^ Frame->Coords.YAxis) * 1.0f);
+
+			FCoords coords = Frame->Coords;
+			coords.Origin = newOrigin;
+			coords.XAxis = Frame->Coords.XAxis;
+			coords.YAxis = Frame->Coords.YAxis * -1.0f;
+			coords.ZAxis = Frame->Coords.ZAxis;
+			GetWorldMatrix(Frame, coords, &wm, &wmi);
+
+			D3DXMatrixTranslation(&wm, newOrigin.X, newOrigin.Y, newOrigin.Z);
+
+			StaticMeshesVertexBuffer buffer;
+			buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
+			buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
+			buffer.push_back({ { -1.0f,  1.0f, 0.0f },  {0.0f, 0.0f} });
+			buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
+			buffer.push_back({ {  1.0f,	-1.0f, 0.0f },  {1.0f, 1.0f} });
+			buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
+			if (m_TextureManager.BindTexture(PF_Unlit, m_TextureManager.GetFakeTexture()))
+			{
+				m_LLRenderer->SetRenderState(D3DRS_ZENABLE, 0);
+				m_LLRenderer->RenderTriangleList(wmi, buffer.data(), 2, buffer.size(), 0, 0);
+			}
+			m_LLRenderer->PopDeviceState();
 		}
-		m_LLRenderer->PopDeviceState();
 	}
 
 	m_LLRenderer->PopDeviceState();
@@ -323,6 +343,7 @@ void HighlevelRenderer::Draw3DLine(FSceneNode* Frame, const FVector& PositionFro
 
 	const FVector triangle1[3] = { (PositionFrom - lineSides), (PositionTo - lineSides), (PositionFrom+lineSides)};
 	const FVector triangle2[3] = { (PositionTo - lineSides), (PositionFrom+lineSides), (PositionTo + lineSides)};
+
 	m_DebugMesh.buffer.push_back({ {triangle1[0].X, triangle1[0].Y, triangle1[0].Z}, 0xFF000000 | Color.TrueColor()});
 	m_DebugMesh.buffer.push_back({ {triangle1[1].X, triangle1[1].Y, triangle1[1].Z}, 0xFF000000 | Color.TrueColor()});
 	m_DebugMesh.buffer.push_back({ {triangle1[2].X, triangle1[2].Y, triangle1[2].Z}, 0xFF000000 | Color.TrueColor()});
@@ -373,7 +394,11 @@ void HighlevelRenderer::GetViewMatrix(FSceneNode* Frame, D3DXMATRIX& viewMatrix)
 	D3DXMATRIX cameraMatrix;
 	D3DXMatrixIdentity(&cameraMatrix);
 	{
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+		FVector axis[3]{ FVector(-1.0f,0.0f,0.0f),FVector(0.0f, 1.0f, 0.0f),FVector(0.0f, 0.0f, 1.0f) };
+#else
 		FVector axis[3]{ FVector(1.0f,0.0f,0.0f),FVector(0.0f, 1.0f, 0.0f),FVector(0.0f, 0.0f, 1.0f) };
+#endif
 		axis[0] = axis[0].TransformVectorBy(FrameCoords);
 		axis[1] = axis[1].TransformVectorBy(FrameCoords);
 		axis[2] = axis[2].TransformVectorBy(FrameCoords);
@@ -644,8 +669,11 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 				for (int i = 0; i < 3; i++)
 				{
 					const auto& uvDiffuse = calculateUV(projPts[i], Surface.Texture, albedoTextureHandle->md);
-
-					LowlevelRenderer::VertexPos3Tex0 vtx = { { localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y } };
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+					LowlevelRenderer::VertexPos3Tex0 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y } };
+#else
+					LowlevelRenderer::VertexPos3Tex0 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y } };
+#endif
 					D3DXVec3TransformCoord(&vtx.Pos, &vtx.Pos, &sharedMesh->worldMatrixInverse);
 
 					//note: mesh hashes in Deus Ex are not stable between frames
@@ -695,10 +723,13 @@ void HighlevelRenderer::OnDrawMeshBegin(FSceneNode* Frame, AActor* Owner)
 	const auto DrawScale = Owner->bParticles ? 1.0 : Owner->DrawScale;
 	FCoords coordsWithView = (Frame->Coords * (Owner->Location + Owner->PrePivot) * Owner->Rotation * Owner->Mesh->RotOrigin * FScale(Owner->Mesh->Scale * DrawScale, 0.0, SHEER_None)) * -Owner->Mesh->Origin;
 	FCoords coordsLocalToWorld = (UnrealCoordsIndentity * (Owner->Location + Owner->PrePivot) * Owner->Rotation * Owner->Mesh->RotOrigin * FScale(Owner->Mesh->Scale * DrawScale, 0.0, SHEER_None)) * -Owner->Mesh->Origin;
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+	coordsLocalToWorld.XAxis *= -1.0f;
+	coordsWithView.XAxis *= -1.0f;
+#endif
 
 	GetWorldMatrix(Frame, coordsLocalToWorld, &renderContext->drawcallInfo->worldMatrix, &renderContext->drawcallInfo->worldMatrixInv);
 	GetWorldMatrix(Frame, coordsWithView, &renderContext->drawcallInfo->localToViewMatrix, &renderContext->drawcallInfo->viewToLocalMatrix);
-
 	const auto key = reinterpret_cast<DynamicMeshesKey>(renderContext->drawcallInfo->Owner);
 	for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
 	{
@@ -772,10 +803,15 @@ void HighlevelRenderer::OnDrawMesh(FSceneNode* Frame, FTextureInfo& Info, FTrans
 		auto fixSigned0 = [](float& value) {
 			if (value >= 0.0f && std::signbit(value)) { value = std::abs(value); }
 		};
-
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+		auto d3dvtx0 = LowlevelRenderer::VertexPos3Tex0{ {-vtx[0].X, vtx[0].Y, vtx[0].Z}, {md.multU * Pts[0]->U,			  md.multV * Pts[0]->V } };
+		auto d3dvtx1 = LowlevelRenderer::VertexPos3Tex0{ {-vtx[1].X, vtx[1].Y, vtx[1].Z}, {md.multU * Pts[i - 1]->U,  md.multV * Pts[i - 1]->V }};
+		auto d3dvtx2 = LowlevelRenderer::VertexPos3Tex0{ {-vtx[2].X, vtx[2].Y, vtx[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V }};
+#else
 		auto d3dvtx0 = LowlevelRenderer::VertexPos3Tex0{ {vtx[0].X, vtx[0].Y, vtx[0].Z}, {md.multU * Pts[0]->U,			  md.multV * Pts[0]->V } };
 		auto d3dvtx1 = LowlevelRenderer::VertexPos3Tex0{ {vtx[1].X, vtx[1].Y, vtx[1].Z}, {md.multU * Pts[i - 1]->U,  md.multV * Pts[i - 1]->V }};
 		auto d3dvtx2 = LowlevelRenderer::VertexPos3Tex0{ {vtx[2].X, vtx[2].Y, vtx[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V }};
+#endif
 		D3DXVec3TransformCoord(&d3dvtx0.Pos, &d3dvtx0.Pos, &viewToLocalMatrix);
 		D3DXVec3TransformCoord(&d3dvtx1.Pos, &d3dvtx1.Pos, &viewToLocalMatrix);
 		D3DXVec3TransformCoord(&d3dvtx2.Pos, &d3dvtx2.Pos, &viewToLocalMatrix);

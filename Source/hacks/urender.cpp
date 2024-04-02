@@ -259,10 +259,10 @@ namespace Hacks
       Frame->Span = originalSpan;
       Frame->Viewport->Actor->FovAngle = origFovAngle;
       Frame->ComputeRenderCoords(origPos, origRot);
-      for (auto& l : lines)
-      {
-        ::Misc::g_Facade->GetHLRenderer()->Draw3DLine(Frame, std::get<0>(l), std::get<1>(l), std::get<2>(l));
-      }
+      //for (auto& l : lines)
+      //{
+      //  ::Misc::g_Facade->GetHLRenderer()->Draw3DLine(Frame, std::get<0>(l), std::get<1>(l), std::get<2>(l));
+      //}
     }
     else
     {

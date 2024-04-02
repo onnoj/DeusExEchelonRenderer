@@ -3,6 +3,7 @@ add_definitions(-D_DLL -DEE_LIBDLL -DDEUSEX=1)
 
 set(DEUSEX_INT_FILE "DeusExEchelonRenderer.int")
 set(DEUSEX_RTX_FILE "rtx.conf")
+add_compile_definitions("CONVERT_TO_LEFTHANDED_COORDINATES=1")
 
 macro(deusex_replace_cmake_cxx_flags from to)
 	set(CompilerFlags
@@ -81,8 +82,6 @@ target_link_libraries (DeusExEchelonRenderer ${DEUSEX_LIBS})
 
 find_package(fmt)
 target_link_libraries(DeusExEchelonRenderer fmt::fmt PolyHook_2)
-
-
 
 if(MSVC)
 	add_definitions(-D_UNICODE -DUNICODE)

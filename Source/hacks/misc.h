@@ -25,7 +25,7 @@ struct GlobalRenderOptions
 	bool hasDebugMenu = true;
 	bool clusterNodes = true;
 	bool clusterNodesWithSameParent = true;
-	bool hasDebugDraw = false;
+	bool hasDebugDraw = true;
 	bool enableViewportXYOffsetWorkaround = true;
 };
 

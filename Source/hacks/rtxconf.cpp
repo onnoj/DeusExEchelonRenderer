@@ -43,12 +43,10 @@ void InstallRTXConfigPatches()
       while (std::getline(rtxConfig, line, L'\n'))
       {
         lines.push_back(line);
-        std::transform(line.begin(), line.end(), line.begin(),[](unsigned char c){ return std::tolower(c); });
         for (int i = 0; i < std::size(defaultConfigOptions); i++)
         {
           std::wstring key = std::get<0>(defaultConfigOptions[i]);
           std::wstring lowercaseKey = key;
-          std::transform(lowercaseKey.begin(), lowercaseKey.end(), lowercaseKey.begin(),[](unsigned char c){ return std::tolower(c); });
 
           if (line.find(lowercaseKey) != -1)
           {

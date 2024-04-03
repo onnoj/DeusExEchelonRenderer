@@ -47,6 +47,7 @@ public:
     FPlane,
     UETexture,
     String,
+    Lambda,
   };
 public:
   void Init();
@@ -152,6 +153,10 @@ DebugMenu::DebugMenuTypes DebugMenu::getTypeIndex()
   if constexpr (std::is_same<T, std::string>::value)
   {
     return DebugMenuTypes::String;
+  }
+  if constexpr (std::is_same<T, std::function<void()>>::value)
+  {
+    return DebugMenuTypes::Lambda;
   }
   assert(false);
   return DebugMenuTypes::Undefined;

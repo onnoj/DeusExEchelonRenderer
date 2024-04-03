@@ -186,6 +186,7 @@ const char* DebugMenu::getTypeFormat(DebugMenuTypes pType)
     case DebugMenuTypes::FPlane:return "X:%f, Y:%f, Z:%f, W:%f";
     case DebugMenuTypes::UETexture:return "%d";
     case DebugMenuTypes::String: return "%s";
+    case DebugMenuTypes::Lambda: return nullptr;
     case DebugMenuTypes::Undefined: [[fallthrough]];
     default:  assert(false); return "{}";
   }
@@ -229,6 +230,7 @@ void DebugMenu::getTypeVaListRead(std::function<void(std::va_list& outList)> pFu
       
       recombinator(1, source);
     } break;
+    case DebugMenuTypes::Lambda: break;
     case DebugMenuTypes::Undefined: [[fallthrough]];
     default: assert(false);
   }
@@ -273,6 +275,7 @@ void DebugMenu::getTypeVaListWrite(std::function<void(std::va_list& outList)> pF
     recombinator(1, &b[0]);
     target = b;
   } break;
+  case DebugMenuTypes::Lambda: break;
   case DebugMenuTypes::Undefined: [[fallthrough]];
   default: assert(false);
   }
@@ -330,15 +333,6 @@ void DebugMenu::Update()
         {
           const UETextureType& textureDesc = *reinterpret_cast<UETextureType*>(item->storage);
           auto texture = FindTexture(*textureDesc);
-          //if (texture == nullptr)
-          //{
-          //  auto& textureManager = ::Misc::g_Facade->GetHLRenderer()->GetTextureManager();
-          //  auto textures = textureManager.FindTextures(*textureDesc);
-          //  if (textures.empty())
-          //  {
-          //    continue;
-          //  }
-          //}
           if (texture)
           {
             const ImVec2 posR = ImGui::GetCursorScreenPos();
@@ -348,6 +342,15 @@ void DebugMenu::Update()
             draw_list->AddImage((ImTextureID)texture->m_TextureSRV, posR + ImVec2(0, 0), posR + ImVec2(hw, hw));
             ImGui::SetCursorScreenPos(posR + ImVec2(0, hw + 10.0f));
             ImGui::ItemSize(ImRect(0, hw, 0, hw));
+          }
+          continue;
+        }
+        else if (item->storageType == DebugMenuTypes::Lambda)
+        {
+          if (ImGui::Button((id + "##lambdabutton").c_str(), ImVec2(20, 20)))
+          {
+            auto functor = *reinterpret_cast<std::function<void()>*>(item->storage);
+            functor();
           }
           continue;
         }

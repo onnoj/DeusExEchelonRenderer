@@ -166,6 +166,13 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 		}
 	}
 
+#if 0
+	//Kept as an example
+	g_DebugMenu.DebugVar("Rendering", "Test Button", DebugMenuUniqueID(), std::function<void()>([&](){
+		MessageBoxA(NULL, "Hello world", "", MB_OK);
+	}));
+#endif
+
 	bool clearEachFrame = false;
 	g_DebugMenu.DebugVar("Rendering", "Wipe Render Cache", DebugMenuUniqueID(), clearEachFrame);
 	if (clearEachFrame)

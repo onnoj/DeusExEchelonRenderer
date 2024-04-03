@@ -2,6 +2,9 @@
 
 Welcome to the Deus Ex Echelon Renderer; a fixed-function rendering pipeline intended for use in with [NVidia's RTX Remix](https://www.nvidia.com/de-de/geforce/rtx-remix/)! 
 
+Note that this is a piece of tech, and not a mod. You can probably play through Deus Ex with this renderer, but you'll want to tweak the default rtx.conf options a bit.
+Hopefully, in due time, there will be proper graphics overhaul mods that utilize this or another renderer.
+
 ![NvRemixBridge Screenshot 2024 03 29 - 21 06 40 59](https://github.com/onnoj/DeusExEchelonRenderer/assets/4381237/84481569-d305-4110-9f63-6f4a1ee7ee9f)
 ![NvRemixBridge Screenshot 2024 03 29 - 21 07 18 84](https://github.com/onnoj/DeusExEchelonRenderer/assets/4381237/5b4e6cd6-81ce-4923-9cb4-011c3f561a86)
 
@@ -41,7 +44,6 @@ Thanks to Marijn Kentie and others, there are various modern open-source rendere
 While taking inspiration from those renderers, this renderer is written from scratch with the goal to provide render calls in the most compatible way with RTX Remix.
 
 ## Features
-- **Switch from RH to LH coordinates**: When exporting from the game, the lights have their x coordinates inverted. In-game, this is working correctly. Could be a bug in RTX Remix, so changing coordinate systems might be a fast workaround.
 - **Real-time lighting**: The renderer uses the 'real' lights from the map data and passes them on to RTX Remix.
 - - **Note about Spotlights support**: At the time of writing, spotlights do not update properly (they accumulate over multiple frames) in RTX Remix. This is however working in the latest _development_ builds of RTX Remix, but be wary of dragons.
 - **Stable Geometry**: The level geometry is stable, meaning that from RTX Remix's perspective, walking around the world doesn't cause the geometry to change. This greatly reduces flickering. The exception are things that move (like doors).
@@ -52,6 +54,7 @@ While taking inspiration from those renderers, this renderer is written from scr
 - Level meshes are stable, but object meshes are not, and cannot be replaced efficiently (yet).
 
 ## TODO
+- **Switch from RH to LH coordinates**: When exporting from the game, the lights have their x coordinates inverted. In-game, this is working correctly. Could be a bug in RTX Remix, so changing coordinate systems might be a fast workaround.
 - **Hack out mesh frame clipping**: Currently the meshes are clipped, so characters for example can get clipped a little bit in cutscenes. Additionally, from the perspective of RTX Remix, the clipped mesh becomes unique (and thus cannot be replaced efficiently by the toolkit).
 - **Light effects**: Currently, only the 'disco' light effect is implemented. The other effects (such as flickering), should be implemented as well.
 - **RTX Hash to Name Mapping**: It could be useful for other tools/scripts to have access to human readable names for textures and what not. Currently I re-calculate the remix texture hash but don't do anything with it.
@@ -65,8 +68,10 @@ While taking inspiration from those renderers, this renderer is written from scr
 Contributions to the project are welcome! If you have ideas for improvements or new features, feel free to fork the repository and submit a pull request. Be sure to follow the contribution guidelines outlined in the repository.
 
 ## License
+Copyright (c) 2024 Onno Jongbloed
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+If you redistribute the renderer or create derivative works based on it, I would appreciate being attributed. Please attribute Onno Jongbloed and provide a link to the original source.
 
 Several external libraries are used, you can find more information about their licenses in the .\EXTERNAL\ directory:
 * PolyHook 2.0 - MIT License - Copyright (c) 2018 Stephen Eckels

@@ -11,8 +11,13 @@ Welcome to the Deus Ex Echelon Renderer; a fixed-function rendering pipeline int
 1. Grab the latest [RTX Remix release](https://github.com/NVIDIAGameWorks/rtx-remix/releases), extract it in Deus Ex's **System** folder.
 2. Grab the [latest release of the renderer](https://github.com/onnoj/DeusExEchelonRenderer/releases), extract it in the game's system folder as well.
 3. If you haven't already, grab [Deus Exe](https://kentie.net/article/dxguide/), again, Deus Ex's System folder.
-4. Start the game, select the "Echelon Renderer" from the list of renderers. If you use Deus Exe, for the best performance, set "FPS Limit" to 0, and turn off "Raw Input".
-5. Have fun! (Use alt+x to set a graphics preset)
+4. Start the game, select the "Echelon Renderer" from the list of renderers.
+5. If you use Deus Exe:
+    * For the best performance, set "FPS Limit" to 0
+    * Make sure to turn off "Raw Input", otherwise you cannot interact with RTX Remix: ![image](https://github.com/onnoj/DeusExEchelonRenderer/assets/4381237/60a47f03-eed4-4d02-b1ce-542ac0ee1253)
+
+
+7. Have fun! (Use alt+x to set a graphics preset)
 
 ## For developers: How to build
 

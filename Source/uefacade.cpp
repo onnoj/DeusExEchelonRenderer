@@ -36,6 +36,18 @@ public:
 	}
 } LogOutImpl;
 
+class FErrOutImpl : public FOutputDeviceError
+{
+public:
+	void Serialize( const TCHAR* V, EName Event )
+	{
+		char b[1024]{};
+		WideCharToMultiByte(CP_ACP, 0, V, -1, &b[0], std::size(b), NULL, NULL);
+		printf("[NORMALLY-FATAL][%d] %s\n", int(Event), b);
+	}
+	void HandleError() {};
+} ErrOutImpl;
+
 void UD3D9FPRenderDevice::StaticConstructor()
 {
 	if (!g_options.renderingDisabled)
@@ -48,6 +60,7 @@ void UD3D9FPRenderDevice::StaticConstructor()
 
 		GNull = &LogOutImpl;
 		GLog = &LogOutImpl;
+		GError = &ErrOutImpl;
 #endif
 	}
 }
@@ -145,8 +158,6 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 
 void UD3D9FPRenderDevice::Exit()
 {
-	UD3D9FPRenderDevice::Viewport->ResizeViewport((BLIT_HardwarePaint | BLIT_Direct3D), 0, 0, 0);
-
 	GLog->Log(L"Direct3D 9 Fixed-Function Pipeline renderer exiting.");
 	g_DebugMenu.Shutdown();
 	m_HLRenderer.Shutdown();

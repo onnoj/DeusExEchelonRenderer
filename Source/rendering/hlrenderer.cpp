@@ -72,8 +72,6 @@ void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
 
 void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 {
-	m_MaterialDebugger.Update(Frame);
-
 	//Finally; render the UI:
 	m_LLRenderer->EndScene();
 	m_LLRenderer->BeginScene();
@@ -165,6 +163,7 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 			}
 		}
 	}
+	m_MaterialDebugger.Update(Frame);
 
 #if 0
 	//Kept as an example
@@ -229,61 +228,31 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 	//Render Remix warning screen
 	if (!IsDebuggerPresent())
 	{
-		m_LLRenderer->PushDeviceState();
-		{
-			D3DXMATRIX wm; D3DXMatrixIdentity(&wm);
-			D3DXMATRIX wmi; D3DXMatrixIdentity(&wmi);
-			D3DXMATRIX identity; D3DXMatrixIdentity(&identity);
-
-			FVector newOrigin = Frame->Coords.Origin - ((Frame->Coords.XAxis ^ Frame->Coords.YAxis) * 1.0f);
-
-			FCoords coords = Frame->Coords;
-			coords.Origin = newOrigin;
-			coords.XAxis = Frame->Coords.XAxis;
-			coords.YAxis = Frame->Coords.YAxis * -1.0f;
-			coords.ZAxis = Frame->Coords.ZAxis;
-			GetWorldMatrix(Frame, coords, &wm, &wmi);
-
-			D3DXMatrixTranslation(&wm, newOrigin.X, newOrigin.Y, newOrigin.Z);
-
-			StaticMeshesVertexBuffer buffer;
-			buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
-			buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
-			buffer.push_back({ { -1.0f,  1.0f, 0.0f },  {0.0f, 0.0f} });
-			buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
-			buffer.push_back({ {  1.0f,	-1.0f, 0.0f },  {1.0f, 1.0f} });
-			buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
-			if (m_TextureManager.BindTexture(PF_Unlit, m_TextureManager.GetFakeTexture()))
-			{
-				m_LLRenderer->SetRenderState(D3DRS_ZENABLE, 0);
-				m_LLRenderer->RenderTriangleList(wmi, buffer.data(), 2, buffer.size(), 0, 0);
-			}
-			m_LLRenderer->PopDeviceState();
-		}
+		//DrawFullscreenQuad(Frame, m_TextureManager.GetFakeTexture());
 	}
 
 	m_LLRenderer->PopDeviceState();
 }
 
-void HighlevelRenderer::DrawCube(FSceneNode* Frame, const FVector& Position, float Size/*=1.0f*/)
+void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, const DeusExD3D9TextureHandle& pTexture, float Size/*=1.0f*/)
 {
 	if (!g_options.hasDebugDraw)
 	{
 		return;
 	}
-
-	LowlevelRenderer::VertexPos3Color0 vertices[] = {
+	m_LLRenderer->PushDeviceState();
+	LowlevelRenderer::VertexPos3Tex0 vertices[] = {
 		// Front face
-		{{-0.5f, -0.5f, 0.5f}, 0xFF0000FF},  // Bottom left
-		{{0.5f, -0.5f, 0.5f}, 0xFF00FF00},   // Bottom right
-		{{0.5f, 0.5f, 0.5f}, 0xFFFF0000},    // Top right
-		{{-0.5f, 0.5f, 0.5f}, 0xFFFFFFFF},   // Top left
+		{{-0.5f, -0.5f, 0.5f}, {0.0f, 1.0f}},  // Bottom left
+		{{0.5f, -0.5f, 0.5f}, {1.0f, 1.0f}},   // Bottom right
+		{{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},    // Top right
+		{{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},   // Top left
 
 		// Back face
-		{{-0.5f, -0.5f, -0.5f}, 0xFF00FFFF}, // Bottom left
-		{{0.5f, -0.5f, -0.5f}, 0xFFFF00FF},  // Bottom right
-		{{0.5f, 0.5f, -0.5f}, 0xFFFFFF00},   // Top right
-		{{-0.5f, 0.5f, -0.5f}, 0xFF000000}   // Top left
+		{{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}}, // Bottom left
+		{{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f}},  // Bottom right
+		{{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f}},   // Top right
+		{{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f}}   // Top left
 	};
 
 	// Define the indices for the triangles
@@ -318,19 +287,33 @@ void HighlevelRenderer::DrawCube(FSceneNode* Frame, const FVector& Position, flo
 		Position.X, Position.Y, Position.Z
 	));
 
+	uint32_t vtxCount = 0;
+	StaticMeshesVertexBuffer buffer;
 	const auto faces = std::size(indices)/3;
 	for (int i = 0; i < faces; ++i) {
-		LowlevelRenderer::VertexPos3Color0 vertex0 = vertices[indices[(i * 3) + 0]];
-		LowlevelRenderer::VertexPos3Color0 vertex1 = vertices[indices[(i * 3) + 1]];
-		LowlevelRenderer::VertexPos3Color0 vertex2 = vertices[indices[(i * 3) + 2]];
-		D3DXVec3TransformCoord(&vertex0.Pos, &vertices[indices[(i * 3) + 0]].Pos, &wm);
-		D3DXVec3TransformCoord(&vertex1.Pos, &vertices[indices[(i * 3) + 1]].Pos, &wm);
-		D3DXVec3TransformCoord(&vertex2.Pos, &vertices[indices[(i * 3) + 2]].Pos, &wm);
-		m_DebugMesh.buffer.push_back(vertex0);
-		m_DebugMesh.buffer.push_back(vertex1);
-		m_DebugMesh.buffer.push_back(vertex2);
-		m_DebugMesh.primitiveCount++;
+		LowlevelRenderer::VertexPos3Tex0 vertex0 = vertices[indices[(i * 3) + 0]];
+		LowlevelRenderer::VertexPos3Tex0 vertex1 = vertices[indices[(i * 3) + 1]];
+		LowlevelRenderer::VertexPos3Tex0 vertex2 = vertices[indices[(i * 3) + 2]];
+		buffer.push_back(vertex0);
+		buffer.push_back(vertex1);
+		buffer.push_back(vertex2);
 	}
+	uint32_t hash = 0;
+	MurmurHash3_x86_32(buffer.data(), buffer.size() * sizeof(buffer[0]), 0, &hash);
+	if (m_TextureManager.BindTexture(PF_Modulated, pTexture))
+	{
+		SetViewState(Frame, ViewType::game);
+		SetProjectionState(Frame, ProjectionType::perspective);
+
+		m_LLRenderer->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
+		m_LLRenderer->SetRenderState(D3DRS_ALPHATESTENABLE, 0);
+		m_LLRenderer->SetRenderState(D3DRS_ZENABLE, 0);
+		m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 1);
+		m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+
+		m_LLRenderer->RenderTriangleList(wm, buffer.data(), faces, buffer.size(), hash, 0);
+	}
+	m_LLRenderer->PopDeviceState();
 }
 
 void HighlevelRenderer::Draw3DLine(FSceneNode* Frame, const FVector& PositionFrom, const FVector& PositionTo, FColor Color, float Size/* = 1.0f*/)
@@ -359,6 +342,51 @@ void HighlevelRenderer::Draw3DLine(FSceneNode* Frame, const FVector& PositionFro
 	m_DebugMesh.buffer.push_back({ {triangle2[1].X, triangle2[1].Y, triangle2[1].Z}, 0xFF000000 | Color.TrueColor()});
 	m_DebugMesh.buffer.push_back({ {triangle2[2].X, triangle2[2].Y, triangle2[2].Z}, 0xFF000000 | Color.TrueColor()});
 	m_DebugMesh.primitiveCount++;
+}
+
+void HighlevelRenderer::DrawFullscreenQuad(FSceneNode* Frame, const DeusExD3D9TextureHandle& pTexture)
+{
+	m_LLRenderer->PushDeviceState();
+	{
+		D3DXMATRIX wm; D3DXMatrixIdentity(&wm);
+		D3DXMATRIX wmi; D3DXMatrixIdentity(&wmi);
+		D3DXMATRIX identity; D3DXMatrixIdentity(&identity);
+
+		FVector newOrigin = Frame->Coords.Origin - ((Frame->Coords.XAxis ^ Frame->Coords.YAxis) * 1.0f);
+
+		FCoords coords = Frame->Coords;
+		coords.Origin = newOrigin;
+		coords.XAxis = Frame->Coords.XAxis;
+		coords.YAxis = Frame->Coords.YAxis * -1.0f;
+		coords.ZAxis = Frame->Coords.ZAxis;
+		GetWorldMatrix(Frame, coords, &wm, &wmi);
+
+		D3DXMatrixTranslation(&wm, newOrigin.X, newOrigin.Y, newOrigin.Z);
+
+		StaticMeshesVertexBuffer buffer;
+		buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
+		buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
+		buffer.push_back({ { -1.0f,  1.0f, 0.0f },  {0.0f, 0.0f} });
+		buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
+		buffer.push_back({ {  1.0f,	-1.0f, 0.0f },  {1.0f, 1.0f} });
+		buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
+		uint32_t hash = 0;
+		MurmurHash3_x86_32(buffer.data(), buffer.size() * sizeof(buffer[0]), 0, &hash);
+		if (m_TextureManager.BindTexture(PF_Unlit, pTexture))
+		{
+			SetViewState(Frame, ViewType::game);
+			SetProjectionState(Frame, ProjectionType::perspective);
+
+			m_LLRenderer->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
+			m_LLRenderer->SetRenderState(D3DRS_ALPHATESTENABLE, 0);
+			m_LLRenderer->SetRenderState(D3DRS_ZENABLE, 0);
+			m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 1);
+			m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+
+			m_LLRenderer->RenderTriangleList(wmi, buffer.data(), 2, buffer.size(), hash, 0);
+		}
+	}
+	m_LLRenderer->PopDeviceState();
 }
 
 void HighlevelRenderer::OnLevelChange()

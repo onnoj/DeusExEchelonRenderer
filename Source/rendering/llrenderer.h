@@ -10,6 +10,7 @@
 class LowlevelRenderer
 {
 	friend class HighlevelRenderer;
+	friend class MaterialDebugger;
 public:
 	struct VertexPos3Tex0;
 	struct VertexPos3Tex0to4;

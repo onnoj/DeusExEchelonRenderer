@@ -23,9 +23,9 @@ public:
 	void SetViewState(FSceneNode* Frame, ViewType viewType);
 	void SetProjectionState(FSceneNode* Frame, ProjectionType projection);
 
-	void DrawCube(FSceneNode* Frame, const FVector& Position, float Size = 1.0f);
+	void Draw3DCube(FSceneNode* Frame, const FVector& Position, const DeusExD3D9TextureHandle& pTexture, float Size = 1.0f);
 	void Draw3DLine(FSceneNode* Frame, const FVector& PositionFrom, const FVector& PositionTo, FColor Color, float Size = 1.0f);
-
+	void DrawFullscreenQuad(FSceneNode* Frame, const DeusExD3D9TextureHandle& pTexture);
 	void OnRenderingBegin(FSceneNode* Frame);
 	void OnRenderingEnd(FSceneNode* Frame);
 	void OnSceneBegin(FSceneNode* Frame);

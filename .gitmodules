@@ -18,3 +18,6 @@
 	path = EXTERNAL/SDL2
 	url = https://github.com/libsdl-org/SDL.git
 	branch = SDL2
+[submodule "EXTERNAL/json"]
+	path = EXTERNAL/json
+	url = https://github.com/nlohmann/json.git

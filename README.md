@@ -70,6 +70,7 @@ Several external libraries are used, you can find more information about their l
 * IMGUI  - MIT License - Copyright (c) 2014-2023 Omar Cornut
 * xxHash Library - BSD 2-Clause License - Copyright (c) 2012-2021 Yann Collet
 * SMHasher - MIT License
+* nlohmann/json - MIT License
 
 ## Acknowledgements
 

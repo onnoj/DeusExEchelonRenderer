@@ -44,6 +44,7 @@ jobs:
         name: DeusExEchelonRenderer-${{env.GITHUB_SHA_SHORT}}-${{github.run_number}}
         path: |
           ${{github.workspace}}/dist/*
+          ${{github.workspace}}/BIN/DEV/*
 
     - name: Fetch core-mod
       working-directory: "${{ github.workspace }}"

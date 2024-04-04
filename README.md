@@ -71,11 +71,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Several external libraries are used, you can find more information about their licenses in the .\EXTERNAL\ directory:
 * PolyHook 2.0 - MIT License - Copyright (c) 2018 Stephen Eckels
 * Simple DirectMedia Layer - ZLib License - Copyright (C) 1997-2020 Sam Lantinga
-* FMT - MIT License - Copyright (c) 2012 - present, Victor Zverovich
 * IMGUI  - MIT License - Copyright (c) 2014-2023 Omar Cornut
 * xxHash Library - BSD 2-Clause License - Copyright (c) 2012-2021 Yann Collet
 * SMHasher - MIT License
 * nlohmann/json - MIT License
+* eliaskosunen/scnlib - Apache License - No modifications were made to the library.
 
 ## Acknowledgements
 

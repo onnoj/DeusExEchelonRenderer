@@ -16,7 +16,6 @@
 #include <Windows.h>
 #include <string>
 #include <functional>
-#include <fmt/core.h>
 #include <chrono>
 #include <cassert>
 #include <MurmurHash3.h>

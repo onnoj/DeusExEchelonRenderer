@@ -3,7 +3,6 @@
 
 #include <MurmurHash3.cpp>
 #include <xxhash.c>
-#include <fmt/format.h>
 #include <TlHelp32.h> // Need to include this for CreateToolhelp32Snapshot
 
 #include <Psapi.h>

@@ -33,12 +33,13 @@ include_directories(AFTER "${CMAKE_SOURCE_DIR}/INCLUDE/DeusEx/DeusEx/Inc/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/INCLUDE/DeusEx/System/Inc/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/INCLUDE/DeusEx/Extension/Inc/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/imgui/")
-include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/fmt/include/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/murmurhash/src/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/PolyHook_2_0/polyhook2/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/${SDL2_VERSION}/include/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/xxHash/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/json/include/")
+include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/CLI11/include/")
+include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/scnlib/include/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/SOURCE")
 
 set (CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};${CMAKE_SOURCE_DIR}/LIB/")
@@ -57,14 +58,18 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/BIN/)
 set_property(GLOBAL PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 set(CMAKE_FOLDER "EXTERNAL")
-add_subdirectory ("EXTERNAL/fmt" EXCLUDE_FROM_ALL)
 
 set(POLYHOOK_OS "windows")
 set(POLYHOOK_BUILD_STATIC_RUNTIME OFF)
 add_subdirectory ("EXTERNAL/PolyHook_2_0" EXCLUDE_FROM_ALL)
 
+add_subdirectory ("EXTERNAL/scnlib" EXCLUDE_FROM_ALL)
+
+
+
 unset(CMAKE_FOLDER)
 add_subdirectory (Source)
+add_subdirectory (TOOLS/ingestionhelper)
 
 
-install(DIRECTORY "${CMAKE_SOURCE_DIR}/BIN/" DESTINATION 	"${EE_DEUSEXFOLDER}")
+

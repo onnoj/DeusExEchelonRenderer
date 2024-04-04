@@ -1,6 +1,6 @@
 #Configure project settings:
 add_definitions(-D_DLL -DEE_LIBDLL -DDEUSEX=1) 
-
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/USER/)
 set(DEUSEX_INT_FILE "DeusExEchelonRenderer.int")
 set(DEUSEX_RTX_FILE "rtx.conf")
 add_compile_definitions("CONVERT_TO_LEFTHANDED_COORDINATES=1")
@@ -80,8 +80,7 @@ set(DEUSEX_LIBS
 target_link_libraries (DeusExEchelonRenderer ${DEUSEX_LIBS})
 #target_link_libraries (DeusExEchelonRenderer debug ${LIB_DEBUG_Effects11} OPTIMIZED ${LIB_Effects11})
 
-find_package(fmt)
-target_link_libraries(DeusExEchelonRenderer fmt::fmt PolyHook_2)
+target_link_libraries(DeusExEchelonRenderer PolyHook_2)
 
 if(MSVC)
 	add_definitions(-D_UNICODE -DUNICODE)
@@ -103,6 +102,8 @@ target_precompile_headers(DeusExEchelonRenderer
 	PRIVATE
 	"DeusExEchelonRenderer_PCH.h"
 )
+
+install(DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" DESTINATION "${EE_DEUSEXFOLDER}")
 install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_INT_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
 install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_RTX_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
 install(FILES "${CMAKE_SOURCE_DIR}/EXTERNAL/${SDL2_VERSION}/lib/x86/SDL2.dll" DESTINATION 	"${EE_DEUSEXFOLDER}")

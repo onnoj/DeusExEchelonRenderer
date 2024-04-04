@@ -2,9 +2,6 @@
 	path = EXTERNAL/imgui
 	url = https://github.com/ocornut/imgui.git
 	branch = docking
-[submodule "EXTERNAL/fmt"]
-	path = EXTERNAL/fmt
-	url = https://github.com/fmtlib/fmt.git
 [submodule "EXTERNAL/murmurhash"]
 	path = EXTERNAL/murmurhash
 	url = https://github.com/aappleby/smhasher.git
@@ -21,3 +18,9 @@
 [submodule "EXTERNAL/json"]
 	path = EXTERNAL/json
 	url = https://github.com/nlohmann/json.git
+[submodule "EXTERNAL/CLI11"]
+	path = EXTERNAL/CLI11
+	url = https://github.com/CLIUtils/CLI11.git
+[submodule "EXTERNAL/scnlib"]
+	path = EXTERNAL/scnlib
+	url = https://github.com/eliaskosunen/scnlib.git

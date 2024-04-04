@@ -68,6 +68,11 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 		hr = m_Device->Reset(&d3dpp);
 		GLog->Log(SUCCEEDED(hr) ? L"Reset Direct3D 9 device" : L"Failed to reset D3D9 device");
 	}
+	if (!SUCCEEDED(hr))
+	{
+		GWarn->Logf(L"Error code: %08x", hr);
+	}
+
 	if (hr == D3DERR_DEVICELOST)
 	{
 		return false;

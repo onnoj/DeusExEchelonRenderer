@@ -70,12 +70,12 @@ void DebugMenu::Init()
 void DebugMenu::Shutdown()
 {
   if (!EE_HAS_IMGUI() || !m_Initialized) return;
+  m_Initialized = false;
   ImGui_ImplDX11_Shutdown();
   ImGui_ImplSDL2_Shutdown();
   CleanupRenderTarget();
   CleanupDeviceD3D();
   ImGui::DestroyContext();
-  m_Initialized = false;
 }
 
 void DebugMenu::Render()
@@ -151,7 +151,6 @@ bool DebugMenu::CreateDeviceD3D(HWND hWnd)
 
 void DebugMenu::CleanupDeviceD3D()
 {
-  if (!EE_HAS_IMGUI() || !m_Initialized) return;
   CleanupRenderTarget();
   if (m_SwapChain) { m_SwapChain->Release(); m_SwapChain = nullptr; }
   if (m_D3DDeviceContext) { m_D3DDeviceContext->Release(); m_D3DDeviceContext = nullptr; }
@@ -170,7 +169,6 @@ void DebugMenu::CreateRenderTarget()
 
 void DebugMenu::CleanupRenderTarget()
 {
-  if (!EE_HAS_IMGUI() || !m_Initialized) return;
   if (m_MainRenderTargetView) { m_MainRenderTargetView->Release(); m_MainRenderTargetView = nullptr; }
 }
 

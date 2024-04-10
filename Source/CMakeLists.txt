@@ -1,9 +1,13 @@
-#Configure project settings:
+#---------------------------------------------------------------------------------------------------
+#General project settings:
 add_definitions(-D_DLL -DEE_LIBDLL -DDEUSEX=1) 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/USER/)
 set(DEUSEX_INT_FILE "DeusExEchelonRenderer.int")
 set(DEUSEX_RTX_FILE "rtx.conf")
 add_compile_definitions("CONVERT_TO_LEFTHANDED_COORDINATES=1")
+
+#---------------------------------------------------------------------------------------------------
+# Helpers
 
 macro(deusex_replace_cmake_cxx_flags from to)
 	set(CompilerFlags
@@ -18,6 +22,33 @@ macro(deusex_replace_cmake_cxx_flags from to)
 		string(REPLACE "${from}" "${to}" ${CompilerFlag} "${${CompilerFlag}}")
 	endforeach()
 endmacro()
+
+macro(deusex_modify_resourcerc)
+	if(DEFINED ENV{CICD_REF})
+        set(VERSION_REGEX "refs/tags/v([0-9]+)\.([0-9]+)\.([0-9]+)(.*)")
+        string(REGEX MATCHALL ${VERSION_REGEX} VERSION_MATCHES $ENV{CICD_REF})
+        if (VERSION_MATCHES)
+			message(STATUS "Versionmatches = ${VERSION_MATCHES}")
+            set(VERSION_MAJOR ${CMAKE_MATCH_1})
+            set(VERSION_MINOR ${CMAKE_MATCH_2})
+            set(VERSION_PATCH ${CMAKE_MATCH_3})
+			
+			file(STRINGS "DeusExEchelonRenderer.rc" RES_FILE_CONTENTS NEWLINE_CONSUME)
+			string(REPLACE "1,2,3,4" "${VERSION_MAJOR},${VERSION_MINOR},${VERSION_PATCH},0" RES_FILE_CONTENTS "${RES_FILE_CONTENTS}")
+			string(REPLACE "1.2.3.4" "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}" RES_FILE_CONTENTS "${RES_FILE_CONTENTS}")
+			file(WRITE "DeusExEchelonRenderer.rc" "${RES_FILE_CONTENTS}\n")
+        else()
+            message(STATUS "Environment variable CICD_REF ($ENV{CICD_REF}) does not match the expected pattern.")
+        endif()
+    else()
+        message(STATUS "Environment variable CICD_REF ($ENV{CICD_REF}) is not defined, version file not updated.")
+    endif()
+endmacro()
+
+deusex_modify_resourcerc()
+
+#---------------------------------------------------------------------------------------------------
+# Source files, etc
 
 set(SRC_BASE
 	"uefacade.cpp"
@@ -57,11 +88,11 @@ set(HDR_BASE
 	"${DEUSEX_INT_FILE}"
 	"${DEUSEX_RTX_FILE}"
 )
-add_library (DeusExEchelonRenderer SHARED ${SRC_BASE} ${HDR_BASE})
 
-#source_group("Header Files" FILES ${HDR_BASE})
-source_group(TREE "${CMAKE_SOURCE_DIR}/Source" PREFIX "Source Files" FILES ${SRC_BASE})
-source_group(TREE "${CMAKE_SOURCE_DIR}/Source" PREFIX "Header Files" FILES ${HDR_BASE})
+#---------------------------------------------------------------------------------------------------
+# Configure project output
+add_library (DeusExEchelonRenderer SHARED ${SRC_BASE} ${HDR_BASE})
+target_sources(DeusExEchelonRenderer PRIVATE DeusExEchelonRenderer.rc)
 
 set_source_files_properties(${HDR_BASE} PROPERTIES HEADER_FILE_ONLY 1)
 find_library(LIB_DEUSEX "deusex.lib")
@@ -78,8 +109,6 @@ set(DEUSEX_LIBS
 	"${LIB_D3D9}" "${LIB_D3DX9}" "${LIB_SDL2}"
 	)
 target_link_libraries (DeusExEchelonRenderer ${DEUSEX_LIBS})
-#target_link_libraries (DeusExEchelonRenderer debug ${LIB_DEBUG_Effects11} OPTIMIZED ${LIB_Effects11})
-
 target_link_libraries(DeusExEchelonRenderer PolyHook_2)
 
 if(MSVC)
@@ -103,6 +132,13 @@ target_precompile_headers(DeusExEchelonRenderer
 	"DeusExEchelonRenderer_PCH.h"
 )
 
+#---------------------------------------------------------------------------------------------------
+# Configure IDE
+source_group(TREE "${CMAKE_SOURCE_DIR}/Source" PREFIX "Source Files" FILES ${SRC_BASE})
+source_group(TREE "${CMAKE_SOURCE_DIR}/Source" PREFIX "Header Files" FILES ${HDR_BASE})
+
+#---------------------------------------------------------------------------------------------------
+# Configure INSTALL target
 install(DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" DESTINATION "${EE_DEUSEXFOLDER}")
 install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_INT_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
 install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_RTX_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")

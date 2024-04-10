@@ -29,6 +29,7 @@ jobs:
     - name: Configure CMake
       env:
         CICD_REFNAME: ${{  github.ref_name }}
+        CICD_REF: ${{ github.ref }}
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -G"Visual Studio 17 2022" -A win32 -DEE_DEUSEXFOLDER=${{github.workspace}}/dist
 
     - name: Build

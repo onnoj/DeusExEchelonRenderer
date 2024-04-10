@@ -8,6 +8,8 @@ assignees: ''
 ---
 
 ```The following is a template you can use to fill out your bug report; feel free to delete what you don't use!```
+```Use the 'preview' tab to easily read the template (especially any URLs!)```
+```Don't forget to remove these three lines before submitting!```
 
 **Describe the bug**
 * A clear and concise description of what the bug is.

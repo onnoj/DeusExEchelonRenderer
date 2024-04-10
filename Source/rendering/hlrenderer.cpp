@@ -26,7 +26,7 @@ void HighlevelRenderer::Initialize(LowlevelRenderer* pLLRenderer)
 	m_LLRenderer = pLLRenderer;
 	m_TextureManager.Initialize(m_LLRenderer);
 	m_LightManager.Initialize(m_LLRenderer);
-	GLog->Log(L"HLRenderer Initialized");
+	GLog->Log(L"[EchelonRenderer]\t HLRenderer Initialized");
 }
 
 void HighlevelRenderer::Shutdown()
@@ -40,7 +40,7 @@ void HighlevelRenderer::Shutdown()
 	m_LightManager.Shutdown();
 	m_TextureManager.Shutdown();
 	m_LLRenderer = nullptr;
-	GLog->Log(L"HLRenderer shutdown");
+	GLog->Log(L"[EchelonRenderer]\t HLRenderer shutdown");
 }
 
 void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)

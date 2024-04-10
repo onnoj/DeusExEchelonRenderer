@@ -15,13 +15,18 @@
 bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen)
 {
 	check(IsWindow(hWnd));
-	GLog->Log(L"Initializing LLRenderer");
+	GLog->Log(L"[EchelonRenderer]\t Initializing LLRenderer");
 	HRESULT hr{};
 	if (m_API == nullptr)
 	{
-		GLog->Log(L"Initializing Direct3D 9 API");
+		GLog->Log(L"[EchelonRenderer]\t Initializing Direct3D 9 API");
 		m_API = Direct3DCreate9(D3D_SDK_VERSION);
 		check(m_API != nullptr);
+		if (m_API == nullptr)
+		{
+			GWarn->Logf(L"[EchelonRenderer-WARN]\t Failed to initialize D3D9/Remix API; last error code was %08x", GetLastError());
+			return false;
+		}
 	}
 	
 	m_outputSurface.colorBytes = pColorBytes;
@@ -29,14 +34,12 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 	if (pFullscreen)
 	{
 		auto res = FindClosestResolution(pWidth, pHeight);
+		GLog->Logf(L"[EchelonRenderer]\t Fullscreen was requested, matched %dx%d to available resolution %dx%d.", pWidth, pHeight, res.Width, res.Height);
 		pWidth = res.Width;
 		pHeight = res.Height;
 	}
 
 	ResizeDisplaySurface(0, 0, pWidth, pHeight, pFullscreen);
-	//
-		//if(!LowlevelRenderer::findAALevel()) //Clamp MSAA option to max supported level.
-	//  return 0;
 
 	D3DPRESENT_PARAMETERS d3dpp;
 	ZeroMemory(&d3dpp, sizeof(d3dpp));
@@ -61,28 +64,47 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 			D3DCREATE_HARDWARE_VERTEXPROCESSING,
 			&d3dpp,
 			&m_Device);
-		GLog->Log(SUCCEEDED(hr) ? L"Initialized Direct3D 9 device" : L"Failed to initialize D3D9 device");
+		GLog->Log(SUCCEEDED(hr) ? L"[EchelonRenderer]\t Initialized Direct3D 9 device" : L"[EchelonRenderer]\t Failed to initialize D3D9 device");
 	}
 	else 
 	{
 		hr = m_Device->Reset(&d3dpp);
-		GLog->Log(SUCCEEDED(hr) ? L"Reset Direct3D 9 device" : L"Failed to reset D3D9 device");
-	}
-	if (!SUCCEEDED(hr))
-	{
-		GWarn->Logf(L"Error code: %08x", hr);
+		GLog->Log(SUCCEEDED(hr) ? L"[EchelonRenderer]\t Reset Direct3D 9 device" : L"[EchelonRenderer]\t Failed to reset D3D9 device");
 	}
 
-	if (hr == D3DERR_DEVICELOST)
+	if (!SUCCEEDED(hr))
 	{
-		return false;
-	}
-	if (hr == D3DERR_NOTAVAILABLE)
-	{
-		return false;
-	}
-	if (hr == D3DERR_INVALIDCALL)
-	{
+		GWarn->Logf(L"[EchelonRenderer-WARN]\t Error code was: %08x", hr);
+		GLog->Logf(L"d3dpp.Windowed = %d", d3dpp.Windowed);
+		GLog->Logf(L"d3dpp.hDeviceWindow = 0x%x", d3dpp.hDeviceWindow);
+		GLog->Logf(L"d3dpp.SwapEffect = %d", d3dpp.SwapEffect);
+		GLog->Logf(L"d3dpp.BackBufferFormat = %d", d3dpp.BackBufferFormat);
+		GLog->Logf(L"d3dpp.BackBufferWidth = %d", d3dpp.BackBufferWidth);
+		GLog->Logf(L"d3dpp.BackBufferHeight = %d", d3dpp.BackBufferHeight);
+		GLog->Logf(L"d3dpp.BackBufferCount = %d", d3dpp.BackBufferCount);
+		GLog->Logf(L"d3dpp.EnableAutoDepthStencil = %d", d3dpp.EnableAutoDepthStencil);
+		GLog->Logf(L"d3dpp.AutoDepthStencilFormat = %d", d3dpp.AutoDepthStencilFormat);
+		GLog->Logf(L"d3dpp.Flags = %x", d3dpp.Flags);
+		GLog->Logf(L"d3dpp.PresentationInterval = %d", d3dpp.PresentationInterval);
+		GLog->Logf(L"d3dpp.FullScreen_RefreshRateInHz = %d", d3dpp.FullScreen_RefreshRateInHz);
+
+		if (hr == D3DERR_DEVICELOST)
+		{
+			GWarn->Log(L"[EchelonRenderer-WARN]\t Device lost while initializing or resetting device, retrying...");
+			return false;
+		}
+		if (hr == D3DERR_NOTAVAILABLE)
+		{
+			GWarn->Log(L"[EchelonRenderer-WARN]\t Device does not support the requested parameters.");
+			return false;
+		}
+		if (hr == D3DERR_INVALIDCALL)
+		{
+			GWarn->Log(L"[EchelonRenderer-WARN]\t Device was passed invalid parameters.");
+			return false;
+		}
+
+		GError->Logf(L"Unrecoverable error when (re)initializing the d3d9 device.");
 		return false;
 	}
 	check(SUCCEEDED(hr));
@@ -97,11 +119,24 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 		&m_DepthStencilSurface,
 		nullptr
 	);
-	if (hr == D3DERR_DEVICELOST)
+	if (!SUCCEEDED(hr))
 	{
+		GWarn->Logf(L"[EchelonRenderer-WARN]\t Error code was: %08x", hr);
+		GLog->Logf(L"m_outputSurface.Width = %d", m_outputSurface.width);
+		GLog->Logf(L"m_outputSurface.height = %d", m_outputSurface.height);
+
+		if (hr == D3DERR_DEVICELOST)
+		{
+			GWarn->Log(L"[EchelonRenderer-WARN]\t Device lost while creating DepthStencilSurface, retrying...");
+			return false;
+		}
+
+		GError->Logf(L"Unrecoverable error when creating the Depth Stencil buffer.");
 		return false;
 	}
 	check(SUCCEEDED(hr));
+
+	///
 
 	if (m_fakeLightBuffer == nullptr)
 	{
@@ -175,7 +210,7 @@ void LowlevelRenderer::Shutdown()
 	}
 #endif
 
-	GLog->Log(L"LLRenderer shutdown");
+	GLog->Log(L"[EchelonRenderer]\t LLRenderer shutdown");
 	::Sleep(100);
 }
 
@@ -219,7 +254,7 @@ void LowlevelRenderer::RenderTriangleListBuffer(const D3DXMATRIX& pWm, DWORD pFV
 		);
 		if (!SUCCEEDED(hr))
 		{
-			GWarn->Logf(L"D3D failed to create vertex buffer, error 0x%08x", hr);
+			GWarn->Logf(L"[EchelonRenderer-WARN]\t D3D failed to create vertex buffer, error 0x%08x", hr);
 			return;
 		}
 		m_vtxBufferAllocations++;
@@ -489,6 +524,7 @@ bool LowlevelRenderer::ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint3
 	m_outputSurface.fullscreen = pFullScreen;
 	if (surfaceChanged && m_Device != nullptr)
 	{
+		GWarn->Log(L"Render surface has changed, we need to shutdown and reinitialize the renderer.");
 		Shutdown();
 		Initialize((HWND)GRenderDevice->Viewport->GetWindow(), pWidth, pHeight, m_outputSurface.colorBytes, pFullScreen);
 	}
@@ -552,7 +588,7 @@ bool LowlevelRenderer::ValidateViewport(uint32_t pLeft, uint32_t pTop, uint32_t 
 		d3dViewport.MaxZ = LowlevelRenderer::FarRange;
 		if (FAILED(m_Device->SetViewport(&d3dViewport)))
 		{
-			GLog->Logf(L"Failed to resized viewport to %dx%d", pWidth, pHeight);
+			GLog->Logf(L"[EchelonRenderer]\t Failed to resized viewport to %dx%d", pWidth, pHeight);
 			return false;
 		}
 
@@ -859,27 +895,27 @@ std::vector<D3DDISPLAYMODE> LowlevelRenderer::GetDisplayModes() const
 	static std::vector<D3DDISPLAYMODE> lastDisplayModes;
 
 	if (!m_API)
-		return displayModes;
-
-	UINT adapterCount = m_API->GetAdapterCount();
-	if (adapterCount == 0)
-	{ //bit of a hack, for some reason we can get in a situation where getAdapterCount returns 0...
+	{
 		return lastDisplayModes;
 	}
 
-	for (UINT adapter = 0; adapter < adapterCount; ++adapter) {
-		UINT modeCount = m_API->GetAdapterModeCount(adapter, D3DFMT_X8R8G8B8);
-		for (UINT mode = 0; mode < modeCount; ++mode) {
-			D3DDISPLAYMODE modeInfo;
-			if (SUCCEEDED(m_API->EnumAdapterModes(adapter, D3DFMT_X8R8G8B8, mode, &modeInfo))) {
-				displayModes.push_back(modeInfo);
-			}
+	const auto modeCount = m_API->GetAdapterModeCount(D3DADAPTER_DEFAULT, D3DFMT_X8R8G8B8);
+	if (modeCount == 0)
+	{
+		//HACK: might be a remix bug, but, there were some cases where this briefly returned 0 for all adapters, when resizing.
+		return lastDisplayModes;
+	}
+
+	for (auto modeIndex = 0; modeIndex < modeCount; modeIndex++) {
+		D3DDISPLAYMODE modeInfo{};
+		if (SUCCEEDED(m_API->EnumAdapterModes(D3DADAPTER_DEFAULT, D3DFMT_X8R8G8B8, modeIndex, &modeInfo))) {
+			displayModes.push_back(modeInfo);
 		}
 	}
 
 	std::sort(displayModes.begin(), displayModes.end(), [](const D3DDISPLAYMODE& pLH, const D3DDISPLAYMODE& pRH) {
-		return (pLH.Width > pRH.Width) && (pLH.Height > pRH.Height);
-		});
+		return ((pLH.Width > pRH.Width) || ((pLH.Width == pRH.Width && pLH.Height > pRH.Height)));
+	});
 	lastDisplayModes = displayModes;
 	return displayModes;
 }

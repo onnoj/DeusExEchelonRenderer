@@ -88,7 +88,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 	InstallFDynamicItemFilterHacks();
 
 	Misc::setRendererFacade(this);
-	GLog->Log(L"Initializing Direct3D 9 Fixed-Function Pipeline renderer.");
+	GLog->Log(L"[EchelonRenderer]\t Initializing Direct3D 9 Fixed-Function Pipeline renderer.");
 	g_DebugMenu.Init();
 
 	//We set the following variables to inform the engine of our capabilities. 
@@ -113,6 +113,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 	UD3D9FPRenderDevice::Viewport->ResizeViewport(BLIT_HardwarePaint | BLIT_Direct3D);
 	UBOOL Result = UD3D9FPRenderDevice::Viewport->ResizeViewport(blitType, pWidth, pHeight, pColorBytes);
 	if (!Result) {
+		GError->Logf(L"[EchelonRenderer]\t Unreal Engine failed to resize the viewport with parameters {type:%x, width:%d, height:%d, color:%x}", blitType, pWidth, pHeight, pColorBytes);
 		return 0;
 	}
 
@@ -121,6 +122,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 	{
 		if (!m_LLRenderer.Initialize((HWND)pInViewport->GetWindow(), pWidth, pHeight, pColorBytes, pFullscreen))
 		{
+			GWarn->Logf(L"[EchelonRenderer]\t Renderer failed to initialize with parameters {type: %x, width:%d, height:%d, color:%x}", blitType, pWidth, pHeight, pColorBytes);
 			::Sleep(500);
 			continue;
 		}
@@ -130,7 +132,8 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 
 	if (!rendererInitialized)
 	{
-		GError->Log(L"Failed to initialize the low-level renderer.");
+		this->Exec(L"SHOWLOG", *GLog);
+		GError->Log(L"Failed to initialize the low-level renderer. Please check DeusEx.log in either the game's System Folder or in the 'Deus Ex' folder in My Documents.");
 		return 0;
 	}
 
@@ -158,7 +161,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 
 void UD3D9FPRenderDevice::Exit()
 {
-	GLog->Log(L"Direct3D 9 Fixed-Function Pipeline renderer exiting.");
+	GLog->Log(L"[EchelonRenderer]\t Direct3D 9 Fixed-Function Pipeline renderer exiting.");
 	g_DebugMenu.Shutdown();
 	m_HLRenderer.Shutdown();
 	m_LLRenderer.Shutdown();
@@ -266,7 +269,7 @@ void UD3D9FPRenderDevice::Unlock(UBOOL Blit)
 		static auto lastUpdate = now;
 		if (now > lastUpdate + std::chrono::milliseconds(1000*10))
 		{
-			GLog->Logf(L"Frame duration: %2f ms", avgFrameDurationMs);
+			//GLog->Logf(L"[EchelonRenderer]\t Frame duration: %2f ms", avgFrameDurationMs);
 			lastUpdate = now;
 		}
 	}
@@ -366,7 +369,7 @@ UBOOL UD3D9FPRenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar)
 		}
 		else if (ParseCommand(&Cmd, L"GetRes"))
 		{
-			GLog->Log(L"Getting the list of resolutions (not implemented)");
+			GLog->Log(L"[EchelonRenderer]\t Getting the list of resolutions (not implemented)");
 			//TODO:
 			//TCHAR* resolutions=m_LLRenderer.getModes();
 			//Ar.Log(resolutions);
@@ -379,7 +382,7 @@ UBOOL UD3D9FPRenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar)
 			{
 				float b;
 				b = _wtof(ptr); //Get brightness value;
-				GLog->Logf(L"Setting brightness: %f (NOT IMPLEMENTED)", b);
+				GLog->Logf(L"[EchelonRenderer]\t Setting brightness: %f (NOT IMPLEMENTED)", b);
 				//TODO:
 				//m_LLRenderer.setBrightness(b);
 			}

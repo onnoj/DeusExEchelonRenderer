@@ -310,7 +310,7 @@ void MaterialDebugger::renderAllTextures()
 		}
 		texture->Unlock(textureInfo);
 	}
-	GLog->Logf(L"Rendered %d textures.", count);
+	GLog->Logf(L"[EchelonRenderer]\t Rendered %d textures.", count);
 #endif
 }
 
@@ -334,13 +334,13 @@ void MaterialDebugger::exportHashMappings(bool pLoadAllTextures)
 				for (int i = 0; i < textureFiles.Num(); i++)
 				{
 					auto textureFilePath = packagePath + textureFiles(i);
-					GLog->Logf(L"Texture package: %s", *textureFilePath);
+					GLog->Logf(L"[EchelonRenderer]\t Texture package: %s", *textureFilePath);
 					if (GFileManager->FileSize(*textureFilePath) > 0)
 					{
 						UObject* package = UObject::LoadPackage(NULL, *textureFilePath, LOAD_None);
 						if (package == nullptr || !package->IsA(UPackage::StaticClass()))
 						{
-							GLog->Logf(L"Was not able to load texture package %s", *textureFilePath);
+							GLog->Logf(L"[EchelonRenderer]\t Was not able to load texture package %s", *textureFilePath);
 							continue;
 						}
 						//UObject::ResetLoaders(package, 0, 1);

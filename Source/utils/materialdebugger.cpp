@@ -180,7 +180,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 		{
 			char b[32]{ 0 };
 			::sprintf(&b[0], "%08llx", t->remixHash);
-			if (remixTextureHashes.find(&b[0]) < 0)
+			if (remixTextureHashes.find(&b[0]) == std::string::npos)
 			{
 				if (!remixTextureHashes.empty())
 				{

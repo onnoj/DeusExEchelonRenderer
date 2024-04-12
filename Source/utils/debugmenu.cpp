@@ -15,6 +15,7 @@
 #include <backends/imgui_impl_dx11.cpp>
 
 #include <map>
+#include <algorithm>
 
 #pragma comment(lib, "d3d11.lib")
 
@@ -317,6 +318,7 @@ void DebugMenu::Update()
     if (ImGui::CollapsingHeader(categoryName.c_str(), expanded ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None))
     {
       expanded = true;
+      
       for (auto& itemPair : debugItems)
       {
         const auto& item = itemPair.second;

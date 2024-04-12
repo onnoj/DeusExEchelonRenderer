@@ -13,11 +13,11 @@
 #define TOKENIZE(s) TOKENIZE2(s)
 #endif
 //#define DebugMenuUniqueID() (g_options.hasDebugMenu ? (()).c_str()) : nullptr)
-#define DebugMenuUniqueID() (g_options.hasDebugMenu ? ([](){                            \
+#define DebugMenuUniqueID() (g_options.hasDebugMenu ? ([]()->uint64_t{                  \
   static std::string s = (std::string(__FILE__) + std::string(TOKENIZE(__LINE__)));     \
-  static uint32_t key = std::hash<std::string>()(s);                             \
+  static uint64_t key = (uint64_t(__LINE__)<<32) | uint64_t(std::hash<std::string>()(s));         \
   return key;                                                                           \
-}()) : 0)
+}()) : 0ull)
 
 using UETextureType = std::optional<uint32_t>;
 
@@ -58,7 +58,7 @@ public:
   void VisitTexture(FTextureInfo* pUETextureInfo);
   
   template <typename T>
-  void DebugVar(const char* pCategory, const char* pDisplayName, uint32_t pIdentifier, T& pmValue, DebugMenuValueOptions options = {});
+  void DebugVar(const char* pCategory, const char* pDisplayName, uint64_t pIdentifier, T& pmValue, DebugMenuValueOptions options = {});
 protected:
   bool CreateDeviceD3D(HWND _hwnd);
   void CleanupDeviceD3D();
@@ -73,11 +73,11 @@ protected:
   void getTypeVaListRead(std::function<void(std::va_list& outList)> pFunctor, DebugMenuTypes pType, void* pData);
   void getTypeVaListWrite(std::function<void(std::va_list& outList)> pFunctor, DebugMenuTypes pType, void* pData);
 private:
-  using DebugItemKey = uint32_t;
+  using DebugItemKey = uint64_t;
   struct DebugItemValue {
     std::string category;
     std::string displayName;
-    uint32_t identifier;
+    DebugItemKey identifier;
     std::string identifierString;
     DebugMenuTypes storageType = DebugMenuTypes::Undefined;
     void* storage = nullptr;
@@ -105,8 +105,8 @@ private:
   } m_TextureData[16];
   uint8_t m_FreeTextureIndex = 0;
 
-  using DebugMap = std::map<DebugItemKey, std::unique_ptr<DebugItemValue>>;
-  using CategoryDebugMap = std::unordered_map<DebugItemKey, std::tuple<std::string/*category*/, bool/*expanded*/, std::shared_ptr<DebugMap>>>;
+  using DebugMap = std::map<DebugItemKey, std::shared_ptr<DebugItemValue>>;
+  using CategoryDebugMap = std::map<DebugItemKey, std::tuple<std::string/*category*/, bool/*expanded*/, std::shared_ptr<DebugMap>>>;
   CategoryDebugMap m_DebugItems;
 };
 extern DebugMenu g_DebugMenu;
@@ -142,6 +142,10 @@ DebugMenu::DebugMenuTypes DebugMenu::getTypeIndex()
   {
     return DebugMenuTypes::Vector3f;
   }
+  if constexpr (std::is_same<T, D3DVECTOR>::value)
+  {
+    return DebugMenuTypes::Vector3f;
+  }
   if constexpr (std::is_same<T, bool>::value)
   {
     return DebugMenuTypes::Boolean;
@@ -163,7 +167,7 @@ DebugMenu::DebugMenuTypes DebugMenu::getTypeIndex()
 }
 
 template <typename T>
-void DebugMenu::DebugVar(const char* pCategory, const char* pDisplayName, uint32_t pIdentifier, T& pmValue, DebugMenuValueOptions options)
+void DebugMenu::DebugVar(const char* pCategory, const char* pDisplayName, uint64_t pIdentifier, T& pmValue, DebugMenuValueOptions options)
 {
   if (!g_options.hasDebugMenu)
   {
@@ -179,13 +183,13 @@ void DebugMenu::DebugVar(const char* pCategory, const char* pDisplayName, uint32
     categoryIt = m_DebugItems.emplace(categoryKey, std::make_tuple(pCategory, false, std::make_shared<DebugMap>())).first;
   }
 
-  const uint32_t key = pIdentifier;
+  const uint64_t key = pIdentifier;
   
   DebugMap& itemMap = *std::get<2>(categoryIt->second);//*((*categoryIt).second.second.get());
   auto itemIt = itemMap.find(key);
   if (itemIt == itemMap.end())
   {
-    itemIt = itemMap.emplace(key, std::make_unique<DebugItemValue>()).first;
+    itemIt = itemMap.emplace(key, std::make_shared<DebugItemValue>()).first;
     value = itemIt->second.get();
     value->category = pCategory;
     value->displayName = pDisplayName;
@@ -197,7 +201,7 @@ void DebugMenu::DebugVar(const char* pCategory, const char* pDisplayName, uint32
     value->valueOptions = options;
     value->op = DebugItemValue::operation::readFromSrc;
     char b[64]{};
-    sprintf(&b[0], "%d", value->identifier);
+    sprintf(&b[0], "%lld", value->identifier);
     value->identifierString = &b[0];
   }
   else

@@ -117,9 +117,9 @@ void LightManager::Render(FSceneNode* Frame)
 				float thetaBoost = 1.0f;
 				float phiBoost = 1.0f;
 				float rangeBoost = 1.0f;
-				g_DebugMenu.DebugVar("Lighting", "thetaBoost", DebugMenuUniqueID(), thetaBoost, {DebugMenuValueOptions::editor::slider, 1.0f, 50.0f});
-				g_DebugMenu.DebugVar("Lighting", "phiBoost", DebugMenuUniqueID(), phiBoost, {DebugMenuValueOptions::editor::slider, 1.0f, 50.0f});
-				g_DebugMenu.DebugVar("Lighting", "rangeBoost", DebugMenuUniqueID(), rangeBoost, {DebugMenuValueOptions::editor::slider, 1.0f, 50.0f});
+				g_DebugMenu.DebugVar("Lighting", "global spotlight thetaBoost", DebugMenuUniqueID(), thetaBoost, {DebugMenuValueOptions::editor::slider, 1.0f, 50.0f});
+				g_DebugMenu.DebugVar("Lighting", "global spotlight phiBoost", DebugMenuUniqueID(), phiBoost, {DebugMenuValueOptions::editor::slider, 1.0f, 50.0f});
+				g_DebugMenu.DebugVar("Lighting", "global spotlight rangeBoost", DebugMenuUniqueID(), rangeBoost, {DebugMenuValueOptions::editor::slider, 1.0f, 50.0f});
 
 				d3dLight.Type = D3DLIGHT_SPOT;
 				d3dLight.Range = light->WorldLightRadius() * rangeBoost;
@@ -184,6 +184,34 @@ void LightManager::Render(FSceneNode* Frame)
 #endif
 		d3dLight.Theta = 1.0f;
 		d3dLight.Phi = 1.0f;
+
+		D3DXVECTOR3 positionOffset{0.0f, 0.0f, 0.0f};
+		D3DXVECTOR3 directionOffset{0.0f, 0.0f, 0.0f};
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight diffuse R", DebugMenuUniqueID(), d3dLight.Diffuse.r, {DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight diffuse G", DebugMenuUniqueID(), d3dLight.Diffuse.g, {DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight diffuse B", DebugMenuUniqueID(), d3dLight.Diffuse.b, {DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight diffuse A", DebugMenuUniqueID(), d3dLight.Diffuse.a, {DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight specular R", DebugMenuUniqueID(), d3dLight.Specular.r, {DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight specular G", DebugMenuUniqueID(), d3dLight.Specular.g, {DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight specular B", DebugMenuUniqueID(), d3dLight.Specular.b, {DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight specular A", DebugMenuUniqueID(), d3dLight.Specular.a, {DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight position X", DebugMenuUniqueID(), positionOffset.x, {DebugMenuValueOptions::editor::slider, -100.0f, 100.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight position Y", DebugMenuUniqueID(), positionOffset.y, {DebugMenuValueOptions::editor::slider, -100.0f, 100.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight position Z", DebugMenuUniqueID(), positionOffset.z, {DebugMenuValueOptions::editor::slider, -100.0f, 100.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight direction X", DebugMenuUniqueID(), directionOffset.x, {DebugMenuValueOptions::editor::slider, -3.16f, 3.16f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight direction Y", DebugMenuUniqueID(), directionOffset.y, {DebugMenuValueOptions::editor::slider, -3.16f, 3.16f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight direction Z", DebugMenuUniqueID(), directionOffset.z, {DebugMenuValueOptions::editor::slider, -3.16f, 3.16f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight range", DebugMenuUniqueID(), d3dLight.Range, {DebugMenuValueOptions::editor::slider, 0.0f, 5000.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight falloff", DebugMenuUniqueID(), d3dLight.Falloff, {DebugMenuValueOptions::editor::slider, 0.0f, 5000.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight Attenuation0", DebugMenuUniqueID(), d3dLight.Attenuation0, {DebugMenuValueOptions::editor::slider, 0.0f, 2.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight Attenuation1", DebugMenuUniqueID(), d3dLight.Attenuation1, {DebugMenuValueOptions::editor::slider, 0.0f, 2.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight Attenuation2", DebugMenuUniqueID(), d3dLight.Attenuation2, {DebugMenuValueOptions::editor::slider, 0.0f, 2.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight theta", DebugMenuUniqueID(), d3dLight.Theta, {DebugMenuValueOptions::editor::slider, 0.0f, 50.0f});
+		g_DebugMenu.DebugVar("Lighting", "JCSpotlight phi", DebugMenuUniqueID(), d3dLight.Phi, {DebugMenuValueOptions::editor::slider, 0.0f, 50.0f});
+		d3dLight.Position = D3DXVECTOR3(d3dLight.Position) + positionOffset;
+		d3dLight.Direction = D3DXVECTOR3(d3dLight.Direction) + directionOffset;
+
+
 		m_LLRenderer->RenderLight((uint32_t)ReservedSlots::jcDentonLight, d3dLight);
 	}
 

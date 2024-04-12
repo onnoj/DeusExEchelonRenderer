@@ -137,29 +137,47 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 				}
 
 				auto flags = info.flags;
+				const bool isTranslucent = (flags & PF_Translucent) != 0;
+				const bool isUnlitEmissive = (flags & PF_Unlit) != 0; 
+				auto wm = info.worldMatrix;
+
 				if (pass == pass::solid)
 				{
-					if ((flags & PF_Translucent) != 0)
+					if (isTranslucent)
 					{
 						continue;
+					}
+
+					if (isUnlitEmissive)
+					{ //render without unlit flag
+						flags &= ~PF_Unlit;
 					}
 				} 
 				else if (pass == pass::translucent)
 				{
-					if ((flags & PF_Translucent) == 0)
+					if (!(isTranslucent || isUnlitEmissive))
 					{
+						continue;
+					}
+
+					if (isUnlitEmissive)
+					{
+						D3DXMATRIX s;
+						D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
+						D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+						m_TextureManager.BindTexture(flags, info.textureHandle);
+						m_LLRenderer->RenderTriangleList(wm, info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+
+						D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
+						D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+						m_TextureManager.BindTexture(flags, info.textureHandle);
+						m_LLRenderer->RenderTriangleList(wm, info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
 						continue;
 					}
 				}
 
-				if ((flags & PF_Unlit) != 0)
-				{
-					m_TextureManager.BindTexture(flags, info.textureHandle);
-					m_LLRenderer->RenderTriangleList(info.worldMatrix, info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
-					flags &= ~PF_Unlit;
-				}
 				m_TextureManager.BindTexture(flags, info.textureHandle);
-				m_LLRenderer->RenderTriangleList(info.worldMatrix, info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+				m_LLRenderer->RenderTriangleList(wm, info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
 			}
 		}
 	}

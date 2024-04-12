@@ -61,8 +61,8 @@ void IngestionHelper::processFiles()
         pName.replace(pos, strlen(pair.first), pair.second);
         pos += strlen(pair.second);
       }
-      return pName;
     }
+    return pName;
   };
 
   for (auto const& dir_entry : std::filesystem::directory_iterator{ m_InputFolder })

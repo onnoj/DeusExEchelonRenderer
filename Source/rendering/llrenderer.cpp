@@ -72,8 +72,6 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 		GLog->Log(SUCCEEDED(hr) ? L"[EchelonRenderer]\t Reset Direct3D 9 device" : L"[EchelonRenderer]\t Failed to reset D3D9 device");
 	}
 
-	m_Device->GetDeviceCaps(&m_caps);
-
 	if (!SUCCEEDED(hr))
 	{
 		GWarn->Logf(L"[EchelonRenderer-WARN]\t Error code was: %08x", hr);
@@ -110,6 +108,13 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 		return false;
 	}
 	check(SUCCEEDED(hr));
+
+	hr = m_Device->GetDeviceCaps(&m_caps);
+	if (FAILED(hr))
+	{
+		GWarn->Logf(L"[EchelonRenderer-WARN]\t Unable to pull device caps.  Error code was: %08x", hr);
+		return false;
+	}
 
 	hr = m_Device->CreateDepthStencilSurface(
 		m_outputSurface.width, // Width of the depth buffer surface

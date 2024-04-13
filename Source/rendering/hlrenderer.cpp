@@ -96,7 +96,7 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 		m_TextureManager.BindTexture(rc.flags, textureHandle);
 		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
 		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE /*D3DTA_CURRENT*/);
+		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
 		m_LLRenderer->RenderTriangleList(identityMatrix, rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
 	}
 	m_LLRenderer->PopDeviceState();

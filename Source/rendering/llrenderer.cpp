@@ -438,6 +438,13 @@ void LowlevelRenderer::BeginFrame()
 		g_DebugMenu.DebugVar("Rendering", "Wireframe", DebugMenuUniqueID(), hasWireframe);
 		res = this->SetRenderState(D3DRS_FILLMODE, hasWireframe ? D3DFILL_WIREFRAME : D3DFILL_SOLID); check(SUCCEEDED(res));
 
+		res = this->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+		res = this->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+		res = this->SetSamplerState(0, D3DSAMP_MAXANISOTROPY, 1);
+
+		this->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+		this->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+
 		////Set view matrix
 		//D3DMATRIX d3dView = { +1.0f,  0.0f,  0.0f,  0.0f,
 		//	0.0f, -1.0f,  0.0f,  0.0f,
@@ -823,9 +830,13 @@ void LowlevelRenderer::ConfigureSamplerState(int pStageID, UnrealPolyFlags pFlag
 {
 	if ((pFlags & PF_NoSmooth) == 0)
 	{
-		this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, D3DTEXF_ANISOTROPIC);
-		this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, D3DTEXF_ANISOTROPIC);
-		this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, m_caps.MaxAnisotropy);
+		auto filter = D3DTEXF_ANISOTROPIC;
+		auto anisotropyLevel = m_caps.MaxAnisotropy;
+		g_DebugMenu.DebugVar("Rendering", "Tex Filter Type", DebugMenuUniqueID(), filter, {DebugMenuValueOptions::editor::slider, 0.0f,0.0f, 0, 8});
+		g_DebugMenu.DebugVar("Rendering", "Tex Filter Level", DebugMenuUniqueID(), anisotropyLevel, {DebugMenuValueOptions::editor::slider, 0.0f,0.0f, 0, m_caps.MaxAnisotropy});
+		this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, filter);
+		this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, filter);
+		this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, anisotropyLevel);
 	}
 	else
 	{
@@ -878,6 +889,14 @@ void LowlevelRenderer::PopDeviceState()
 				if (slot)
 				{
 					m_Device->SetTextureStageState(stageId, D3DTEXTURESTAGESTATETYPE(stateId), *slot);
+				}
+			}
+			for (int samplerStateId = 0; samplerStateId < newState->MAX_SAMPLERSTATES; samplerStateId++)
+			{
+				auto& slot = newState->m_SamplerStates[stageId][samplerStateId];
+				if (slot)
+				{
+					m_Device->SetSamplerState(stageId, D3DSAMPLERSTATETYPE(samplerStateId), *slot);
 				}
 			}
 		}

@@ -35,8 +35,10 @@ public:
 	void PopDeviceState();
 	HRESULT SetRenderState(D3DRENDERSTATETYPE State,DWORD Value);
 	HRESULT SetTextureStageState(DWORD Stage,D3DTEXTURESTAGESTATETYPE Type,DWORD Value);
+	HRESULT SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value);
 	void ConfigureBlendState(UnrealBlendFlags pFlags);
 	void ConfigureTextureStageState(int pStageID, UnrealPolyFlags pFlags);
+	void ConfigureSamplerState(int pStageID, UnrealPolyFlags pFlags);
 	void SetProjectionState();
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	std::vector<D3DDISPLAYMODE> GetDisplayModes() const;
@@ -63,9 +65,11 @@ private:
 		static constexpr uint32_t MAX_TEXTURESLOTS = 8;
 		static constexpr uint32_t MAX_TEXTURESTAGES = 8;
 		static constexpr uint32_t MAX_TEXTURESTAGESTATES = 32;
+		static constexpr uint32_t MAX_SAMPLERSTATES = 16;
 		std::optional<IDirect3DTexture9*> m_TextureSlots[MAX_TEXTURESLOTS];
 		std::optional<DWORD> m_RenderStates[MAX_RENDERSTATES];
 		std::optional<DWORD> m_TextureStageStates[MAX_TEXTURESTAGES][MAX_TEXTURESTAGESTATES];
+		std::optional<DWORD> m_SamplerStates[MAX_TEXTURESTAGES][MAX_SAMPLERSTATES];
 		std::optional<uint32_t> m_ViewportLeft;
 		std::optional<uint32_t> m_ViewportTop;
 		std::optional<uint32_t> m_ViewportWidth;
@@ -136,4 +140,6 @@ private:
 		//HWND hwnd{};
 		uint32_t colorBytes = 0;
 	} m_outputSurface;
+
+	D3DCAPS9 m_caps = {};
 };

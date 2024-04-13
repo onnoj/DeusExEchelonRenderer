@@ -72,6 +72,8 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 		GLog->Log(SUCCEEDED(hr) ? L"[EchelonRenderer]\t Reset Direct3D 9 device" : L"[EchelonRenderer]\t Failed to reset D3D9 device");
 	}
 
+	m_Device->GetDeviceCaps(&m_caps);
+
 	if (!SUCCEEDED(hr))
 	{
 		GWarn->Logf(L"[EchelonRenderer-WARN]\t Error code was: %08x", hr);
@@ -812,6 +814,22 @@ void LowlevelRenderer::ConfigureTextureStageState(int pStageID, UnrealBlendFlags
 	}
 }
 
+void LowlevelRenderer::ConfigureSamplerState(int pStageID, UnrealPolyFlags pFlags)
+{
+	if ((pFlags & PF_NoSmooth) == 0)
+	{
+		this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, D3DTEXF_ANISOTROPIC);
+		this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, D3DTEXF_ANISOTROPIC);
+		this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, m_caps.MaxAnisotropy);
+	}
+	else
+	{
+		this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+		this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+		this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, 1);
+	}
+}
+
 void LowlevelRenderer::PushDeviceState() 
 { 
 	const bool canPush = ((m_CurrentState + 1) < &m_States[std::size(m_States) - 1]);
@@ -885,6 +903,18 @@ HRESULT LowlevelRenderer::SetTextureStageState(DWORD Stage, D3DTEXTURESTAGESTATE
 	{
 		m_CurrentState->m_TextureStageStates[Stage][Type] = Value;
 		return m_Device->SetTextureStageState(Stage, Type, Value);
+	}
+	return S_OK;
+}
+
+HRESULT LowlevelRenderer::SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value)
+{
+	check(Sampler < m_CurrentState->MAX_TEXTURESTAGES);
+	check(Type < m_CurrentState->MAX_SAMPLERSTATES);
+	if (!m_CurrentState->m_SamplerStates[Sampler][Type] || *m_CurrentState->m_SamplerStates[Sampler][Type] != Value)
+	{
+		m_CurrentState->m_SamplerStates[Sampler][Type] = Value;
+		return m_Device->SetSamplerState(Sampler, Type, Value);
 	}
 	return S_OK;
 }

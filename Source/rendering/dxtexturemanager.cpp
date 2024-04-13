@@ -142,6 +142,7 @@ bool TextureManager::BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHand
     }
     m_llrenderer->ConfigureBlendState(polygonFlags);
     m_llrenderer->ConfigureTextureStageState(0, polygonFlags);
+    m_llrenderer->ConfigureSamplerState(0, polygonFlags);
     return true;
   }
   return false;

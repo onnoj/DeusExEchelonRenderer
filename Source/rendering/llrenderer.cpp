@@ -109,6 +109,13 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 	}
 	check(SUCCEEDED(hr));
 
+	hr = m_Device->GetDeviceCaps(&m_caps);
+	if (FAILED(hr))
+	{
+		GWarn->Logf(L"[EchelonRenderer-WARN]\t Unable to pull device caps.  Error code was: %08x", hr);
+		return false;
+	}
+
 	hr = m_Device->CreateDepthStencilSurface(
 		m_outputSurface.width, // Width of the depth buffer surface
 		m_outputSurface.height, // Height of the depth buffer surface
@@ -812,6 +819,22 @@ void LowlevelRenderer::ConfigureTextureStageState(int pStageID, UnrealBlendFlags
 	}
 }
 
+void LowlevelRenderer::ConfigureSamplerState(int pStageID, UnrealPolyFlags pFlags)
+{
+	if ((pFlags & PF_NoSmooth) == 0)
+	{
+		this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, D3DTEXF_ANISOTROPIC);
+		this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, D3DTEXF_ANISOTROPIC);
+		this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, m_caps.MaxAnisotropy);
+	}
+	else
+	{
+		this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+		this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+		this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, 1);
+	}
+}
+
 void LowlevelRenderer::PushDeviceState() 
 { 
 	const bool canPush = ((m_CurrentState + 1) < &m_States[std::size(m_States) - 1]);
@@ -885,6 +908,18 @@ HRESULT LowlevelRenderer::SetTextureStageState(DWORD Stage, D3DTEXTURESTAGESTATE
 	{
 		m_CurrentState->m_TextureStageStates[Stage][Type] = Value;
 		return m_Device->SetTextureStageState(Stage, Type, Value);
+	}
+	return S_OK;
+}
+
+HRESULT LowlevelRenderer::SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value)
+{
+	check(Sampler < m_CurrentState->MAX_TEXTURESTAGES);
+	check(Type < m_CurrentState->MAX_SAMPLERSTATES);
+	if (!m_CurrentState->m_SamplerStates[Sampler][Type] || *m_CurrentState->m_SamplerStates[Sampler][Type] != Value)
+	{
+		m_CurrentState->m_SamplerStates[Sampler][Type] = Value;
+		return m_Device->SetSamplerState(Sampler, Type, Value);
 	}
 	return S_OK;
 }

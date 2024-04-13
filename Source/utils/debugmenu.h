@@ -134,6 +134,10 @@ DebugMenu::DebugMenuTypes DebugMenu::getTypeIndex()
   {
     return DebugMenuTypes::Integer;
   }
+  if constexpr (std::is_same<T, unsigned long>::value)
+  {
+    return DebugMenuTypes::Integer;
+  }
   if constexpr (std::is_same<T, FPlane>::value)
   {
     return DebugMenuTypes::FPlane;
@@ -162,7 +166,10 @@ DebugMenu::DebugMenuTypes DebugMenu::getTypeIndex()
   {
     return DebugMenuTypes::Lambda;
   }
-  assert(false);
+  if constexpr (std::is_convertible<T, uint32_t>::value)
+  {
+    return DebugMenuTypes::Integer;
+  }
   return DebugMenuTypes::Undefined;
 }
 

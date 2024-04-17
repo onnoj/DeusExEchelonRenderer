@@ -308,6 +308,8 @@ void DebugMenu::Update()
     //io.DisplayFramebufferScale.y = dpiScale;
   }
   
+
+
 #if 1
   for (auto& categoryPair : m_DebugItems)
   {

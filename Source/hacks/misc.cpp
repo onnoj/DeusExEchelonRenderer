@@ -121,4 +121,49 @@ FrameContextManager::Context* FrameContextManager::GetContext()
 
 //////////////////////////////////////////////////////////////////////////
 
+D3DXMATRIX UECoordsToMatrix(const FCoords& pCoords, D3DXMATRIX* pInverse/*=nullptr*/)
+{
+  static const D3DXMATRIX identity = []() {D3DXMATRIX m; D3DXMatrixIdentity(&m); return m; }();
+
+  D3DXMATRIX correction = identity;
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+  correction(0, 0) *= -1.0f;
+#endif
+
+  FVector axis[3]{ FVector(1.0f,0.0f,0.0f),FVector(0.0f, 1.0f, 0.0f),FVector(0.0f, 0.0f, 1.0f) };
+  axis[0] = axis[0].TransformVectorBy(pCoords);
+  axis[1] = axis[1].TransformVectorBy(pCoords);
+  axis[2] = axis[2].TransformVectorBy(pCoords);
+
+  D3DXMATRIX rotationTranslationM = identity;
+  rotationTranslationM(0, 0) = axis[0].X;
+  rotationTranslationM(0, 1) = axis[0].Y;
+  rotationTranslationM(0, 2) = axis[0].Z;
+
+  rotationTranslationM(1, 0) = axis[1].X;
+  rotationTranslationM(1, 1) = axis[1].Y;
+  rotationTranslationM(1, 2) = axis[1].Z;
+
+  rotationTranslationM(2, 0) = axis[2].X;
+  rotationTranslationM(2, 1) = axis[2].Y;
+  rotationTranslationM(2, 2) = axis[2].Z;
+
+  FVector translation = FVector(0.0f, 0.0f, 0.0f);
+  translation = translation.TransformPointBy(pCoords);
+  rotationTranslationM(3, 0) = translation.X;
+  rotationTranslationM(3, 1) = translation.Y;
+  rotationTranslationM(3, 2) = translation.Z;
+
+
+  D3DXMATRIX result;
+  D3DXMatrixMultiply(&result, &rotationTranslationM, &correction);
+  if (pInverse != nullptr)
+  {
+    D3DXMatrixInverse(pInverse, nullptr, &result);
+  }
+  return result;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 #include "warningscreen.inc"

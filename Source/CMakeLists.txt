@@ -62,6 +62,7 @@ set(SRC_BASE
 	"utils/materialdebugger.cpp"
 	"hacks/misc.cpp"
 	"hacks/urender.cpp"
+	"hacks/umesh.cpp"
 	"hacks/uengine.cpp"
 	"hacks/fdynamicitemfilter.cpp"
 	"hacks/fscenenode.cpp"

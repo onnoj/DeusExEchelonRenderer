@@ -49,7 +49,7 @@ void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
 
 	auto& ctx = *g_ContextManager.GetContext();
 	ctx.frameSceneNode = Frame;
-	ctx.uservalues.brightness = 0.5f + Frame->Viewport->GetOuterUClient()->Brightness;
+	ctx.uservalues.brightness = 0.80f + Frame->Viewport->GetOuterUClient()->Brightness;
 	ctx.uservalues.brightness = ctx.uservalues.brightness * ctx.uservalues.brightness;
 
 	

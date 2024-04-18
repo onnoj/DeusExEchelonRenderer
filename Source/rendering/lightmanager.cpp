@@ -246,6 +246,18 @@ void LightManager::CacheLights()
 		m_UpperBound = max(m_UpperBound, light->GetIndex());
 		m_KnownLights.push_back(light);
 	}
+
+	//Find JC's flashlight
+	ADeusExPlayer* player = Cast<ADeusExPlayer>(ctx.frameSceneNode->Viewport->Actor);
+	for (auto augmentation = player->AugmentationSystem->FirstAug; m_lightAugmentation == nullptr && augmentation != nullptr; augmentation = augmentation->Next)
+	{
+		std::wstring augName = *(augmentation->GetClass()->FriendlyName);
+		if (augName == L"AugLight")
+		{
+			m_lightAugmentation = augmentation;
+			break;
+		}
+	}
 }
 
 void LightManager::OnLevelChange()
@@ -257,20 +269,6 @@ void LightManager::OnLevelChange()
 	m_KnownLights.clear();
 
 	CacheLights();
-
-	FObjectIterator it(AAugmentationManager::StaticClass());
-	for (; it.operator int() != 0; it.operator++())
-	{
-		AAugmentationManager* manager = static_cast<AAugmentationManager*>(*it);
-		for (auto augmentation = manager->FirstAug; augmentation != nullptr; augmentation = augmentation->Next)
-		{
-			if (augmentation->GetClass()->FriendlyName.GetIndex() == 4423)
-			{
-				m_lightAugmentation = augmentation;
-				break;
-			}
-		}
-	}
 }
 
 ///

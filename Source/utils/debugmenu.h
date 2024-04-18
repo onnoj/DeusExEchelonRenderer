@@ -7,6 +7,7 @@
 #include <string>
 #include <cstdarg>
 #include <map>
+#include <mutex>
 
 #ifndef TOKENIZE
 #define TOKENIZE2(s) #s

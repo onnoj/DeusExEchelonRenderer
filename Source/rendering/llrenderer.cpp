@@ -234,7 +234,7 @@ void LowlevelRenderer::EndScene()
 	check(SUCCEEDED(res));
 }
 
-void LowlevelRenderer::RenderTriangleListBuffer(const D3DXMATRIX& pWm, DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug)
+void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug)
 {
 	IDirect3DVertexBuffer9* buffer = nullptr;
 	auto bufferedGeoIterator = (pHash != 0 ? m_bufferedGeo.find(pHash) : m_bufferedGeo.end());
@@ -292,7 +292,6 @@ void LowlevelRenderer::RenderTriangleListBuffer(const D3DXMATRIX& pWm, DWORD pFV
 
 	{
 		HRESULT res = S_OK;
-		res = m_Device->SetTransform(D3DTS_WORLD, &pWm);  check(SUCCEEDED(res));
 		res = m_Device->SetStreamSource(0, buffer, 0, pVertexSize); check(SUCCEEDED(res));
 		res = m_Device->SetIndices(nullptr); check(SUCCEEDED(res));
 		m_Device->SetVertexShaderConstantI(pDebug, nullptr, 0);
@@ -302,10 +301,9 @@ void LowlevelRenderer::RenderTriangleListBuffer(const D3DXMATRIX& pWm, DWORD pFV
 	}
 }
 
-void LowlevelRenderer::RenderTriangleList(const D3DXMATRIX& pWm, const LowlevelRenderer::VertexPos3Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
+void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
 	return RenderTriangleListBuffer(
-		pWm,
 		D3DFVF_XYZ | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
 		pVertices,
 		primitiveCount,
@@ -316,10 +314,9 @@ void LowlevelRenderer::RenderTriangleList(const D3DXMATRIX& pWm, const LowlevelR
 	);
 }
 
-void LowlevelRenderer::RenderTriangleList(const D3DXMATRIX& pWm, const LowlevelRenderer::VertexPos3Tex0to4* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
+void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0to4* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
 	return RenderTriangleListBuffer(
-		pWm,
 		D3DFVF_XYZ | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
 		pVertices,
 		primitiveCount,
@@ -330,10 +327,9 @@ void LowlevelRenderer::RenderTriangleList(const D3DXMATRIX& pWm, const LowlevelR
 	);
 }
 
-void LowlevelRenderer::RenderTriangleList(const D3DXMATRIX& pWm, const LowlevelRenderer::VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
+void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
 	return RenderTriangleListBuffer(
-		pWm,
 		D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
 		pVertices,
 		primitiveCount,
@@ -445,6 +441,12 @@ void LowlevelRenderer::BeginFrame()
 		this->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
 		this->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
 
+		if (!m_CurrentState->m_WorldMatrix)
+		{
+			m_CurrentState->m_WorldMatrix = D3DXMATRIX();
+		}
+		m_Device->GetTransform(D3DTS_WORLD, &m_CurrentState->m_WorldMatrix.value());
+
 		////Set view matrix
 		//D3DMATRIX d3dView = { +1.0f,  0.0f,  0.0f,  0.0f,
 		//	0.0f, -1.0f,  0.0f,  0.0f,
@@ -547,6 +549,16 @@ bool LowlevelRenderer::ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint3
 		return ValidateViewport(pWidth, pHeight, pWidth, pHeight);
 	}
 	return false;
+}
+
+void LowlevelRenderer::SetWorldMatrix(const D3DMATRIX& pMatrix)
+{
+	if (!m_CurrentState->m_WorldMatrix || ::memcmp(&(m_CurrentState->m_WorldMatrix.value()), &pMatrix, sizeof(pMatrix))!=0)
+	{
+		auto result = m_Device->SetTransform(D3DTS_WORLD, &pMatrix); 
+		m_CurrentState->m_WorldMatrix = pMatrix;
+		check(SUCCEEDED(result));
+	}
 }
 
 void LowlevelRenderer::SetViewMatrix(const D3DMATRIX& pMatrix)
@@ -900,9 +912,13 @@ void LowlevelRenderer::PopDeviceState()
 				}
 			}
 		}
+		check(newState->m_WorldMatrix);
+		check(newState->m_ViewMatrix);
+		check(newState->m_ProjectionMatrix);
 
-		this->SetProjectionMatrix(*(newState->m_ProjectionMatrix));
+		this->SetWorldMatrix(*(newState->m_WorldMatrix));
 		this->SetViewMatrix(*(newState->m_ViewMatrix));
+		this->SetProjectionMatrix(*(newState->m_ProjectionMatrix));
 		ValidateViewport(*newState->m_ViewportLeft, *newState->m_ViewportTop, *newState->m_ViewportWidth, *newState->m_ViewportHeight);
 		m_CurrentState--;
 	}

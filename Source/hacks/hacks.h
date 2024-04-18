@@ -3,6 +3,7 @@
 extern void InstallFSceneNodeHacks();
 extern void InstallFSpanBufferHacks();
 extern void InstallURenderHacks();
+extern void InstallUMeshHacks();
 extern void InstallUGameEngineHacks();
 extern void InstallFDynamicItemFilterHacks();
 extern void InstallThreadAffinityHacks();
@@ -12,6 +13,7 @@ extern void InstallRTXConfigPatches();
 extern void UninstallFSceneNodeHacks();
 extern void UninstallFSpanBufferHacks();
 extern void UninstallURenderHacks();
+extern void UninstallUMeshHacks();
 extern void UninstallUGameEngineHacks();
 extern void UninstallFDynamicItemFilterHacks();
 extern void UninstallThreadAffinityHacks();

@@ -85,6 +85,10 @@ namespace
 
 void MaterialDebugger::Update(FSceneNode* Frame)
 {
+	{
+		
+	}
+	///
 	FVector dir = -(Frame->Coords.XAxis ^ Frame->Coords.YAxis);
 	FVector begin = Frame->Coords.Origin;
 	FVector end = Frame->Coords.Origin + dir*1000000.0f;
@@ -115,14 +119,17 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 						{
 							const auto& surf = levelModel->Surfs(iSurf);
 							const auto texture = surf.Texture;
-							FTextureInfo info{};
-							texture->Lock(info, 0, 0, GRenderDevice);
-							textureID = info.CacheID;
-							surfFlags = surf.PolyFlags;
-							textureFlags = texture->PolyFlags;
-							g_DebugMenu.VisitTexture(&info);
-							texture->Unlock(info);
-							break;
+							if (texture)
+							{
+								FTextureInfo info{};
+								texture->Lock(info, 0, 0, GRenderDevice);
+								textureID = info.CacheID;
+								surfFlags = surf.PolyFlags;
+								textureFlags = texture->PolyFlags;
+								g_DebugMenu.VisitTexture(&info);
+								texture->Unlock(info);
+								break;
+							}
 						}
 					}
 				}
@@ -386,9 +393,9 @@ void MaterialDebugger::exportHashMappings(bool pLoadAllTextures)
 		//Do a dummy render call so that Remix picks up the texture
 		{
 			textureManager.BindTexture(texture->PolyFlags, md);
-			static D3DMATRIX identity = []() { D3DXMATRIX m; D3DXMatrixIdentity(&m); return m; }();
+			hlRenderer->SetWorldTransformStateToIdentity();
 			static LowlevelRenderer::VertexPos3Tex0to4 vbuffer;
-			llRenderer->RenderTriangleList(identity, &vbuffer, 1, 1, 0, 0);
+			llRenderer->RenderTriangleList( &vbuffer, 1, 1, 0, 0);
 		}
 
 		if (textureInfo.Texture != nullptr)

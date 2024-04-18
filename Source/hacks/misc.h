@@ -49,11 +49,10 @@ public:
 			FActorLink* Volumetrics = nullptr;
 			DWORD PolyFlags = 0;
 			UTexture* LastTextureInfo = nullptr;
+			bool InViewSpace = false;
 			std::optional<TextureMetaData> LastTextureMetadata;
-			D3DXMATRIX worldMatrix{};
-			D3DXMATRIX worldMatrixInv{};
-			D3DXMATRIX localToViewMatrix{};
-			D3DXMATRIX viewToLocalMatrix{};
+			std::optional<D3DXMATRIX> worldMatrix;
+			std::optional<D3DXMATRIX> worldMatrixInv;
 			DrawCall() = default;
 		};
 		std::optional<DrawCall> drawcallInfo;
@@ -169,5 +168,6 @@ namespace Misc /*should probably rename to util*/
 						reinterpret_cast<uint64_t>(pAddress) <= (moduleStart + baseOffsetMax) &&
 						reinterpret_cast<uint64_t>(pAddress) < moduleEnd);
 	}
-
 }
+
+extern D3DXMATRIX UECoordsToMatrix(const FCoords& pCoords, D3DXMATRIX* pInverse=nullptr);

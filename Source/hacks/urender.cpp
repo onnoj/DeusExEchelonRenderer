@@ -65,6 +65,7 @@ namespace Hacks
       g_DebugMenu.DebugVar("Global", "Frame X", DebugMenuUniqueID(), Viewport->SizeX, {DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, -8000, 8000});
       g_DebugMenu.DebugVar("Global", "Frame Y", DebugMenuUniqueID(), Viewport->SizeY, {DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 1, 2880});
       g_DebugMenu.DebugVar("Global", "Orthozoom", DebugMenuUniqueID(), Viewport->Actor->OrthoZoom, {DebugMenuValueOptions::editor::slider, -1000000.0f, 1000000.0f});
+
       FSceneNode* Frame = URenderVTableFuncs::CreateMasterFrame(GRender, Viewport, Location, Rotation, Bounds);
       return Frame;
     }
@@ -592,10 +593,6 @@ namespace Hacks
     0000DCBB 6 bytes -> 90
     */
 
-    //PolyFlags &= ~PF_Flat;
-    //PolyFlags &= ~PF_Invisible;
-    //PolyFlags |= PF_TwoSided;
-
     if (g_options.hasObjectMeshes)
     {
       FrameContextManager::ScopedContext ctx;
@@ -610,14 +607,49 @@ namespace Hacks
       ctx->drawcallInfo->Volumetrics = Volumetrics;
       ctx->drawcallInfo->PolyFlags = PolyFlags;
 
-      if (Owner->Mesh->IsA(ULodMesh::StaticClass()))
+      //For LOD meshes (which are most meshes in game), disable the lodding system
+      //and always render the highest level of detail.
+      const bool isLodMesh = Owner->Mesh->IsA(ULodMesh::StaticClass());
+      if (isLodMesh)
       {
+        ((ULodMesh*)Owner->Mesh)->LODStrength = 0.0;
         ((ULodMesh*)Owner->Mesh)->LODMorph = 1.0;
         ((ULodMesh*)Owner->Mesh)->LODMinVerts = ((ULodMesh*)Owner->Mesh)->Verts.Num();
       }
 
+      //Store the transformation details. We'll set them to origin
+      //so that UE renders the model in local/model space.
+      auto origLocation = Owner->Location;
+      auto origPrePivot = Owner->PrePivot;
+      auto origRotation = Owner->Rotation;
+      auto origFrameCoords = Frame->Coords;
+      auto origUncoords = Frame->Uncoords;
+      auto origCoords = Coords;
+
+      //Calculate the rotation. Note that there is a difference in coordination systems between Deus Ex and DirectX, so Roll and Yaw are swapped.
+      const auto pi2 = (PI + PI);
+      D3DXMATRIX& wm = *ctx->drawcallInfo->worldMatrix;
+      D3DXMATRIX& wmi = *ctx->drawcallInfo->worldMatrixInv;
+      
+      //Inform high-level renderer we're about to draw a mesh
       ::Misc::g_Facade->GetHLRenderer()->OnDrawMeshBegin(Frame, Owner);
+
+      //Disable view transformations and move the rendered mesh to origin with no rotation.
+      //We'll do the transformations in the fixed-function pipeline.
+      //This way, RTX Remix can pick up the mesh, so that we can replace static meshes.
+      Frame->Coords = FCoords(FVector(0.0f, 0.0f, 0.0f));
+      Frame->Uncoords = FCoords(FVector(0.0f, 0.0f, 0.0f));
+      Owner->Location = FVector(0.0f, 0.0f, 0.0f);
+      Owner->Rotation = FRotator(0, 0, 0);
+      const_cast<FCoords&>(Coords) = FCoords(FVector(0.0f, 0.0f, 0.0f));;
       (GRender->*URenderFuncs::DrawMesh)(Frame, Owner, LightSink, SpanBuffer, Zone, Coords, LeafLights, Volumetrics, PolyFlags);
+      const_cast<FCoords&>(Coords) = origCoords;
+      Owner->Location = origLocation;
+      Owner->Rotation = origRotation;
+      Frame->Coords = origFrameCoords;
+      Frame->Uncoords = origUncoords;
+
+      //Inform the high-level renderer that we're done, and can submit the vertex buffer for rendering.
       ::Misc::g_Facade->GetHLRenderer()->OnDrawMeshEnd(Frame, Owner);
     }
   }

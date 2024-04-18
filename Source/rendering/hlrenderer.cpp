@@ -79,10 +79,10 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 	//Render UI meshes
 #if 1
 	m_LLRenderer->PushDeviceState();
-	m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-	D3DXMATRIX identityMatrix;
-	D3DXMatrixIdentity(&identityMatrix);
 
+	SetWorldTransformStateToIdentity();
+
+	m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
 	m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
 	m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 	m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
@@ -97,7 +97,7 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
 		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
 		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-		m_LLRenderer->RenderTriangleList(identityMatrix, rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
+		m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
 	}
 	m_LLRenderer->PopDeviceState();
 #endif
@@ -140,7 +140,6 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 				const bool isTranslucent = (flags & PF_Translucent) != 0;
 				const bool isUnlitEmissive = (flags & PF_Unlit) != 0; 
 				auto wm = info.worldMatrix;
-
 				if (pass == pass::solid)
 				{
 					if (isTranslucent)
@@ -165,19 +164,22 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 						D3DXMATRIX s;
 						D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
 						D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+						SetWorldTransformState(wm);
 						m_TextureManager.BindTexture(flags, info.textureHandle);
-						m_LLRenderer->RenderTriangleList(wm, info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+						m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
 
 						D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
 						D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+						SetWorldTransformState(wm);
 						m_TextureManager.BindTexture(flags, info.textureHandle);
-						m_LLRenderer->RenderTriangleList(wm, info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+						m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
 						continue;
 					}
 				}
 
+				SetWorldTransformState(wm);
 				m_TextureManager.BindTexture(flags, info.textureHandle);
-				m_LLRenderer->RenderTriangleList(wm, info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+				m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
 			}
 		}
 	}
@@ -227,9 +229,8 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 		m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG0, D3DTA_DIFFUSE);
 		m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
-		D3DXMATRIX wm; D3DXMatrixIdentity(&wm);
+		SetWorldTransformStateToIdentity();
 		m_LLRenderer->RenderTriangleListBuffer(
-			wm,
 			D3DFVF_XYZ | D3DFVF_DIFFUSE /*| D3DFVF_TEX1 | D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
 			m_DebugMesh.buffer.data(),
 			m_DebugMesh.primitiveCount,
@@ -304,6 +305,7 @@ void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, c
 	D3DXMatrixTransformation(&wm, nullptr, nullptr, &D3DXVECTOR3(Size, Size, Size), nullptr, nullptr, &D3DXVECTOR3(
 		Position.X, Position.Y, Position.Z
 	));
+	SetWorldTransformState(wm);
 
 	uint32_t vtxCount = 0;
 	StaticMeshesVertexBuffer buffer;
@@ -320,16 +322,13 @@ void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, c
 	MurmurHash3_x86_32(buffer.data(), buffer.size() * sizeof(buffer[0]), 0, &hash);
 	if (m_TextureManager.BindTexture(PF_Modulated, pTexture))
 	{
-		SetViewState(Frame, ViewType::game);
-		SetProjectionState(Frame, ProjectionType::perspective);
-
 		m_LLRenderer->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
 		m_LLRenderer->SetRenderState(D3DRS_ALPHATESTENABLE, 0);
 		m_LLRenderer->SetRenderState(D3DRS_ZENABLE, 0);
 		m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 1);
 		m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 
-		m_LLRenderer->RenderTriangleList(wm, buffer.data(), faces, buffer.size(), hash, 0);
+		m_LLRenderer->RenderTriangleList(buffer.data(), faces, buffer.size(), hash, 0);
 	}
 	m_LLRenderer->PopDeviceState();
 }
@@ -372,12 +371,12 @@ void HighlevelRenderer::DrawFullscreenQuad(FSceneNode* Frame, const DeusExD3D9Te
 
 		FVector newOrigin = Frame->Coords.Origin - ((Frame->Coords.XAxis ^ Frame->Coords.YAxis) * 1.0f);
 
-		FCoords coords = Frame->Coords;
+		FCoords coords;
 		coords.Origin = newOrigin;
 		coords.XAxis = Frame->Coords.XAxis;
 		coords.YAxis = Frame->Coords.YAxis * -1.0f;
 		coords.ZAxis = Frame->Coords.ZAxis;
-		GetWorldMatrix(Frame, coords, &wm, &wmi);
+		wm = UECoordsToMatrix(coords, &wmi);
 
 		D3DXMatrixTranslation(&wm, newOrigin.X, newOrigin.Y, newOrigin.Z);
 
@@ -392,16 +391,14 @@ void HighlevelRenderer::DrawFullscreenQuad(FSceneNode* Frame, const DeusExD3D9Te
 		MurmurHash3_x86_32(buffer.data(), buffer.size() * sizeof(buffer[0]), 0, &hash);
 		if (m_TextureManager.BindTexture(PF_Unlit, pTexture))
 		{
-			SetViewState(Frame, ViewType::game);
-			SetProjectionState(Frame, ProjectionType::perspective);
-
 			m_LLRenderer->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
 			m_LLRenderer->SetRenderState(D3DRS_ALPHATESTENABLE, 0);
 			m_LLRenderer->SetRenderState(D3DRS_ZENABLE, 0);
 			m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 1);
 			m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 
-			m_LLRenderer->RenderTriangleList(wmi, buffer.data(), 2, buffer.size(), hash, 0);
+			SetWorldTransformState(wmi);
+			m_LLRenderer->RenderTriangleList(buffer.data(), 2, buffer.size(), hash, 0);
 		}
 	}
 	m_LLRenderer->PopDeviceState();
@@ -455,9 +452,12 @@ void HighlevelRenderer::GetViewMatrix(FSceneNode* Frame, D3DXMATRIX& viewMatrix)
 		axis[0] = axis[0].TransformVectorBy(FrameCoords);
 		axis[1] = axis[1].TransformVectorBy(FrameCoords);
 		axis[2] = axis[2].TransformVectorBy(FrameCoords);
-		axis[0].Normalize();
-		axis[1].Normalize();
-		axis[2].Normalize();
+		check(UEFloatEquals(axis[0].SizeSquared(), 1.0f));
+		check(UEFloatEquals(axis[1].SizeSquared(), 1.0f));
+		check(UEFloatEquals(axis[2].SizeSquared(), 1.0f));
+		//axis[0].Normalize();
+		//axis[1].Normalize();
+		//axis[2].Normalize();
 
 		cameraMatrix(0, 0) = axis[0].X;
 		cameraMatrix(0, 1) = axis[0].Y;
@@ -507,45 +507,6 @@ void HighlevelRenderer::GetPerspectiveProjectionMatrix(FSceneNode* Frame, D3DXMA
 		( 1.0f - (useFrame ? 0.0f : offsetT)) * aspect * fovHalfAngle, 
 		LowlevelRenderer::NearRange, LowlevelRenderer::FarRange
 	);
-}
-
-void HighlevelRenderer::GetWorldMatrix(FSceneNode* Frame, const FCoords& Coords, D3DXMATRIX* outWorldMatrix, D3DXMATRIX* outWorldMatrixInverse)
-{
-	if (outWorldMatrix != nullptr)
-	{
-		D3DXMatrixIdentity(outWorldMatrix);
-		FVector axis[3]{ FVector(1.0f,0.0f,0.0f),FVector(0.0f, 1.0f, 0.0f),FVector(0.0f, 0.0f, 1.0f) };
-		axis[0] = axis[0].TransformVectorBy(Coords);
-		axis[1] = axis[1].TransformVectorBy(Coords);
-		axis[2] = axis[2].TransformVectorBy(Coords);
-		axis[0].Normalize();
-		axis[1].Normalize();
-		axis[2].Normalize();
-		auto& worldMatrix = *outWorldMatrix;
-
-		worldMatrix(0, 0) = axis[0].X;
-		worldMatrix(0, 1) = axis[0].Y;
-		worldMatrix(0, 2) = axis[0].Z;
-
-		worldMatrix(1, 0) = axis[1].X;
-		worldMatrix(1, 1) = axis[1].Y;
-		worldMatrix(1, 2) = axis[1].Z;
-
-		worldMatrix(2, 0) = axis[2].X;
-		worldMatrix(2, 1) = axis[2].Y;
-		worldMatrix(2, 2) = axis[2].Z;
-
-		FVector translation = FVector(0.0f, 0.0f, 0.0f);
-		translation = translation.TransformPointBy(Coords);
-		worldMatrix(3, 0) = translation.X;
-		worldMatrix(3, 1) = translation.Y;
-		worldMatrix(3, 2) = translation.Z;
-
-		if (outWorldMatrixInverse != nullptr)
-		{
-			D3DXMatrixInverse(outWorldMatrixInverse, NULL, outWorldMatrix);
-		}
-	}
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -741,17 +702,18 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 	sharedMesh->hash ^= hash;
 
 	//5. All static meshes are drawn at the end of the frame, dynamic ones are drawn right away.
+	SetWorldTransformState(sharedMesh->worldMatrix);
 	if (surfaceIsDynamic)
 	{
 		auto flags = sharedMesh->flags;
 		if ((flags & PF_Unlit) != 0)
 		{
 			m_TextureManager.BindTexture(flags, sharedMesh->textureHandle);
-			m_LLRenderer->RenderTriangleList(sharedMesh->worldMatrix, sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), sharedMesh->hash, 0);
+			m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), sharedMesh->hash, 0);
 			flags &= ~PF_Unlit;
 		}
 		m_TextureManager.BindTexture(flags, sharedMesh->textureHandle);
-		m_LLRenderer->RenderTriangleList(sharedMesh->worldMatrix, sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), sharedMesh->hash, 0);
+		m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), sharedMesh->hash, 0);
 	}
 }
 
@@ -769,20 +731,9 @@ void HighlevelRenderer::OnDrawMeshBegin(FSceneNode* Frame, AActor* Owner)
 		//for now, skip any polygons not draw by DrawMesh
 		return;
 	}
-	//SetViewState(Frame, ViewType::game);
-	//SetProjectionState(Frame, ProjectionType::perspective);
 
 	renderContext->drawcallInfo->Owner = Owner;
-	const auto DrawScale = Owner->bParticles ? 1.0 : Owner->DrawScale;
-	FCoords coordsWithView = (Frame->Coords * (Owner->Location + Owner->PrePivot) * Owner->Rotation * Owner->Mesh->RotOrigin * FScale(Owner->Mesh->Scale * DrawScale, 0.0, SHEER_None)) * -Owner->Mesh->Origin;
-	FCoords coordsLocalToWorld = (UnrealCoordsIndentity * (Owner->Location + Owner->PrePivot) * Owner->Rotation * Owner->Mesh->RotOrigin * FScale(Owner->Mesh->Scale * DrawScale, 0.0, SHEER_None)) * -Owner->Mesh->Origin;
-#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
-	coordsLocalToWorld.XAxis *= -1.0f;
-	coordsWithView.XAxis *= -1.0f;
-#endif
 
-	GetWorldMatrix(Frame, coordsLocalToWorld, &renderContext->drawcallInfo->worldMatrix, &renderContext->drawcallInfo->worldMatrixInv);
-	GetWorldMatrix(Frame, coordsWithView, &renderContext->drawcallInfo->localToViewMatrix, &renderContext->drawcallInfo->viewToLocalMatrix);
 	const auto key = reinterpret_cast<DynamicMeshesKey>(renderContext->drawcallInfo->Owner);
 	for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
 	{
@@ -808,20 +759,17 @@ void HighlevelRenderer::OnDrawMesh(FSceneNode* Frame, FTextureInfo& Info, FTrans
 		return;
 	}
 
-	//SetViewState(Frame, ViewType::game);
-	//SetProjectionState(Frame, ProjectionType::perspective);
-
 	UTexture* prevTexture = renderContext->drawcallInfo->LastTextureInfo;
 	if (prevTexture != Info.Texture)
 	{
 		//renderContext->drawcallInfo->LastTextureMetadata.emplace(m_TextureManager.OLDGetTextureMetadata(&Info));
 		renderContext->drawcallInfo->LastTextureMetadata.emplace(m_TextureManager.ProcessTexture(PolyFlags, &Info)->md);
 		renderContext->drawcallInfo->LastTextureInfo = Info.Texture;
-		if (prevTexture != nullptr)
-		{
-			//texture changed!
-			int x = 1;
-		}
+		//if (prevTexture != nullptr)
+		//{
+		//	//texture changed! debug me!
+		//	int x = 1;
+		//}
 	}
 
 	DynamicMeshesValue& mesh = [&]() -> DynamicMeshesValue& {
@@ -846,37 +794,19 @@ void HighlevelRenderer::OnDrawMesh(FSceneNode* Frame, FTextureInfo& Info, FTrans
 	FTransTexture* firstVertexInfo = Pts[0];
 
 	const auto& md = (*renderContext->drawcallInfo->LastTextureMetadata);
-	const auto& viewToLocalMatrix = renderContext->drawcallInfo->viewToLocalMatrix;
-	FVector vtx[3]{ firstVertexInfo->Point /*.TransformPointBy(Frame->Uncoords)*/, {}, {}};
+	FVector vtx[3]{ firstVertexInfo->Point, {}, {}};
 	for (int i = 2; i < NumPts; i++)
 	{
-		vtx[1] = Pts[i - 1]->Point/*.TransformPointBy(Frame->Uncoords)*/;
-		vtx[2] = Pts[i]->Point/*.TransformPointBy(Frame->Uncoords)*/;
+		vtx[1] = Pts[i - 1]->Point;
+		vtx[2] = Pts[i]->Point;
 
 		auto fixSigned0 = [](float& value) {
 			if (value >= 0.0f && std::signbit(value)) { value = std::abs(value); }
 		};
-#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
-		auto d3dvtx0 = LowlevelRenderer::VertexPos3Tex0{ {-vtx[0].X, vtx[0].Y, vtx[0].Z}, {md.multU * Pts[0]->U,			  md.multV * Pts[0]->V } };
-		auto d3dvtx1 = LowlevelRenderer::VertexPos3Tex0{ {-vtx[1].X, vtx[1].Y, vtx[1].Z}, {md.multU * Pts[i - 1]->U,  md.multV * Pts[i - 1]->V }};
-		auto d3dvtx2 = LowlevelRenderer::VertexPos3Tex0{ {-vtx[2].X, vtx[2].Y, vtx[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V }};
-#else
 		auto d3dvtx0 = LowlevelRenderer::VertexPos3Tex0{ {vtx[0].X, vtx[0].Y, vtx[0].Z}, {md.multU * Pts[0]->U,			  md.multV * Pts[0]->V } };
 		auto d3dvtx1 = LowlevelRenderer::VertexPos3Tex0{ {vtx[1].X, vtx[1].Y, vtx[1].Z}, {md.multU * Pts[i - 1]->U,  md.multV * Pts[i - 1]->V }};
 		auto d3dvtx2 = LowlevelRenderer::VertexPos3Tex0{ {vtx[2].X, vtx[2].Y, vtx[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V }};
-#endif
-		D3DXVec3TransformCoord(&d3dvtx0.Pos, &d3dvtx0.Pos, &viewToLocalMatrix);
-		D3DXVec3TransformCoord(&d3dvtx1.Pos, &d3dvtx1.Pos, &viewToLocalMatrix);
-		D3DXVec3TransformCoord(&d3dvtx2.Pos, &d3dvtx2.Pos, &viewToLocalMatrix);
-		fixSigned0(d3dvtx0.Pos.x);
-		fixSigned0(d3dvtx0.Pos.y);
-		fixSigned0(d3dvtx0.Pos.z);
-		fixSigned0(d3dvtx1.Pos.x);
-		fixSigned0(d3dvtx1.Pos.y);
-		fixSigned0(d3dvtx1.Pos.z);
-		fixSigned0(d3dvtx2.Pos.x);
-		fixSigned0(d3dvtx2.Pos.y);
-		fixSigned0(d3dvtx2.Pos.z);
+
 		mesh.buffer->push_back(std::move(d3dvtx0));
 		mesh.buffer->push_back(std::move(d3dvtx1));
 		mesh.buffer->push_back(std::move(d3dvtx2));
@@ -892,9 +822,6 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
 		//for now, skip any polygons not draw by DrawMesh
 		return;
 	}
-
-	//SetViewState(Frame, ViewType::game);
-	SetProjectionState(Frame, ProjectionType::perspective);
 
 	const auto key = reinterpret_cast<DynamicMeshesKey>(renderContext->drawcallInfo->Owner);
 	for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
@@ -914,7 +841,31 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
 			vertexSum += std::abs(vtx.Pos.z);
 		}
 
-		const auto meshIndex = Owner->GetIndex();	
+		auto wmCoords = GMath.UnitCoords;
+		wmCoords = wmCoords * Owner->Location * Owner->Rotation;
+
+		static UBOOL& HasSpecialCoords = []() -> UBOOL& {
+			uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+			return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
+		}();
+		static FCoords& SpecialCoords = []() -> FCoords& {
+			uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+			return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
+		}();
+
+		auto actor = Owner;
+		auto parent = Owner->Owner;
+		if (parent != nullptr)
+		{
+			wmCoords = wmCoords * parent->Rotation * SpecialCoords.Inverse();
+		}
+
+		D3DXMATRIX wm = UECoordsToMatrix(wmCoords);
+		renderContext->drawcallInfo->worldMatrix = wm;
+
+		SetWorldTransformState(*renderContext->drawcallInfo->worldMatrix);
+		SetViewState(Frame, ViewType::game);
+		const auto meshIndex = Owner->Mesh->GetIndex();	
 		m_TextureManager.BindTexture(dynamicMeshInfo.flags, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags, &dynamicMeshInfo.textureInfo));
 		float diff = std::abs(dynamicMeshInfo.lastVertexSum - vertexSum);
 		bool isAnimating = Owner->AnimRate > 0.0f;
@@ -922,13 +873,13 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
 		{
 			dynamicMeshInfo.lastVertexSum = vertexSum;
 			const uint32_t meshHash = appMemCrc(buffer->data(), buffer->size() * sizeof(LowlevelRenderer::VertexPos3Tex0));
-			m_LLRenderer->RenderTriangleList(renderContext->drawcallInfo->worldMatrix, buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
+			m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
 			dynamicMeshInfo.lastDrawcallHash = meshHash;
 		}
 		else
 		{
 			const uint32_t meshHash = dynamicMeshInfo.lastDrawcallHash;
-			m_LLRenderer->RenderTriangleList(renderContext->drawcallInfo->worldMatrix, buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
+			m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
 		}
 	}
 }
@@ -1027,6 +978,18 @@ void HighlevelRenderer::OnDrawUIEnd(FSceneNode* Frame)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void HighlevelRenderer::SetWorldTransformStateToIdentity() 
+{
+	static D3DXMATRIX identity = []() { D3DXMATRIX m; D3DXMatrixIdentity(&m); return m; }();
+	m_LLRenderer->SetWorldMatrix(identity);
+}
+
+void HighlevelRenderer::SetWorldTransformState(const D3DXMATRIX& pMatrix) 
+{
+	m_LLRenderer->SetWorldMatrix(pMatrix);
+}
+
+
 void HighlevelRenderer::SetViewState(FSceneNode* Frame, ViewType viewType) 
 {
 	check(Frame->Parent == nullptr);
@@ -1035,6 +998,21 @@ void HighlevelRenderer::SetViewState(FSceneNode* Frame, ViewType viewType)
 	if (viewType == ViewType::game)
 	{
 		GetViewMatrix(Frame, vm);
+	}
+	if (viewType == ViewType::engine)
+	{
+		D3DXMatrixIdentity(&vm);
+		vm(0, 0) = 1.0f;
+		vm(0, 1) = 0.0f;
+		vm(0, 2) = 0.0f;
+
+		vm(1, 0) = 0.0f;
+		vm(1, 1) = -1.0f;
+		vm(1, 2) = 0.0f;
+
+		vm(2, 0) = 0.0f;
+		vm(2, 1) = 0.0f;
+		vm(2, 2) = -1.0f;
 	}
 	else if (viewType == ViewType::identity)
 	{

@@ -12,7 +12,7 @@
 class HighlevelRenderer
 {
 public:
-	enum class ViewType { identity, game };
+	enum class ViewType { identity, engine, game };
 	enum class ProjectionType { identity, orthogonal, uiorthogonal, perspective };
 public:
 	void Initialize(LowlevelRenderer* pLLRenderer);
@@ -20,6 +20,8 @@ public:
 
 	void OnLevelChange();
 
+	void SetWorldTransformStateToIdentity();
+	void SetWorldTransformState(const D3DXMATRIX& pMatrix);
 	void SetViewState(FSceneNode* Frame, ViewType viewType);
 	void SetProjectionState(FSceneNode* Frame, ProjectionType projection);
 
@@ -39,7 +41,6 @@ public:
 	void OnDrawUIBegin(FSceneNode* Frame);
 	void OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZDepth, FPlane pColor, FPlane pFog, DWORD pPolyFlags);
 	void OnDrawUIEnd(FSceneNode* Frame);
-	void GetWorldMatrix(FSceneNode* Frame, const FCoords& Coords, D3DXMATRIX* worldMatrix, D3DXMATRIX* worldMatrixInverse);
 	void GetViewMatrix(FSceneNode* Frame, D3DXMATRIX& viewMatrix);
 	void GetPerspectiveProjectionMatrix(FSceneNode* Frame, D3DXMATRIX& projMatrix);
 

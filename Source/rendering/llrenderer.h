@@ -27,8 +27,11 @@ public:
 	void EndScene();
 	void BeginFrame();
 	void EndFrame();
+	
+	void SetWorldMatrix(const D3DMATRIX& pMatrix);
 	void SetViewMatrix(const D3DMATRIX& pMatrix);
 	void SetProjectionMatrix(const D3DMATRIX& pMatrix);
+
 	bool ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight, bool pFullscreen);
 	bool ValidateViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight);
 	void PushDeviceState();
@@ -45,10 +48,10 @@ public:
 	D3DDISPLAYMODE FindClosestResolution(uint32_t pWidth, uint32_t pHeight) const;
 	void ClearDepth() {/*TODO?*/ };
 	void ClearDisplaySurface(const Vec4& clearColor);
-	void RenderTriangleListBuffer(const D3DXMATRIX& pWm, DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const D3DXMATRIX& pWm, const VertexPos3Tex0to4* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const D3DXMATRIX& pWm, const VertexPos3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const D3DXMATRIX& pWm, const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug);
+	void RenderTriangleList(const VertexPos3Tex0to4* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void RenderTriangleList(const VertexPos3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void RenderTriangleList(const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderLight(int32_t index, const D3DLIGHT9& pLight);
 	void FlushLights();
 
@@ -74,6 +77,7 @@ private:
 		std::optional<uint32_t> m_ViewportTop;
 		std::optional<uint32_t> m_ViewportWidth;
 		std::optional<uint32_t> m_ViewportHeight;
+		std::optional<D3DMATRIX> m_WorldMatrix;
 		std::optional<D3DMATRIX> m_ViewMatrix;
 		std::optional<D3DMATRIX> m_ProjectionMatrix;
 	} m_States[8];

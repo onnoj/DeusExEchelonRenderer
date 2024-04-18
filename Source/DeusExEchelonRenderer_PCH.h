@@ -77,6 +77,7 @@ using UnrealBlendFlags = decltype(PF_Translucent|PF_NotSolid);
 using UnrealPolyFlags = decltype(PF_Translucent|PF_NotSolid);
 using Vec3 = D3DXVECTOR3;
 using Vec4 = D3DXVECTOR4;
+inline bool UEFloatEquals(float pValue, float pComparison) { return (pValue > (pComparison-KINDA_SMALL_NUMBER)) && (pValue < (pComparison+KINDA_SMALL_NUMBER)); }
 
 //Frequently used headers
 #include "hacks/misc.h"

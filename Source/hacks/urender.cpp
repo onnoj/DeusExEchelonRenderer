@@ -631,6 +631,16 @@ namespace Hacks
       D3DXMATRIX& wm = *ctx->drawcallInfo->worldMatrix;
       D3DXMATRIX& wmi = *ctx->drawcallInfo->worldMatrixInv;
       
+
+      //if (actor && actor->Mesh && actor->Mesh->GetIndex() == 34652)
+      //{
+      //  for (auto light = LeafLights; light != nullptr; light = LeafLights->Next)
+      //  {
+      //    
+      //  }
+      //  int x = 1;
+      //}
+
       //Inform high-level renderer we're about to draw a mesh
       ::Misc::g_Facade->GetHLRenderer()->OnDrawMeshBegin(Frame, Owner);
 

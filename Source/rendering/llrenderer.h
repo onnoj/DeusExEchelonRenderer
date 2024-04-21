@@ -52,6 +52,7 @@ public:
 	void RenderTriangleList(const VertexPos3Tex0to4* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void DisableLight(int32_t index);
 	void RenderLight(int32_t index, const D3DLIGHT9& pLight);
 	void FlushLights();
 

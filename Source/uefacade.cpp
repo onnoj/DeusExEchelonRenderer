@@ -87,6 +87,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 	InstallUMeshHacks();
 	InstallUGameEngineHacks();
 	InstallFDynamicItemFilterHacks();
+	InstallULightManagerHacks();
 
 	Misc::setRendererFacade(this);
 	GLog->Log(L"[EchelonRenderer]\t Initializing Direct3D 9 Fixed-Function Pipeline renderer.");
@@ -169,6 +170,7 @@ void UD3D9FPRenderDevice::Exit()
 #if !defined(RELEASE_CONFIG)
 	FreeConsole();
 #endif
+	UninstallULightManagerHacks();
 	UninstallFDynamicItemFilterHacks();
 	UninstallURenderHacks();
 	UninstallUMeshHacks();

@@ -100,6 +100,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 	FBspNode* node = nullptr;
 	uint32_t iNode = 0;
 	uint32_t iActor = 0;
+	uint32_t iMesh = 0;
 	int32_t iSurf = 0;
 	std::string actorName;
 	if (Frame->Level->SingleLineCheck(res, nullptr, end, begin, TRACE_AllEverything) == 0)
@@ -142,6 +143,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 				if (raycast->Actor->Mesh != nullptr)
 				{
 					texture = raycast->Actor->Mesh->GetTexture(0, raycast->Actor);
+					iMesh = raycast->Actor->Mesh->GetIndex();
 				}
 
 				if (texture == nullptr)
@@ -245,6 +247,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 	g_DebugMenu.DebugVar("Modding - Inspector", "iSurf", DebugMenuUniqueID(), iSurf);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Remix Hashes", DebugMenuUniqueID(), remixTextureHashes);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Actor Index", DebugMenuUniqueID(), iActor);
+	g_DebugMenu.DebugVar("Modding - Inspector", "Mesh Index", DebugMenuUniqueID(), iMesh);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Actor Name", DebugMenuUniqueID(), actorName);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Viewed Texture", DebugMenuUniqueID(), textureID);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Node Flags", DebugMenuUniqueID(), nodeFlagsTxt);

@@ -64,6 +64,7 @@ set(SRC_BASE
 	"hacks/urender.cpp"
 	"hacks/umesh.cpp"
 	"hacks/uengine.cpp"
+	"hacks/ulightmanager.cpp"
 	"hacks/fdynamicitemfilter.cpp"
 	"hacks/fscenenode.cpp"
 	"hacks/fspanbuffer.cpp"

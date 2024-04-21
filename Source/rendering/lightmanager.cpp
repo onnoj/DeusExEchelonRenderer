@@ -28,7 +28,7 @@ void LightManager::Initialize(LowlevelRenderer* pLLRenderer)
 	m_Effects.insert(std::make_pair(LE_Cylinder, &effectNOP));
 	m_Effects.insert(std::make_pair(LE_Rotor, &effectNOP));
 	m_Effects.insert(std::make_pair(LE_Unused, &effectNOP));
-	m_KnownLights.reserve(10000);
+	m_LevelLights.reserve(10000);
 }
 
 void LightManager::Shutdown()
@@ -36,126 +36,73 @@ void LightManager::Shutdown()
 	m_LLRenderer = nullptr;
 }
 
-void LightManager::Render(FSceneNode* Frame)
+void LightManager::Update(FSceneNode* Frame)
 {
 	assert(m_LLRenderer != nullptr);
 	auto& ctx = *g_ContextManager.GetContext();
 
-	UModel* Model = Frame->Level->Model;
-	auto& GSurfs = Model->Surfs;
-	auto& GNodes = Model->Nodes;
-	auto& GVerts = Model->Verts;
-	auto& GVertPoints = Model->Points;
 
-	//We only need to render the lights once per map.
-	static uint32_t frameCount = 0;
-	frameCount++;
+}
 
-	auto lightOffset = m_LowerBound;
-	auto numberOfLights = m_KnownLights.size();
-	m_LightIndexOffset = lightOffset;
-	check((numberOfLights&0xFFFFF000ul)==0);
+void LightManager::Render(FSceneNode* Frame)
+{
+	Update(Frame); //move to hlrenderer
+	//
+	assert(m_LLRenderer != nullptr);
+	auto& ctx = *g_ContextManager.GetContext();
 
-	for(auto light : m_KnownLights)
+	//Mark lights that were rendered in the previous frame, but not this frame, as inactive.
+	//push to renderer, and then wipe the list for use for the next frame.
+	for (auto it = m_ExpiringFrameLights.begin(); it != m_ExpiringFrameLights.end();)
 	{
-		uint32_t lightIndex = (light->GetIndex() - lightOffset) + uint32_t(ReservedSlots::MAX_RESERVED);
-		if (light != nullptr &&
-			light->LightType == ELightType::LT_Steady &&
-			light->LightBrightness > 0)
+		LightInfo lightInfo = *it;
+		if (HasFrameLight(lightInfo.lightActor))
 		{
-			FVector pos = light->Location + FVector(0.0f, 0.0f, (frameCount % 2) ? 0.01f : 0.0f); //keep lights awake
-			auto radius = light->WorldLightRadius() * ctx.uservalues.brightness;//((light->WorldLightRadius())/2.0f);
-			auto location = light->Location.TransformPointBy(Frame->Coords);
-			auto brightness = light->LightBrightness / 255.f;
-			//auto effect          = FLightManager::Effects[(Actor->LightEffect<LE_MAX) ? Actor->LightEffect : 0];
-			FPlane floatColor{};
-			GRender->GlobalLighting((Frame->Viewport->Actor->ShowFlags & SHOW_PlayerCtrl) != 0, light, brightness, floatColor);
+			it = m_ExpiringFrameLights.erase(it);
+		}
+		else
+		{
+			it++;
+		}
 
-			floatColor *= brightness * light->Level->Brightness;
-			floatColor.X = min(floatColor.X, 1.0f);
-			floatColor.Y = min(floatColor.Y, 1.0f);
-			floatColor.Z = min(floatColor.Z, 1.0f);
+	}
 
-			D3DLIGHT9 d3dLight{};
-			ZeroMemory(&d3dLight, sizeof(d3dLight));
-#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
-			d3dLight.Position.x = -pos.X;
-			d3dLight.Position.y = pos.Y;
-			d3dLight.Position.z = pos.Z;
-#else
-			d3dLight.Position.x = pos.X;
-			d3dLight.Position.y = pos.Y;
-			d3dLight.Position.z = pos.Z;
-#endif
-			d3dLight.Diffuse.r = floatColor.X;
-			d3dLight.Diffuse.g = floatColor.Y;
-			d3dLight.Diffuse.b = floatColor.Z;
+	auto renderLight = [&](LightInfo& light)
+	{
+		m_Effects[ELightEffect(light.lightActor->LightEffect)](*light.lightIndex, light.lightActor, light.d3dLight);
+		m_LLRenderer->RenderLight(*light.lightIndex, light.d3dLight);
 
-			//0/1/1 should results in physically correct lighting: // 1/(d*d)
-			//however, this results in everything being too dark in remix.
-			const bool isDisco = (light->LightEffect == ELightEffect::LE_Disco);
-			const bool isSpotlight = (light->LightEffect == ELightEffect::LE_Spotlight || light->LightEffect == ELightEffect::LE_StaticSpot);
-			const bool isPointlight = (light->LightEffect == ELightEffect::LE_None);
-
-			if (isPointlight)
+		if (light.isDisco)
+		{
+			light.d3dLight.Range *= 2.0f;
+			for (uint8_t i = 0; i < light.lightExtraCount; i++)
 			{
-				d3dLight.Type = D3DLIGHT_POINT;
-				d3dLight.Specular = d3dLight.Diffuse;
-				d3dLight.Range = radius;
-				d3dLight.Attenuation0 = 0.0f;
-				d3dLight.Attenuation1 = 0.0f;
-				d3dLight.Attenuation2 = 0.0f;
-			}
-			else if (isSpotlight || isDisco)
-			{
-				FVector direction = light->GetViewRotation().Vector();
-				float sine = 1.0 - light->LightCone / 256.0;
-				float rSine = 1.0 / (1.0 - sine);
-				float sineRSine = sine * rSine;
-				float sineSq = sine * sine;
-
-				float thetaBoost = 1.0f;
-				float phiBoost = 1.0f;
-				float rangeBoost = 1.0f;
-				g_DebugMenu.DebugVar("Lighting", "global spotlight thetaBoost", DebugMenuUniqueID(), thetaBoost, {DebugMenuValueOptions::editor::slider, 1.0f, 50.0f});
-				g_DebugMenu.DebugVar("Lighting", "global spotlight phiBoost", DebugMenuUniqueID(), phiBoost, {DebugMenuValueOptions::editor::slider, 1.0f, 50.0f});
-				g_DebugMenu.DebugVar("Lighting", "global spotlight rangeBoost", DebugMenuUniqueID(), rangeBoost, {DebugMenuValueOptions::editor::slider, 1.0f, 50.0f});
-
-				d3dLight.Type = D3DLIGHT_SPOT;
-				d3dLight.Range = light->WorldLightRadius() * rangeBoost;
-				d3dLight.Diffuse.r *= (d3dLight.Range) * rangeBoost;
-				d3dLight.Diffuse.g *= (d3dLight.Range) * rangeBoost;
-				d3dLight.Diffuse.b *= (d3dLight.Range) * rangeBoost;
-				d3dLight.Direction = { direction.X, direction.Y, direction.Z };
-				d3dLight.Theta = sine * thetaBoost;
-				d3dLight.Phi = sine * phiBoost;
-			}
-			else
-			{
-				continue;
-			}
-
-			if (g_options.hasLights)// && ((currentLevel!=lastLevel) || (frameCount%60)==0))
-			{
-				m_Effects[ELightEffect(light->LightEffect)](lightIndex, light, d3dLight);
-				m_LLRenderer->RenderLight(lightIndex, d3dLight);
-
-				if (isDisco)
-				{
-					d3dLight.Range *= 2.0f;
-					uint32_t temporaryIndex = lightIndex << 4;
-					for (uint8_t i = 0; i < 16; i++)
-					{
-						m_Effects[ELightEffect(light->LightEffect)](temporaryIndex + i, light, d3dLight);
-						m_LLRenderer->RenderLight(temporaryIndex + i, d3dLight);
-					}
-				}
+				uint32_t discoReservedIndex = LevelLightsExtraRange.lower + light.lightExtraIndex + i;
+				m_Effects[ELightEffect(light.lightActor->LightEffect)](discoReservedIndex, light.lightActor, light.d3dLight);
+				m_LLRenderer->RenderLight(discoReservedIndex, light.d3dLight);
 			}
 		}
+	};
+
+	//Render all static level lights
+	for(auto& light : m_LevelLights)
+	{
+		CalculateLightInfo(light.lightActor, light);
+		renderLight(light);
+	}
+	for(auto& light : m_FrameLights)
+	{
+		renderLight(light);
+	}
+	for(auto& light : m_ExpiringFrameLights)
+	{
+		check(light.lightIndex);
+		m_LLRenderer->DisableLight(*light.lightIndex);
 	}
 
 	///JCDenton's spotlight vision augmentation
 	{
+		const uint32_t lightIndex = ReservedLightsRange.lower + (uint32_t)ReservedSlots::jcDentonLight;
 		const bool lightEnabled = (m_lightAugmentation != nullptr && m_lightAugmentation->bIsActive);
 		auto fwd = -(Frame->Coords.XAxis ^ Frame->Coords.YAxis);
 		D3DLIGHT9 d3dLight{};
@@ -211,12 +158,103 @@ void LightManager::Render(FSceneNode* Frame)
 		d3dLight.Position = D3DXVECTOR3(d3dLight.Position) + positionOffset;
 		d3dLight.Direction = D3DXVECTOR3(d3dLight.Direction) + directionOffset;
 
-
-		m_LLRenderer->RenderLight((uint32_t)ReservedSlots::jcDentonLight, d3dLight);
+		m_LLRenderer->RenderLight(lightIndex, d3dLight);
 	}
 
-	/// 
-	m_LLRenderer->FlushLights();
+	// send lights to renderer
+	m_LLRenderer->FlushLights(); 
+
+	// move left over previous frame lights into recycling for re-use.
+	m_ExpiredFrameLights.insert(m_ExpiredFrameLights.end(), m_ExpiringFrameLights.begin(), m_ExpiringFrameLights.end());
+	m_ExpiringFrameLights = m_FrameLights;
+	m_FrameLights.clear();
+}
+
+bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& pmInfo)
+{
+	auto& ctx = *g_ContextManager.GetContext();
+  if (pActor == nullptr ||
+    pActor->LightType != ELightType::LT_Steady ||
+    pActor->LightBrightness <= 0)
+  {
+    return false;
+  }
+
+	check(pmInfo.lightIndex);
+	pmInfo.lightActor = pActor;
+
+	static uint32_t frameCount = 0;
+	frameCount++;
+  FVector pos = pActor->Location + FVector(0.0f, 0.0f, (frameCount % 2) ? 0.01f : 0.0f);
+  auto radius = pActor->WorldLightRadius() * ctx.uservalues.brightness;
+  auto brightness = pActor->LightBrightness / 255.f;
+  FPlane floatColor{};
+  GRender->GlobalLighting((ctx.frameSceneNode->Viewport->Actor->ShowFlags & SHOW_PlayerCtrl) != 0, pActor, brightness, floatColor);
+	
+  floatColor *= brightness * pActor->Level->Brightness;
+  floatColor.X = min(floatColor.X, 1.0f);
+  floatColor.Y = min(floatColor.Y, 1.0f);
+  floatColor.Z = min(floatColor.Z, 1.0f);
+
+	D3DLIGHT9& d3dLight = pmInfo.d3dLight;
+  ZeroMemory(&d3dLight, sizeof(d3dLight));
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+  d3dLight.Position.x = -pos.X;
+  d3dLight.Position.y = pos.Y;
+  d3dLight.Position.z = pos.Z;
+#else
+  d3dLight.Position.x = pos.X;
+  d3dLight.Position.y = pos.Y;
+  d3dLight.Position.z = pos.Z;
+#endif
+  d3dLight.Diffuse.r = floatColor.X;
+  d3dLight.Diffuse.g = floatColor.Y;
+  d3dLight.Diffuse.b = floatColor.Z;
+
+  pmInfo.isDisco = (pActor->LightEffect == ELightEffect::LE_Disco);
+  pmInfo.isSpotlight = (pActor->LightEffect == ELightEffect::LE_Spotlight || pActor->LightEffect == ELightEffect::LE_StaticSpot);
+	pmInfo.isPointlight = !pmInfo.isSpotlight; //(pActor->LightEffect == ELightEffect::LE_None || pActor->LightEffect == ELightEffect::LE_NonIncidence);
+
+  if (pmInfo.isPointlight)
+  {
+    d3dLight.Type = D3DLIGHT_POINT;
+    d3dLight.Specular = d3dLight.Diffuse;
+    d3dLight.Range = radius;
+    d3dLight.Attenuation0 = 0.0f;
+    d3dLight.Attenuation1 = 0.0f;
+    d3dLight.Attenuation2 = 0.0f;
+  }
+  else if (pmInfo.isSpotlight || pmInfo.isDisco)
+  {
+    FVector direction = pActor->GetViewRotation().Vector();
+    float sine = 1.0 - pActor->LightCone / 256.0;
+    float rSine = 1.0 / (1.0 - sine);
+    float sineRSine = sine * rSine;
+    float sineSq = sine * sine;
+
+    float thetaBoost = 1.0f;
+    float phiBoost = 1.0f;
+    float rangeBoost = 1.0f;
+    g_DebugMenu.DebugVar("Lighting", "global spotlight thetaBoost", DebugMenuUniqueID(), thetaBoost, { DebugMenuValueOptions::editor::slider, 1.0f, 50.0f });
+    g_DebugMenu.DebugVar("Lighting", "global spotlight phiBoost", DebugMenuUniqueID(), phiBoost, { DebugMenuValueOptions::editor::slider, 1.0f, 50.0f });
+    g_DebugMenu.DebugVar("Lighting", "global spotlight rangeBoost", DebugMenuUniqueID(), rangeBoost, { DebugMenuValueOptions::editor::slider, 1.0f, 50.0f });
+
+    d3dLight.Type = D3DLIGHT_SPOT;
+    d3dLight.Range = pActor->WorldLightRadius() * rangeBoost;
+    d3dLight.Diffuse.r *= (d3dLight.Range) * rangeBoost;
+    d3dLight.Diffuse.g *= (d3dLight.Range) * rangeBoost;
+    d3dLight.Diffuse.b *= (d3dLight.Range) * rangeBoost;
+    d3dLight.Direction = { direction.X, direction.Y, direction.Z };
+    d3dLight.Theta = sine * thetaBoost;
+    d3dLight.Phi = sine * phiBoost;
+  }
+  else
+  {
+    return false;
+  }
+	
+
+	return true;
 }
 
 void LightManager::CacheLights()
@@ -235,6 +273,16 @@ void LightManager::CacheLights()
 	for (int i = 0; i < Model->Lights.Num(); i++)
 	{
 		auto light = Model->Lights(i);
+		if (light != nullptr)
+		{
+			m_LevelLightsLowerBound = min(m_LevelLightsLowerBound, light->GetIndex());
+			m_LevelLightsUpperBound = max(m_LevelLightsUpperBound, light->GetIndex());
+		}
+	}
+
+	for (int i = 0; i < Model->Lights.Num(); i++)
+	{
+		auto light = Model->Lights(i);
 
 		//Skip if we've already seen this light.
 		if (light==nullptr || !seenLights.insert(light).second)
@@ -242,9 +290,23 @@ void LightManager::CacheLights()
 			continue;
 		}
 
-		m_LowerBound = min(m_LowerBound, light->GetIndex());
-		m_UpperBound = max(m_UpperBound, light->GetIndex());
-		m_KnownLights.push_back(light);
+		m_LevelLightsLowerBound = min(m_LevelLightsLowerBound, light->GetIndex());
+		m_LevelLightsUpperBound = max(m_LevelLightsUpperBound, light->GetIndex());
+
+		LightInfo lightInfo;
+		lightInfo.lightIndex = LevelLightsRange.lower + (light->GetIndex() - m_LevelLightsLowerBound);
+		check(lightInfo.lightIndex && (*lightInfo.lightIndex >= LevelLightsRange.lower) && (*lightInfo.lightIndex < LevelLightsRange.upper));
+		if (CalculateLightInfo(light, lightInfo))
+		{
+			if (lightInfo.isDisco)
+			{
+				lightInfo.lightExtraIndex = m_FreeLevelLightsExtraIndex;
+				lightInfo.lightExtraCount = 16;
+				m_FreeLevelLightsExtraIndex += 16;
+				m_FreeLevelLightsExtraIndex %= (LevelLightsExtraRange.upper - LevelLightsExtraRange.lower);
+			}
+			m_LevelLights.push_back(lightInfo);
+		}
 	}
 
 	//Find JC's flashlight
@@ -262,13 +324,102 @@ void LightManager::CacheLights()
 
 void LightManager::OnLevelChange()
 {
-	m_LowerBound = 0xFFFFFFFFul;
-	m_UpperBound = 0x00000000ul;
-	m_LightIndexOffset.reset();
-	m_lightAugmentation = nullptr;
-	m_KnownLights.clear();
+	if (m_LLRenderer)
+	{
+		auto disableOldLight = [&](const LightInfo& pLightInfo)
+		{
+			m_LLRenderer->DisableLight(*pLightInfo.lightIndex);
+			for (int i = 0; i < pLightInfo.lightExtraCount; i++)
+			{
+				uint32_t index = LevelLightsExtraRange.lower + pLightInfo.lightExtraIndex + i;
+				m_LLRenderer->DisableLight(index);
+			}
+		};
+		
+		for (const auto& l : m_LevelLights)
+		{
+			disableOldLight(l);
+		}
+		for (const auto& l : m_FrameLights)
+		{
+			disableOldLight(l);
+		}
+		for (const auto& l : m_ExpiringFrameLights)
+		{
+			disableOldLight(l);
+		}
+		for (const auto& l : m_ExpiredFrameLights)
+		{
+			disableOldLight(l);
+		}
+	}
 
+	m_LevelLightsLowerBound = 0xFFFFFFFFul;
+	m_LevelLightsUpperBound = 0x00000000ul;
+	m_FreeFrameLightIndex = 0;
+	m_FreeLevelLightsExtraIndex = 0;
+	m_lightAugmentation = nullptr;
+	m_LevelLights.clear();
+	m_FrameLights.clear();
+	m_ExpiringFrameLights.clear();
+	m_ExpiredFrameLights.clear();
 	CacheLights();
+}
+
+void LightManager::AddFrameLight(AActor* pLight, FVector* pLocation /*= nullptr*/)
+{
+	LightInfo& lightInfo = [&]() -> LightInfo& {
+		for (auto& existingLight : m_FrameLights)
+		{
+			if (existingLight.lightActor == pLight)
+			{
+				return existingLight;
+			}
+		}
+
+		for (auto it = m_ExpiringFrameLights.begin(); it != m_ExpiringFrameLights.end(); it++)
+		{
+			LightManager::LightInfo frameLightInfo = (*it);
+			if (frameLightInfo.lightActor == pLight)
+			{
+				m_ExpiringFrameLights.erase(it);
+				return m_FrameLights.emplace_back(std::move(frameLightInfo));
+			}
+		}
+
+		for (auto it = m_ExpiredFrameLights.begin(); it != m_ExpiredFrameLights.end(); it++)
+		{
+			LightManager::LightInfo frameLightInfo = (*it);
+			if (frameLightInfo.lightActor == pLight)
+			{
+				m_ExpiredFrameLights.erase(it);
+				return m_FrameLights.emplace_back(std::move(frameLightInfo));
+			}
+		}
+		
+		auto& info = m_FrameLights.emplace_back();
+		info.lightActor = pLight;
+		info.lightIndex = DynamicLightsRange.lower + m_FreeFrameLightIndex;
+		m_FreeFrameLightIndex++;
+		return info;
+	}();
+
+	if (!CalculateLightInfo(pLight, lightInfo))
+	{
+		m_ExpiringFrameLights.push_back(lightInfo);
+	}
+}
+
+bool LightManager::HasFrameLight(AActor* pLight)
+{
+	for (const auto l : m_FrameLights)
+	{
+		if (l.lightActor == pLight)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 ///

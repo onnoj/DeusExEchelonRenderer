@@ -340,6 +340,11 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos4Colo
 	);
 }
 
+void LowlevelRenderer::DisableLight(int32_t index)
+{
+	m_Device->LightEnable(index, FALSE);
+}
+
 void LowlevelRenderer::RenderLight(int32_t index, const D3DLIGHT9& pLight)
 {
 	static const int maxLightsPerCall = [&]() {

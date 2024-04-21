@@ -822,8 +822,9 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
 		//for now, skip any polygons not draw by DrawMesh
 		return;
 	}
+	auto& callInfo = *renderContext->drawcallInfo;
 
-	const auto key = reinterpret_cast<DynamicMeshesKey>(renderContext->drawcallInfo->Owner);
+	const auto key = reinterpret_cast<DynamicMeshesKey>(callInfo.Owner);
 	for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
 	{
 		auto& dynamicMeshInfo = foundIt->second;
@@ -860,26 +861,51 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
 			wmCoords = wmCoords * parent->Rotation * SpecialCoords.Inverse();
 		}
 
-		D3DXMATRIX wm = UECoordsToMatrix(wmCoords);
-		renderContext->drawcallInfo->worldMatrix = wm;
 
-		SetWorldTransformState(*renderContext->drawcallInfo->worldMatrix);
-		SetViewState(Frame, ViewType::game);
-		const auto meshIndex = Owner->Mesh->GetIndex();	
-		m_TextureManager.BindTexture(dynamicMeshInfo.flags, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags, &dynamicMeshInfo.textureInfo));
-		float diff = std::abs(dynamicMeshInfo.lastVertexSum - vertexSum);
-		bool isAnimating = Owner->AnimRate > 0.0f;
-		if (diff>2.0f || isAnimating)
+
+		for (auto light = callInfo.LeafLights; light != nullptr; light = light->Next)
 		{
-			dynamicMeshInfo.lastVertexSum = vertexSum;
-			const uint32_t meshHash = appMemCrc(buffer->data(), buffer->size() * sizeof(LowlevelRenderer::VertexPos3Tex0));
-			m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
-			dynamicMeshInfo.lastDrawcallHash = meshHash;
+			m_LightManager.AddFrameLight(light->Actor, &light->Location);
 		}
-		else
+
+
+		SetViewState(Frame, ViewType::game);
+		D3DXMATRIX wm = UECoordsToMatrix(wmCoords);
+		callInfo.worldMatrix = wm;
+		const bool isEmissive = (callInfo.PolyFlags & PF_Unlit) != 0;
+		for (int i = 0; i < (isEmissive ? 3 : 1); i++)
 		{
-			const uint32_t meshHash = dynamicMeshInfo.lastDrawcallHash;
-			m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
+			const auto meshIndex = Owner->Mesh->GetIndex();	
+			float diff = std::abs(dynamicMeshInfo.lastVertexSum - vertexSum);
+			bool isAnimating = Owner->AnimRate > 0.0f;
+
+			if (i >= 1)
+			{
+				const FVector scale = (i == 1) ? FVector{0.9999f, 0.9999f, 0.9999f} : FVector{1.0001f, 1.0001f, 1.0001f};
+				D3DXMATRIX s;
+				D3DXMatrixScaling(&s, scale.X, scale.Y, scale.Z);
+				D3DXMatrixMultiply(&wm, &callInfo.worldMatrix.value(), &s);
+				SetWorldTransformState(wm);
+				m_TextureManager.BindTexture(dynamicMeshInfo.flags &~ PF_Unlit, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags &~ PF_Unlit, &dynamicMeshInfo.textureInfo));
+			}
+			else
+			{
+				SetWorldTransformState(*callInfo.worldMatrix);
+				m_TextureManager.BindTexture(dynamicMeshInfo.flags, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags, &dynamicMeshInfo.textureInfo));
+			}
+
+			if (diff > 2.0f || isAnimating)
+			{
+				dynamicMeshInfo.lastVertexSum = vertexSum;
+				const uint32_t meshHash = appMemCrc(buffer->data(), buffer->size() * sizeof(LowlevelRenderer::VertexPos3Tex0));
+				m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
+				dynamicMeshInfo.lastDrawcallHash = meshHash;
+			}
+			else
+			{
+				const uint32_t meshHash = dynamicMeshInfo.lastDrawcallHash;
+				m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
+			}
 		}
 	}
 }

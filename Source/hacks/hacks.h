@@ -6,6 +6,7 @@ extern void InstallURenderHacks();
 extern void InstallUMeshHacks();
 extern void InstallUGameEngineHacks();
 extern void InstallFDynamicItemFilterHacks();
+extern void InstallULightManagerHacks();
 extern void InstallThreadAffinityHacks();
 extern void InstallBytePatches();
 extern void InstallRTXConfigPatches();
@@ -15,6 +16,7 @@ extern void UninstallFSpanBufferHacks();
 extern void UninstallURenderHacks();
 extern void UninstallUMeshHacks();
 extern void UninstallUGameEngineHacks();
+extern void UninstallULightManagerHacks();
 extern void UninstallFDynamicItemFilterHacks();
 extern void UninstallThreadAffinityHacks();
 extern void UninstallBytePatches();
@@ -42,6 +44,7 @@ struct HookableFunction
   void Restore() { funcPtr = cpy.funcPtr; }
   operator TFuncPtr() { return funcPtr; }
   HookableFunction<TFuncPtr>& operator=(const TFuncPtr& pRH) { funcPtr = pRH; cpy.funcPtr = pRH; return *this; }
+  HookableFunction<TFuncPtr>& operator=(const void* pRH) { func64 = reinterpret_cast<uint64_t>(pRH); cpy.func64 = func64; return *this; }
 private:
   struct
   {

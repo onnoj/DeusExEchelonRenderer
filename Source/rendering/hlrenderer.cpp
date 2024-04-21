@@ -854,14 +854,13 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
 			return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
 		}();
 
+		bool isPlayerWeapon = (Owner->Owner==Frame->Viewport->Actor);
 		auto actor = Owner;
 		auto parent = Owner->Owner;
-		if (parent != nullptr)
+		if (parent != nullptr && !isPlayerWeapon)
 		{
 			wmCoords = wmCoords * parent->Rotation * SpecialCoords.Inverse();
 		}
-
-
 
 		for (auto light = callInfo.LeafLights; light != nullptr; light = light->Next)
 		{

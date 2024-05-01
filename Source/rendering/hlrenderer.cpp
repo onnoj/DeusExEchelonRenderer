@@ -49,9 +49,7 @@ void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
 
 	auto& ctx = *g_ContextManager.GetContext();
 	ctx.frameSceneNode = Frame;
-	ctx.uservalues.brightness = 0.80f + Frame->Viewport->GetOuterUClient()->Brightness;
-	ctx.uservalues.brightness = ctx.uservalues.brightness * ctx.uservalues.brightness;
-
+	ctx.uservalues.brightness = 2.0f * float(Frame->Viewport->GetOuterUClient()->Brightness);
 	
 	static uint32_t lastLevel = 0;
 	uint32_t currentLevel = reinterpret_cast<uint32_t>(Frame->Level);

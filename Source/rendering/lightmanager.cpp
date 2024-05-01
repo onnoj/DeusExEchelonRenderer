@@ -211,18 +211,19 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
   d3dLight.Diffuse.g = floatColor.Y;
   d3dLight.Diffuse.b = floatColor.Z;
 
-  pmInfo.isDisco = (pActor->LightEffect == ELightEffect::LE_Disco);
+  d3dLight.Attenuation0 = 1.0f;
+  d3dLight.Attenuation1 = 0.0f;
+  d3dLight.Attenuation2 = 0.0f;
+
+	pmInfo.isDisco = (pActor->LightEffect == ELightEffect::LE_Disco);
   pmInfo.isSpotlight = (pActor->LightEffect == ELightEffect::LE_Spotlight || pActor->LightEffect == ELightEffect::LE_StaticSpot);
-	pmInfo.isPointlight = !pmInfo.isSpotlight; //(pActor->LightEffect == ELightEffect::LE_None || pActor->LightEffect == ELightEffect::LE_NonIncidence);
+	pmInfo.isPointlight = !pmInfo.isSpotlight && !pmInfo.isDisco; //(pActor->LightEffect == ELightEffect::LE_None || pActor->LightEffect == ELightEffect::LE_NonIncidence);
 
   if (pmInfo.isPointlight)
   {
     d3dLight.Type = D3DLIGHT_POINT;
     d3dLight.Specular = d3dLight.Diffuse;
     d3dLight.Range = radius;
-    d3dLight.Attenuation0 = 0.0f;
-    d3dLight.Attenuation1 = 0.0f;
-    d3dLight.Attenuation2 = 0.0f;
   }
   else if (pmInfo.isSpotlight || pmInfo.isDisco)
   {
@@ -252,8 +253,22 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
   {
     return false;
   }
-	
 
+
+	float diffuseBoost = 1.0f;
+	float rangeMultiplier = 1.0f;
+	float rangeOffset = 0.0f;
+	g_DebugMenu.DebugVar("Lighting", "global light diffuseBoost", DebugMenuUniqueID(), diffuseBoost, { DebugMenuValueOptions::editor::slider, 0.0f, 10.0f });
+	g_DebugMenu.DebugVar("Lighting", "global range offset", DebugMenuUniqueID(), rangeOffset, { DebugMenuValueOptions::editor::slider, 0.0f, 1000.0f });
+	g_DebugMenu.DebugVar("Lighting", "global range multiplier", DebugMenuUniqueID(), rangeMultiplier, { DebugMenuValueOptions::editor::slider, 0.0f, 50.0f });
+	g_DebugMenu.DebugVar("Lighting", "global light Attenuation0", DebugMenuUniqueID(), d3dLight.Attenuation0);
+	g_DebugMenu.DebugVar("Lighting", "global light Attenuation1", DebugMenuUniqueID(), d3dLight.Attenuation1);
+	g_DebugMenu.DebugVar("Lighting", "global light Attenuation2", DebugMenuUniqueID(), d3dLight.Attenuation2);
+	d3dLight.Diffuse.r *= diffuseBoost;
+	d3dLight.Diffuse.g *= diffuseBoost;
+	d3dLight.Diffuse.b *= diffuseBoost;
+	d3dLight.Range *= rangeMultiplier;
+	d3dLight.Range += rangeOffset;
 	return true;
 }
 

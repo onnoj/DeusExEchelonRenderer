@@ -98,6 +98,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 	UnrealPolyFlags surfFlags = 0;
 	UnrealPolyFlags textureFlags = 0;
 	FBspNode* node = nullptr;
+	AActor* actor = nullptr;
 	uint32_t iNode = 0;
 	uint32_t iActor = 0;
 	uint32_t iMesh = 0;
@@ -131,12 +132,17 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 								texture->Unlock(info);
 								break;
 							}
+							else
+							{
+								int x = 1;
+							}
 						}
 					}
 				}
 			}
 			else if (raycast->Actor)
 			{
+				actor = raycast->Actor;
 				iActor = raycast->Actor->GetIndex();
 				actorName = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(raycast->Actor->GetFullName());
 				UTexture* texture = nullptr;
@@ -222,6 +228,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 
 	bool hasSurfaceFlags = false;
 	bool hasTextureFlags = false;
+	
 	for (auto& pf : knownPolyFlags)
 	{
 		if ((surfFlags & pf.first)==pf.first)
@@ -243,10 +250,24 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 	if (!hasSurfaceFlags)  surfaceFlagTxt = "(none)";
 	if (!hasTextureFlags)  textureFlagTxt = "(none)";
 
+	std::string actorClassPath;
+	if (actor)
+	{
+		for(auto cls = actor->GetClass(); cls != nullptr; cls = cls->GetSuperClass())
+		{
+			actorClassPath += std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(cls->GetNameCPP());
+			if (cls->GetSuperClass() != nullptr)
+			{
+				actorClassPath += " <- ";
+			}
+		}
+	}
+
 	g_DebugMenu.DebugVar("Modding - Inspector", "iNode", DebugMenuUniqueID(), iNode);
 	g_DebugMenu.DebugVar("Modding - Inspector", "iSurf", DebugMenuUniqueID(), iSurf);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Remix Hashes", DebugMenuUniqueID(), remixTextureHashes);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Actor Index", DebugMenuUniqueID(), iActor);
+	g_DebugMenu.DebugVar("Modding - Inspector", "Actor Class", DebugMenuUniqueID(), actorClassPath);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Mesh Index", DebugMenuUniqueID(), iMesh);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Actor Name", DebugMenuUniqueID(), actorName);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Viewed Texture", DebugMenuUniqueID(), textureID);

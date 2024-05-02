@@ -1,7 +1,25 @@
 #pragma once
+using json = nlohmann::json;
+
+struct Options
+{
+  std::string textureDumpJSON = "textureDump.json";
+  std::filesystem::path inputFolderPath = "";
+  std::filesystem::path outputFolderPath = "";
+  std::string inputFilenameFormat = "{:X}";
+  std::string outputFormat = "${package}\\${remixhash-hex}.png";
+  std::vector<std::regex> inputFileFilters{};
+  std::map<std::string, std::regex> jsonFilterMap{};
+  enum class OperationMode
+  {
+    unknown,
+    copy,
+  } operationMode = OperationMode::unknown;
+};
 
 struct TextureData
 {
+  json m_JSONItem;
   uint32_t m_CacheId = 0;
   std::vector<std::string> m_Flags;
   uint32_t m_Index = 0;
@@ -18,11 +36,9 @@ class IngestionHelper
 {
   using json = nlohmann::json;
 public:
-  IngestionHelper(const json& pJSONDumpStruct, const std::string pFilenameFormat, const std::filesystem::path& pInputFolder, const std::filesystem::path& pOutputFolder)
+  IngestionHelper(const json& pJSONDumpStruct, const Options& options)
     : m_Root(pJSONDumpStruct),
-      m_FilenameFormat(pFilenameFormat),
-      m_InputFolder(pInputFolder),
-      m_OutputFolder(pOutputFolder) {};
+      m_Options(options){};
   IngestionHelper() = delete;
   virtual ~IngestionHelper() = default;
   IngestionHelper(const IngestionHelper&) = delete;
@@ -34,9 +50,8 @@ protected:
   void processFiles();
 private:
   json m_Root;
-  std::string m_FilenameFormat;
-  std::filesystem::path m_InputFolder;
-  std::filesystem::path m_OutputFolder;
+  Options m_Options;
   std::unordered_map<uint64_t, const TextureData*> m_HashToDataMap;
   std::vector<TextureData> m_TextureDataArray;
 };
+

@@ -6,11 +6,13 @@ include_directories(AFTER "${CMAKE_SOURCE_DIR}/TOOLS/ingestionhelper")
 
 set(SRC_BASE
 	"Source/main.cpp"
+	"Source/utils.cpp"
 	"Source/ingestionhelper.cpp"
 )
 
 set(HDR_BASE
 	"Source/main.h"
+	"Source/utils.h"
 	"Source/ingestionhelper.h"
 )
 

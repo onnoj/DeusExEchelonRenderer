@@ -224,6 +224,21 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
     d3dLight.Type = D3DLIGHT_POINT;
     d3dLight.Specular = d3dLight.Diffuse;
     d3dLight.Range = radius;
+
+		/*
+		* It seems that the original attenuation in UE was linear with a direct cutoff.
+		* D3D9's attenuation formula is Atten = 1/( att0i + att1i * d + att2i * d²).
+		* The following is probably mathemathically bullshit, but, it seems to best approach
+		* the original lighting formula.
+		*/
+		d3dLight.Attenuation0 = 0.5f;
+		d3dLight.Attenuation1 = 1.0f/radius;
+		d3dLight.Attenuation2 = 0.0f;
+
+		g_DebugMenu.DebugVar("Lighting", "pointlight Attenuation0", DebugMenuUniqueID(), d3dLight.Attenuation0);
+		g_DebugMenu.DebugVar("Lighting", "pointlight Attenuation1", DebugMenuUniqueID(), d3dLight.Attenuation1);
+		g_DebugMenu.DebugVar("Lighting", "pointlight Attenuation2", DebugMenuUniqueID(), d3dLight.Attenuation2);
+
   }
   else if (pmInfo.isSpotlight || pmInfo.isDisco)
   {
@@ -248,6 +263,10 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
     d3dLight.Direction = { direction.X, direction.Y, direction.Z };
     d3dLight.Theta = sine * thetaBoost;
     d3dLight.Phi = sine * phiBoost;
+
+		g_DebugMenu.DebugVar("Lighting", "spotlight Attenuation0", DebugMenuUniqueID(), d3dLight.Attenuation0);
+		g_DebugMenu.DebugVar("Lighting", "spotlight Attenuation1", DebugMenuUniqueID(), d3dLight.Attenuation1);
+		g_DebugMenu.DebugVar("Lighting", "spotlight Attenuation2", DebugMenuUniqueID(), d3dLight.Attenuation2);
   }
   else
   {
@@ -261,9 +280,7 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
 	g_DebugMenu.DebugVar("Lighting", "global light diffuseBoost", DebugMenuUniqueID(), diffuseBoost, { DebugMenuValueOptions::editor::slider, 0.0f, 10.0f });
 	g_DebugMenu.DebugVar("Lighting", "global range offset", DebugMenuUniqueID(), rangeOffset, { DebugMenuValueOptions::editor::slider, 0.0f, 1000.0f });
 	g_DebugMenu.DebugVar("Lighting", "global range multiplier", DebugMenuUniqueID(), rangeMultiplier, { DebugMenuValueOptions::editor::slider, 0.0f, 50.0f });
-	g_DebugMenu.DebugVar("Lighting", "global light Attenuation0", DebugMenuUniqueID(), d3dLight.Attenuation0);
-	g_DebugMenu.DebugVar("Lighting", "global light Attenuation1", DebugMenuUniqueID(), d3dLight.Attenuation1);
-	g_DebugMenu.DebugVar("Lighting", "global light Attenuation2", DebugMenuUniqueID(), d3dLight.Attenuation2);
+
 	d3dLight.Diffuse.r *= diffuseBoost;
 	d3dLight.Diffuse.g *= diffuseBoost;
 	d3dLight.Diffuse.b *= diffuseBoost;

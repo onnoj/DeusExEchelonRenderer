@@ -519,6 +519,11 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 	{
 		return;
 	}
+	if ((Surface.PolyFlags & PF_Mirrored) != 0)
+	{
+		Surface.PolyFlags &= ~PF_Invisible;
+	}
+
 	if ((Surface.PolyFlags & PF_Invisible) != 0)
 	{
 		return;

@@ -68,6 +68,17 @@
 #undef _esi
 #undef _edi
 
+#include "utils/utils.h"
+
+//Globals:
+#define g_RendererName L"DeusExEchelonRenderer"
+
+static const std::wstring g_ConfigFilename = []() {
+  std::wstring systemFolder = Utils::GetProcessFolder();
+  systemFolder += (g_RendererName L".ini");
+  return systemFolder;
+}();
+
 //Convenience:
 #include <d3dx9math.h>
 #define SAFE_RELEASE(p)      { if(p) { (p)->Release(); (p)=NULL; } }

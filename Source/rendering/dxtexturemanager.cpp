@@ -3,6 +3,8 @@
 
 #pragma comment(lib, "d3dx9.lib")
 
+#include "utils/configmanager.h"
+#include "utils/utils.h"
 #include "rendering/dxtexturemanager.h"
 
 TextureManager::~TextureManager()
@@ -30,6 +32,11 @@ void TextureManager::Initialize(LowlevelRenderer* pLLRenderer)
   {
     m_FakeTexture.reset();
   }
+
+  for (const auto& textureName : g_ConfigManager.GetHijackedTextureNames())
+  {
+    m_HijackableTextures.insert(Utils::ConvertUtf8ToWc(textureName));
+  }
 }
 
 void TextureManager::Shutdown()
@@ -47,7 +54,49 @@ DeusExD3D9TextureHandle TextureManager::ProcessTexture(UnrealPolyFlags pFlags, F
 
   DeusExD3D9TextureHandle& handle = m_InstanceCache.emplace(std::make_pair(key, std::make_unique<DeusExD3D9Texture>())).first->second;
   handle->valid = false;
-  
+
+  std::wstring textureName = pUETextureInfo->Texture->GetPathName();
+  const bool isHijacked = (m_HijackableTextures.find(textureName) != m_HijackableTextures.end());
+  if (isHijacked)
+  {
+    ProcessHijackedTexture(key, pFlags, pUETextureInfo, handle);
+  }
+  else
+  {
+    ProcessUETexture(key, pFlags, pUETextureInfo, handle);
+  }
+
+  assert(pUETextureInfo->USize == pUETextureInfo->Mips[0]->USize);
+  assert(pUETextureInfo->VSize == pUETextureInfo->Mips[0]->VSize);
+  const bool isDynamic = (pUETextureInfo->bRealtimeChanged || pUETextureInfo->bRealtime || pUETextureInfo->bParametric);
+  //if (isDynamic)
+  //{
+  //  return handle;
+  //}
+  //assert(!isDynamic);
+
+  if (m_llrenderer->AllocateTexture(handle))
+  {
+    handle->valid = true;
+    m_TextureCache.insert(std::make_pair(pUETextureInfo->CacheID, handle));
+  }
+  else
+  {
+    handle->valid = false;
+  }
+
+  //Keep texture data, debug menu might need it.
+  if (!g_options.hasDebugMenu)
+  {
+    if (handle->buffer) handle->buffer->clear();
+    handle->buffer.reset();
+  }
+
+  return handle;
+}
+
+void TextureManager::ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle)
+{
   //We _only_ process mip0, we're not really interested in the other mips for remix...
   auto textureMip0 = pUETextureInfo->Mips[0];
   assert(pUETextureInfo->UClamp != 0);
@@ -56,7 +105,7 @@ DeusExD3D9TextureHandle TextureManager::ProcessTexture(UnrealPolyFlags pFlags, F
   handle->md.height = pUETextureInfo->VClamp; //should be VSize clamped by VClamp if non-0?
   handle->md.multU = 1.0 / (pUETextureInfo->UScale * pUETextureInfo->UClamp);
   handle->md.multV = 1.0 / (pUETextureInfo->VScale * pUETextureInfo->VClamp);
-  handle->md.cacheID = key;
+  handle->md.cacheID = pKey;
 
   switch (pUETextureInfo->Format)
   {
@@ -96,34 +145,40 @@ DeusExD3D9TextureHandle TextureManager::ProcessTexture(UnrealPolyFlags pFlags, F
       assert(false); //unsupported
     } break;
   };
+}
 
-  assert(pUETextureInfo->USize == pUETextureInfo->Mips[0]->USize);
-  assert(pUETextureInfo->VSize == pUETextureInfo->Mips[0]->VSize);
-  const bool isDynamic = (pUETextureInfo->bRealtimeChanged || pUETextureInfo->bRealtime || pUETextureInfo->bParametric);
-  //if (isDynamic)
-  //{
-  //  return handle;
-  //}
-  //assert(!isDynamic);
+void TextureManager::ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle)
+{
+  ProcessUETexture(pKey, pFlags, pUETextureInfo, handle);
 
-  if (m_llrenderer->AllocateTexture(handle))
-  {
-    handle->valid = true;
-    m_TextureCache.insert(std::make_pair(pUETextureInfo->CacheID, handle));
-  }
-  else
-  {
-    handle->valid = false;
-  }
+#if 0
+  auto textureMip0 = pUETextureInfo->Mips[0];
+  assert(pUETextureInfo->UClamp != 0);
+  assert(pUETextureInfo->VClamp != 0);
+  handle->md.width = 16;
+  handle->md.height = 16;
+  handle->md.multU = 1.0 / (pUETextureInfo->UScale * pUETextureInfo->UClamp);
+  handle->md.multV = 1.0 / (pUETextureInfo->VScale * pUETextureInfo->VClamp);
+  handle->md.cacheID = pKey;
+  handle->format = D3DFMT_A8R8G8B8;
+  handle->buffer.emplace();
+  const auto bufferSize = handle->md.width * handle->md.height * 4/*D3DFMT_A8R8G8B8 format*/;
+  handle->buffer->reserve(bufferSize);
+  ::memset(handle->buffer->data(), 0, handle->buffer->size());
+  handle->textureDataPtr = handle->buffer->data();
+  handle->textureDataPitch = handle->md.width * 4/*D3DFMT_A8R8G8B8 format*/;
+#endif
 
-  //Keep texture data, debug menu might need it.
-  if (!g_options.hasDebugMenu)
-  {
-    if (handle->buffer) handle->buffer->clear();
-    handle->buffer.reset();
-  }
+  uint32_t key = 0;
+  std::wstring textureName = pUETextureInfo->Texture->GetPathName();
+  MurmurHash3_x86_32(textureName.c_str(), textureName.size() * sizeof(wchar_t), key, &key);
+  MurmurHash3_x86_32(&pFlags, sizeof(pFlags), key, &key);
 
-  return handle;
+  //Purposefully corrupt the last 4 bytes of the texture with the hash of this texture variant
+  const auto bufferSize = handle->md.height * handle->textureDataPitch;
+  uint8_t* buffer = handle->buffer->data();
+  uint8_t* lastFourBytes = (buffer + bufferSize) - 4;
+  *reinterpret_cast<uint32_t*>(lastFourBytes) = key;
 }
 
 bool TextureManager::BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHandle& pTextureHandle)
@@ -139,6 +194,7 @@ bool TextureManager::BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHand
     if (polygonFlags & PF_Mirrored) {
       polygonFlags &= ~PF_Mirrored;
       polygonFlags &= ~PF_Translucent;
+      polygonFlags &= ~PF_Invisible;
     }
 
     m_llrenderer->ConfigureBlendState(polygonFlags);

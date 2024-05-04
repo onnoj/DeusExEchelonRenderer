@@ -16,9 +16,9 @@
 
 #include "MurmurHash3.h"
 #include "utils/debugmenu.h"
+#include "utils/configmanager.h"
 #include "hacks/hacks.h"
 #include "hacks/misc.h"
-
 IMPLEMENT_PACKAGE(DeusExEchelonRenderer);
 IMPLEMENT_CLASS(UD3D9FPRenderDevice);
 
@@ -77,6 +77,9 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 	{
 		return FALSE;
 	}
+
+	g_ConfigManager.LoadConfig();
+	g_ConfigManager.SaveConfig(); //save file again so that we have the defaults
 
 	InstallRTXConfigPatches();
 	InstallBytePatches();

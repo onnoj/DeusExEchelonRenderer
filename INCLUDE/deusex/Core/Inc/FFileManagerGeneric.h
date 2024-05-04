@@ -106,7 +106,7 @@ public:
 			if( !Delete(*(FString(Path) * List(i)),1,1) )
 				return 0;
 		List = FindFiles( *Spec, 0, 1 );
-		for( i=0; i<List.Num(); i++ )
+		for( int i=0; i<List.Num(); i++ )
 			if( !DeleteDirectory(*(FString(Path) * List(i)),1,1) )
 				return 0;
 		return DeleteDirectory( Path, RequireExists, 0 );

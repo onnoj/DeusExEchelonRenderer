@@ -3,6 +3,7 @@
 add_definitions(-D_DLL -DEE_LIBDLL -DDEUSEX=1) 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/USER/)
 set(DEUSEX_INT_FILE "DeusExEchelonRenderer.int")
+set(DEUSEX_INI_FILE "DeusExEchelonRenderer.ini")
 set(DEUSEX_RTX_FILE "rtx.conf")
 add_compile_definitions("CONVERT_TO_LEFTHANDED_COORDINATES=1")
 
@@ -57,6 +58,8 @@ set(SRC_BASE
 	"rendering/dxtexture.cpp"
 	"rendering/dxtexturemanager.cpp"
 	"rendering/lightmanager.cpp"
+	"utils/configmanager.cpp"
+	"utils/utils.cpp"
 	"utils/debugmenu.cpp"
 	"utils/memory.cpp"
 	"utils/materialdebugger.cpp"
@@ -82,11 +85,14 @@ set(HDR_BASE
 	"rendering/dxtexture.h"
 	"rendering/dxtexturemanager.h"
 	"rendering/lightmanager.h"
+	"utils/configmanager.h"
+	"utils/utils.h"
 	"utils/debugmenu.h"
 	"utils/memory.h"
 	"utils/materialdebugger.h"
 	"hacks/misc.h"
 	"hacks/hacks.h"
+	"${DEUSEX_INI_FILE}"
 	"${DEUSEX_INT_FILE}"
 	"${DEUSEX_RTX_FILE}"
 )
@@ -142,6 +148,7 @@ source_group(TREE "${CMAKE_SOURCE_DIR}/Source" PREFIX "Header Files" FILES ${HDR
 #---------------------------------------------------------------------------------------------------
 # Configure INSTALL target
 install(DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" DESTINATION "${EE_DEUSEXFOLDER}")
+install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_INI_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
 install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_INT_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
 install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_RTX_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
 install(FILES "${CMAKE_SOURCE_DIR}/EXTERNAL/${SDL2_VERSION}/lib/x86/SDL2.dll" DESTINATION 	"${EE_DEUSEXFOLDER}")

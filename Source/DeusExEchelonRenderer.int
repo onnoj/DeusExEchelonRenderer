@@ -1,7 +1,7 @@
 [Public]
 Object=(Name=DeusExEchelonRenderer.D3D9FPRenderDevice,Class=Class,MetaClass=Engine.RenderDevice,Autodetect=)
 Preferences=(Caption="Rendering",Parent="Advanced Options")
-Preferences=(Caption="Direct3D 9 (FP) support",Parent="Rendering",Class=DeusExEchelonRenderer.D3D9FPRenderDevice,Immediate=True)
+Preferences=(Caption="Echelon Renderer for RTX Remix",Parent="Rendering",Class=DeusExEchelonRenderer.D3D9FPRenderDevice,Immediate=True)
 
 [D3D9FPRenderDevice]
 ClassCaption="Echelon Renderer for RTX Remix"

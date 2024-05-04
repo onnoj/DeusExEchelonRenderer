@@ -4,6 +4,8 @@
 #include "dxtexture.h"
 #include "llrenderer.h"
 
+#include <unordered_set>
+
 struct TextureHash
 {
   uint32_t m_Hash = 0;
@@ -39,6 +41,8 @@ public:
   void Shutdown();
 
   DeusExD3D9TextureHandle ProcessTexture(UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo);
+  void ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);
+  void ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);
   bool BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHandle& pTextureHandle);
   std::vector<DeusExD3D9TextureHandle> FindTextures(uint32_t pUETextureCacheID);
 
@@ -46,6 +50,8 @@ public:
 private:
   std::unordered_map<uint32_t, DeusExD3D9TextureHandle> m_InstanceCache;
   std::unordered_multimap<uint32_t/*CacheID*/, DeusExD3D9TextureHandle> m_TextureCache;
+  
   LowlevelRenderer* m_llrenderer = nullptr;
   DeusExD3D9TextureHandle m_FakeTexture;
+  std::unordered_set<std::wstring> m_HijackableTextures;
 };

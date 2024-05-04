@@ -1,15 +1,12 @@
 #include "DeusExEchelonRenderer_PCH.h"
 #pragma hdrstop
 
-#include <locale>
-#include <codecvt>
 #include <filesystem>
-#include <codecvt> // codecvt_utf8
-#include <locale>  // wstring_convert
 
 #include "uefacade.h"
 #include "hacks/misc.h"
 #include "utils/debugmenu.h"
+#include "utils/utils.h"
 #include "materialdebugger.h"
 #include "rendering/llrenderer.h"
 #include "rendering/hlrenderer.h"
@@ -127,7 +124,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 								FTextureInfo info{};
 								texture->Lock(info, 0, 0, GRenderDevice);
 								textureID = info.CacheID;
-								textureName = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(info.Texture->GetFullName());
+								textureName = Utils::ConvertWcToUtf8(info.Texture->GetFullName());
 								surfFlags = surf.PolyFlags;
 								textureFlags = texture->PolyFlags;
 								g_DebugMenu.VisitTexture(&info);
@@ -146,7 +143,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 			{
 				actor = raycast->Actor;
 				iActor = raycast->Actor->GetIndex();
-				actorName = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(raycast->Actor->GetFullName());
+				actorName = Utils::ConvertWcToUtf8(raycast->Actor->GetFullName());
 				UTexture* texture = nullptr;
 				if (raycast->Actor->Mesh != nullptr)
 				{
@@ -257,7 +254,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 	{
 		for(auto cls = actor->GetClass(); cls != nullptr; cls = cls->GetSuperClass())
 		{
-			actorClassPath += std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(cls->GetNameCPP());
+			actorClassPath += Utils::ConvertWcToUtf8(cls->GetNameCPP());
 			if (cls->GetSuperClass() != nullptr)
 			{
 				actorClassPath += " <- ";
@@ -396,12 +393,6 @@ void MaterialDebugger::exportHashMappings(bool pLoadAllTextures)
 	using json = nlohmann::json;
 	auto rootObject = json::object();
 	
-
-	auto convertWStringToUTF8 = [](const wchar_t* pWString){
-		static std::wstring_convert<std::codecvt_utf8<wchar_t>> utf8_conv;
-		return utf8_conv.to_bytes(pWString);
-	};
-
 	//dump currently loaded textures
 	auto textureArray = json::array();
 	for (auto it = FObjectIterator(UTexture::StaticClass()); it != FALSE; it.operator++())
@@ -428,9 +419,9 @@ void MaterialDebugger::exportHashMappings(bool pLoadAllTextures)
 		if (textureInfo.Texture != nullptr)
 		{
 			auto textureObject = json::object();
-			textureObject["package"] = convertWStringToUTF8(texturePackage->GetPathName()).c_str();
-			textureObject["path"] = convertWStringToUTF8(textureInfo.Texture->GetPathName()).c_str();
-			textureObject["name"] = convertWStringToUTF8(textureInfo.Texture->GetName()).c_str();
+			textureObject["package"] = Utils::ConvertWcToUtf8(texturePackage->GetPathName()).c_str();
+			textureObject["path"] = Utils::ConvertWcToUtf8(textureInfo.Texture->GetPathName()).c_str();
+			textureObject["name"] = Utils::ConvertWcToUtf8(textureInfo.Texture->GetName()).c_str();
 			textureObject["cacheid"] = textureInfo.CacheID;
 			textureObject["index"] = textureInfo.Texture->GetIndex();
 			textureObject["remixhash"] = md->remixHash;

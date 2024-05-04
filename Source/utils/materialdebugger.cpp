@@ -193,7 +193,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 		for (const auto& t : textures)
 		{
 			char b[32]{ 0 };
-			::sprintf(&b[0], "%08llx", t->remixHash);
+			::sprintf(&b[0], "%016llx", t->remixHash);
 			if (remixTextureHashes.find(&b[0]) == std::string::npos)
 			{
 				if (!remixTextureHashes.empty())
@@ -436,7 +436,7 @@ void MaterialDebugger::exportHashMappings(bool pLoadAllTextures)
 			}
 
 			char remixHashHex[64]{ 0 };
-			::sprintf(&remixHashHex[0], "%llx", md->remixHash);
+			::sprintf(&remixHashHex[0], "%016llx", md->remixHash);
 			textureObject["remixhash-hex"] = remixHashHex;
 			textureArray.push_back(textureObject);
 		}

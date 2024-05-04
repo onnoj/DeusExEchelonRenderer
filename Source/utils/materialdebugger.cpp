@@ -95,6 +95,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 	FCheckResult res(0.0f);
 	auto levelModel = Frame->Level->Model;
 	UETextureType textureID = 0;
+	std::string textureName;
 	UnrealPolyFlags surfFlags = 0;
 	UnrealPolyFlags textureFlags = 0;
 	FBspNode* node = nullptr;
@@ -126,6 +127,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 								FTextureInfo info{};
 								texture->Lock(info, 0, 0, GRenderDevice);
 								textureID = info.CacheID;
+								textureName = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(info.Texture->GetFullName());
 								surfFlags = surf.PolyFlags;
 								textureFlags = texture->PolyFlags;
 								g_DebugMenu.VisitTexture(&info);
@@ -270,6 +272,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 	g_DebugMenu.DebugVar("Modding - Inspector", "Actor Class", DebugMenuUniqueID(), actorClassPath);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Mesh Index", DebugMenuUniqueID(), iMesh);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Actor Name", DebugMenuUniqueID(), actorName);
+	g_DebugMenu.DebugVar("Modding - Inspector", "Viewed Texture Name", DebugMenuUniqueID(), textureName);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Viewed Texture", DebugMenuUniqueID(), textureID);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Node Flags", DebugMenuUniqueID(), nodeFlagsTxt);
 	g_DebugMenu.DebugVar("Modding - Inspector", "Surface Flags", DebugMenuUniqueID(), surfaceFlagTxt);

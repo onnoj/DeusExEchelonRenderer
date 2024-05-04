@@ -1,3 +1,9 @@
+//Sometimes Visual Studio won't recognize an UE type.
+//By force linking these symbols, you can use the following syntax when debugging:
+//DeusExEchelonRenderer.dll!{SymbolName}.
+//ie, in the watch window, instead of specifying:
+//(FSpanBuffer*)this, you can specify: (DeusExEchelonRenderer.dll!FSpanBuffer*)this
+
 #pragma comment(linker, "/INCLUDE:\"??0FLightManagerBase@@QAE@ABV0@@Z\"")
 #pragma comment(linker, "/INCLUDE:\"??0FLightManagerBase@@QAE@XZ\"")
 #pragma comment(linker, "/INCLUDE:\"??0FSpanBuffer@@QAE@ABV0@AAVFMemStack@@@Z\"")

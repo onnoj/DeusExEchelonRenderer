@@ -63,6 +63,7 @@ public:
 			bool skipDynamicFiltering = false;
 			bool bypassSpanBufferRasterization = false;
 			bool bypassSetupDynamics = false;
+			bool disableFDynamicSpriteSetup = false;
 		} overrides;
 
 		struct

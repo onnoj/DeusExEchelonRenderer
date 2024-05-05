@@ -69,6 +69,7 @@ set(SRC_BASE
 	"hacks/uengine.cpp"
 	"hacks/ulightmanager.cpp"
 	"hacks/fdynamicitemfilter.cpp"
+	"hacks/fdynamicsprite.cpp"
 	"hacks/fscenenode.cpp"
 	"hacks/fspanbuffer.cpp"
 	"hacks/threadaffinity.cpp"

@@ -89,6 +89,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 	InstallURenderHacks();
 	InstallUMeshHacks();
 	InstallUGameEngineHacks();
+	InstallFFDynamicSpriteHacks();
 	InstallFDynamicItemFilterHacks();
 	InstallULightManagerHacks();
 
@@ -175,6 +176,7 @@ void UD3D9FPRenderDevice::Exit()
 #endif
 	UninstallULightManagerHacks();
 	UninstallFDynamicItemFilterHacks();
+	UninstallFFDynamicSpriteHacks();
 	UninstallURenderHacks();
 	UninstallUMeshHacks();
 	UninstallFSpanBufferHacks();

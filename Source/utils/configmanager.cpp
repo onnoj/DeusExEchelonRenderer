@@ -42,6 +42,9 @@ void ConfigManager::LoadConfig()
       m_HijackedTextureNames.push_back(textureId);
     }
   }
+
+  //Misc properties
+  GConfig->GetBool(g_RendererName L".Settings", L"RenderBody", m_RenderBody, g_ConfigFilename.c_str());
 }
 
 
@@ -74,5 +77,9 @@ void ConfigManager::SaveConfig()
     GConfig->SetString(g_RendererName L".TextureManager", key.c_str(), L"", g_ConfigFilename.c_str());
   }
 
+  //Misc properties
+  GConfig->SetBool(g_RendererName L".Settings", L"RenderBody", m_RenderBody, g_ConfigFilename.c_str());
+
+  //Store file
   GConfig->Flush(0, g_ConfigFilename.c_str());
 }

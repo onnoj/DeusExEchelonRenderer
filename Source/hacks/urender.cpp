@@ -3,6 +3,7 @@
 
 #include "misc.h"
 #include "hacks.h"
+#include "utils/configmanager.h"
 #include "utils/debugmenu.h"
 #include "uefacade.h"
 
@@ -57,6 +58,35 @@ namespace Hacks
     };
     /*virtual*/ void DrawWorld(FSceneNode* Frame)
     {
+      for (auto iActor = 0; iActor < Frame->Level->Actors.Num(); iActor++)
+      {
+        auto actor = Frame->Level->Actors(iActor);
+        if (actor != nullptr)
+        {
+          Frame->Level->Actors(iActor)->VisibilityRadius = FLT_MAX;
+          Frame->Level->Actors(iActor)->VisibilityHeight = FLT_MAX;
+        }
+      }
+      ///
+      auto playerPawn = Frame->Viewport->Actor;
+
+      FVector offset{ 0.0f, 0.0f, 0.0f };
+      if (g_ConfigManager.GetRenderBody())
+      {
+        const auto playerDir = playerPawn->Rotation.Vector();
+        offset = playerDir * playerPawn->CollisionRadius;
+      }
+
+      Utils::ScopedCall call(
+        [&]()
+        {
+          playerPawn->Location -= offset;
+        },
+        [&]()
+        {
+          playerPawn->Location += offset;
+        }
+      );
       URenderVTableFuncs::DrawWorld(GRender, Frame);
     };
     /*virtual*/ FSceneNode* CreateMasterFrame(UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds)
@@ -65,8 +95,10 @@ namespace Hacks
       g_DebugMenu.DebugVar("Global", "Frame X", DebugMenuUniqueID(), Viewport->SizeX, {DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, -8000, 8000});
       g_DebugMenu.DebugVar("Global", "Frame Y", DebugMenuUniqueID(), Viewport->SizeY, {DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 1, 2880});
       g_DebugMenu.DebugVar("Global", "Orthozoom", DebugMenuUniqueID(), Viewport->Actor->OrthoZoom, {DebugMenuValueOptions::editor::slider, -1000000.0f, 1000000.0f});
-
-      FSceneNode* Frame = URenderVTableFuncs::CreateMasterFrame(GRender, Viewport, Location, Rotation, Bounds);
+      
+      FVector LocationOffset{ 0.0f,0.0f,0.0f };
+      g_DebugMenu.DebugVar("Global", "Frame Position Offset", DebugMenuUniqueID(), LocationOffset);
+      FSceneNode* Frame = URenderVTableFuncs::CreateMasterFrame(GRender, Viewport, Location+LocationOffset, Rotation, Bounds);
       return Frame;
     }
 
@@ -593,6 +625,14 @@ namespace Hacks
     0000DCBB 6 bytes -> 90
     */
 
+    for (FDynamicSprite* Sprite = Frame->Sprite; Sprite; Sprite = Sprite->RenderNext)
+    {
+      if (Sprite->Actor == Frame->Viewport->Actor)
+      {
+        int x = 1;
+      }
+    }
+
     if (g_options.hasObjectMeshes)
     {
       FrameContextManager::ScopedContext ctx;
@@ -667,6 +707,12 @@ namespace Hacks
   void URenderOverride::SetupDynamics(FSceneNode* Frame, AActor* Exclude)
   {
     auto ctx = g_ContextManager.GetContext();
+    if (g_ConfigManager.GetRenderBody() && Exclude == Frame->Viewport->Actor)
+    {
+      Exclude = nullptr;
+      ctx->overrides.bypassSetupDynamics = false;
+    }
+
     if (!ctx->overrides.bypassSetupDynamics)
     {
       (GRender->*URenderFuncs::SetupDynamics)(Frame, Exclude);

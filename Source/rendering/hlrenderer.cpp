@@ -798,17 +798,20 @@ void HighlevelRenderer::OnDrawMesh(FSceneNode* Frame, FTextureInfo& Info, FTrans
 
 	const auto& md = (*renderContext->drawcallInfo->LastTextureMetadata);
 	FVector vtx[3]{ firstVertexInfo->Point, {}, {}};
+	FVector nrm[3]{ firstVertexInfo->Normal, {}, {}};
 	for (int i = 2; i < NumPts; i++)
 	{
 		vtx[1] = Pts[i - 1]->Point;
 		vtx[2] = Pts[i]->Point;
+		nrm[1] = Pts[i - 1]->Normal;
+		nrm[2] = Pts[i]->Normal;
 
 		auto fixSigned0 = [](float& value) {
 			if (value >= 0.0f && std::signbit(value)) { value = std::abs(value); }
 		};
-		auto d3dvtx0 = LowlevelRenderer::VertexPos3Tex0{ {vtx[0].X, vtx[0].Y, vtx[0].Z}, {md.multU * Pts[0]->U,			  md.multV * Pts[0]->V } };
-		auto d3dvtx1 = LowlevelRenderer::VertexPos3Tex0{ {vtx[1].X, vtx[1].Y, vtx[1].Z}, {md.multU * Pts[i - 1]->U,  md.multV * Pts[i - 1]->V }};
-		auto d3dvtx2 = LowlevelRenderer::VertexPos3Tex0{ {vtx[2].X, vtx[2].Y, vtx[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V }};
+		auto d3dvtx0 = LowlevelRenderer::VertexPos3Norm3Tex0{ {vtx[0].X, vtx[0].Y, vtx[0].Z}, {nrm[0].X, nrm[0].Y, nrm[0].Z}, {md.multU* Pts[0]->U,			  md.multV* Pts[0]->V } };
+		auto d3dvtx1 = LowlevelRenderer::VertexPos3Norm3Tex0{ {vtx[1].X, vtx[1].Y, vtx[1].Z}, {nrm[1].X, nrm[1].Y, nrm[1].Z}, {md.multU * Pts[i - 1]->U,  md.multV * Pts[i - 1]->V }};
+		auto d3dvtx2 = LowlevelRenderer::VertexPos3Norm3Tex0{ {vtx[2].X, vtx[2].Y, vtx[2].Z}, {nrm[2].X, nrm[2].Y, nrm[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V }};
 
 		mesh.buffer->push_back(std::move(d3dvtx0));
 		mesh.buffer->push_back(std::move(d3dvtx1));
@@ -899,7 +902,7 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
 			if (diff > 2.0f || isAnimating)
 			{
 				dynamicMeshInfo.lastVertexSum = vertexSum;
-				const uint32_t meshHash = appMemCrc(buffer->data(), buffer->size() * sizeof(LowlevelRenderer::VertexPos3Tex0));
+				const uint32_t meshHash = appMemCrc(buffer->data(), buffer->size() * sizeof(LowlevelRenderer::VertexPos3Norm3Tex0));
 				m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
 				dynamicMeshInfo.lastDrawcallHash = meshHash;
 			}

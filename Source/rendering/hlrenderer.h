@@ -49,7 +49,7 @@ private:
 	using DynamicMeshesKey = uint32_t;
 	using StaticMeshesKey = uint32_t;
 	using UIMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos4Color0Tex0>;
-	using DynamicMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Tex0>;
+	using DynamicMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Norm3Tex0>;
 	using StaticMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Tex0>;
 
 	struct StaticMeshesValue {

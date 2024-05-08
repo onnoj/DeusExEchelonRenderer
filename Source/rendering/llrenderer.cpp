@@ -314,6 +314,19 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0
 	);
 }
 
+void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Norm3Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
+{
+	return RenderTriangleListBuffer(
+		D3DFVF_XYZ | D3DFVF_NORMAL | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
+		pVertices,
+		primitiveCount,
+		pVertexCount,
+		sizeof(LowlevelRenderer::VertexPos3Norm3Tex0),
+		pHash,
+		pDebug
+	);
+}
+
 void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0to4* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
 	return RenderTriangleListBuffer(

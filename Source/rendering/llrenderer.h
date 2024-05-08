@@ -13,6 +13,7 @@ class LowlevelRenderer
 	friend class MaterialDebugger;
 public:
 	struct VertexPos3Tex0;
+	struct VertexPos3Norm3Tex0;
 	struct VertexPos3Tex0to4;
 	struct VertexPos4Color0Tex0;
 	struct VertexPos3Color0;
@@ -50,6 +51,7 @@ public:
 	void ClearDisplaySurface(const Vec4& clearColor);
 	void RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Tex0to4* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void RenderTriangleList(const VertexPos3Norm3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void DisableLight(int32_t index);
@@ -91,6 +93,13 @@ private:
 	struct VertexPos3Tex0
 	{
 		D3DXVECTOR3 Pos;
+		D3DXVECTOR2 Tex0;
+	};
+
+	struct VertexPos3Norm3Tex0
+	{
+		D3DXVECTOR3 Pos;
+		D3DXVECTOR3 Normal;
 		D3DXVECTOR2 Tex0;
 	};
 

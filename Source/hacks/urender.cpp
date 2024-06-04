@@ -222,7 +222,7 @@ namespace Hacks
         FrameContextManager::ScopedContext ctx;
         {
           ctx->frameSceneNode = Frame;
-          ctx->overrides.skipDynamicFiltering = !isLast;
+          ctx->overrides.skipDynamicFiltering = false; //keep off; otherwise meshes are culled from reflections as well.
           ctx->overrides.bypassSetupDynamics = !isLast;
 
           float fov = 155.0f;

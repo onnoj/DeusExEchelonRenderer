@@ -22,6 +22,12 @@ Hopefully, in due time, there will be proper graphics overhaul mods that utilize
 
 7. Have fun! (Use alt+x to set a graphics preset)
 
+### Dependencies
+
+Most users will already have these dependencies installed, but if the renderer doesn't launch properly, you can try (re)installing the following dependencies:
+* Microsoft Visual C++ Runtime Library: [vc_redist.x86.exe](https://aka.ms/vs/17/release/vc_redist.x86.exe), [from this page](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
+* DirectX End-User Runtime: [directx_Jun2010_redist.exe](https://www.microsoft.com/en-us/download/details.aspx?id=8109).
+
 ## For developers: How to build
 
 1. Clone repository recursively (ie with git clone --recurse-submodules)

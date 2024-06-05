@@ -174,6 +174,7 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
 {
 	auto& ctx = *g_ContextManager.GetContext();
   if (pActor == nullptr ||
+    pActor->bSpecialLit ||
     pActor->LightType != ELightType::LT_Steady ||
     pActor->LightBrightness <= 0)
   {

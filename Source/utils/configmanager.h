@@ -7,10 +7,10 @@ public:
   void SaveConfig();
 public:
   std::vector<std::string>& GetHijackedTextureNames() { return m_HijackedTextureNames; }
-  bool GetRenderBody() const { return m_RenderBody; }
+  bool GetRenderPlayerBody() const { return m_RenderPlayerBody; }
 private:
   std::vector<std::string> m_HijackedTextureNames;
-  UBOOL m_RenderBody = false;
+  UBOOL m_RenderPlayerBody = false;
 };
 
 extern ConfigManager g_ConfigManager;

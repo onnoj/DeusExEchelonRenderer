@@ -67,26 +67,7 @@ namespace Hacks
           Frame->Level->Actors(iActor)->VisibilityHeight = FLT_MAX;
         }
       }
-      ///
-      auto playerPawn = Frame->Viewport->Actor;
 
-      FVector offset{ 0.0f, 0.0f, 0.0f };
-      if (g_ConfigManager.GetRenderBody())
-      {
-        const auto playerDir = playerPawn->Rotation.Vector();
-        offset = playerDir * playerPawn->CollisionRadius;
-      }
-
-      Utils::ScopedCall call(
-        [&]()
-        {
-          playerPawn->Location -= offset;
-        },
-        [&]()
-        {
-          playerPawn->Location += offset;
-        }
-      );
       URenderVTableFuncs::DrawWorld(GRender, Frame);
     };
     /*virtual*/ FSceneNode* CreateMasterFrame(UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds)
@@ -666,20 +647,13 @@ namespace Hacks
       auto origUncoords = Frame->Uncoords;
       auto origCoords = Coords;
 
-      //Calculate the rotation. Note that there is a difference in coordination systems between Deus Ex and DirectX, so Roll and Yaw are swapped.
-      const auto pi2 = (PI + PI);
-      D3DXMATRIX& wm = *ctx->drawcallInfo->worldMatrix;
-      D3DXMATRIX& wmi = *ctx->drawcallInfo->worldMatrixInv;
-      
-
-      //if (actor && actor->Mesh && actor->Mesh->GetIndex() == 34652)
-      //{
-      //  for (auto light = LeafLights; light != nullptr; light = LeafLights->Next)
-      //  {
-      //    
-      //  }
-      //  int x = 1;
-      //}
+      //Render the player body mesh (with an offset)
+      auto playerPawn = Frame->Viewport->Actor;
+      FVector offset{ 0.0f, 0.0f, 0.0f };
+      if (g_ConfigManager.GetRenderPlayerBody() && Owner == playerPawn)
+      {
+        offset = FVector(-playerPawn->CollisionRadius, 0.0f, 0.0f);
+      }
 
       //Inform high-level renderer we're about to draw a mesh
       ::Misc::g_Facade->GetHLRenderer()->OnDrawMeshBegin(Frame, Owner);
@@ -689,7 +663,7 @@ namespace Hacks
       //This way, RTX Remix can pick up the mesh, so that we can replace static meshes.
       Frame->Coords = FCoords(FVector(0.0f, 0.0f, 0.0f));
       Frame->Uncoords = FCoords(FVector(0.0f, 0.0f, 0.0f));
-      Owner->Location = FVector(0.0f, 0.0f, 0.0f);
+      Owner->Location = FVector(0.0f, 0.0f, 0.0f) + offset;
       Owner->Rotation = FRotator(0, 0, 0);
       const_cast<FCoords&>(Coords) = FCoords(FVector(0.0f, 0.0f, 0.0f));;
       (GRender->*URenderFuncs::DrawMesh)(Frame, Owner, LightSink, SpanBuffer, Zone, Coords, LeafLights, Volumetrics, PolyFlags);
@@ -707,7 +681,7 @@ namespace Hacks
   void URenderOverride::SetupDynamics(FSceneNode* Frame, AActor* Exclude)
   {
     auto ctx = g_ContextManager.GetContext();
-    if (g_ConfigManager.GetRenderBody() && Exclude == Frame->Viewport->Actor)
+    if (g_ConfigManager.GetRenderPlayerBody() && Exclude == Frame->Viewport->Actor)
     {
       Exclude = nullptr;
       ctx->overrides.bypassSetupDynamics = false;

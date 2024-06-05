@@ -151,6 +151,10 @@ DebugMenu::DebugMenuTypes DebugMenu::getTypeIndex()
   {
     return DebugMenuTypes::Vector3f;
   }
+  if constexpr (std::is_same<T, D3DXVECTOR3>::value)
+  {
+    return DebugMenuTypes::Vector3f;
+  }
   if constexpr (std::is_same<T, bool>::value)
   {
     return DebugMenuTypes::Boolean;

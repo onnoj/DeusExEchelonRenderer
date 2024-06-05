@@ -873,9 +873,18 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
 			m_LightManager.AddFrameLight(light->Actor, &light->Location);
 		}
 
-
+		D3DXMATRIX wm;
+		SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
 		SetViewState(Frame, ViewType::game);
-		D3DXMATRIX wm = UECoordsToMatrix(wmCoords);
+		wm = UECoordsToMatrix(wmCoords);
+
+		//Override viewport depth to signal rtxremix that we're rendering a viewmodel (weapon).
+		//Otherwise, it will show up in reflections and shadow.
+		Utils::ScopedCall scopedFileManager {
+			[&]() { if (isPlayerWeapon) { m_LLRenderer->SetViewportDepth(0.0f, 0.5f); } },
+			[&]() { if (isPlayerWeapon) { m_LLRenderer->ResetViewportDepth(); }  }
+		};
+
 		callInfo.worldMatrix = wm;
 		const bool isEmissive = (callInfo.PolyFlags & PF_Unlit) != 0;
 		for (int i = 0; i < (isEmissive ? 3 : 1); i++)
@@ -1050,7 +1059,7 @@ void HighlevelRenderer::SetViewState(FSceneNode* Frame, ViewType viewType)
 		D3DXMatrixIdentity(&vm);
 	}
 	m_LLRenderer->SetViewMatrix(vm);
-	m_LLRenderer->ValidateViewport(Frame->XB, Frame->YB, Frame->X, Frame->Y);
+	m_LLRenderer->SetViewport(Frame->XB, Frame->YB, Frame->X, Frame->Y);
 }
 
 void HighlevelRenderer::SetProjectionState(FSceneNode* Frame, ProjectionType projection) {
@@ -1072,7 +1081,15 @@ void HighlevelRenderer::SetProjectionState(FSceneNode* Frame, ProjectionType pro
 	}
 	else if (projection == ProjectionType::orthogonal)
 	{
-		D3DXMatrixOrthoLH(&d3dProj, Frame->FX, Frame->FY, 0.0001f, 2.0f);
+		//D3DXMatrixOrthoLH(&d3dProj, Frame->FX, Frame->FY, 0.0001f, 2.0f);
+		const float fovangle = Frame->Viewport->Actor->FovAngle;
+		const float aspect = (Frame->FY/Frame->FX);
+		const float fovHalfAngle = appTan(fovangle * (PI/360.0f) ) * LowlevelRenderer::NearRange;
+
+		float viewportW = float(Frame->Viewport->SizeX);
+		float viewportH = float(Frame->Viewport->SizeY);
+		D3DXMatrixOrthoOffCenterRH(&d3dProj, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, LowlevelRenderer::NearRange);
+
 		m_LLRenderer->SetProjectionMatrix(d3dProj);
 	}
 	else if (projection == ProjectionType::identity)

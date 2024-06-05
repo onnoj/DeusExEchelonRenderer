@@ -34,7 +34,10 @@ public:
 	void SetProjectionMatrix(const D3DMATRIX& pMatrix);
 
 	bool ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight, bool pFullscreen);
-	bool ValidateViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight);
+	bool SetViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight);
+	void SetViewportDepth(float pMinZ, float pMaxZ);
+	void ResetViewportDepth();
+	bool ValidateViewport();
 	void PushDeviceState();
 	void PopDeviceState();
 	HRESULT SetRenderState(D3DRENDERSTATETYPE State,DWORD Value);
@@ -80,11 +83,21 @@ private:
 		std::optional<uint32_t> m_ViewportTop;
 		std::optional<uint32_t> m_ViewportWidth;
 		std::optional<uint32_t> m_ViewportHeight;
+		std::optional<float> m_ViewportMinZ;
+		std::optional<float> m_ViewportMaxZ;
 		std::optional<D3DMATRIX> m_WorldMatrix;
 		std::optional<D3DMATRIX> m_ViewMatrix;
 		std::optional<D3DMATRIX> m_ProjectionMatrix;
 	} m_States[8];
 	State* m_CurrentState = &m_States[0];
+
+	std::optional<uint32_t> m_DesiredViewportLeft;
+	std::optional<uint32_t> m_DesiredViewportTop;
+	std::optional<uint32_t> m_DesiredViewportWidth;
+	std::optional<uint32_t> m_DesiredViewportHeight;
+	std::optional<float> m_DesiredViewportMinZ;
+	std::optional<float> m_DesiredViewportMaxZ;
+
 	bool m_CanFlushLights = false;
 private:
 	using ResourceMap = std::unordered_multimap<uint32_t, void*>;

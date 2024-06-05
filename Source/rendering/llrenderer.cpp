@@ -355,11 +355,21 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos4Colo
 
 void LowlevelRenderer::DisableLight(int32_t index)
 {
+	if (!g_options.hasLights)
+	{
+		return;
+	}
+	
 	m_Device->LightEnable(index, FALSE);
 }
 
 void LowlevelRenderer::RenderLight(int32_t index, const D3DLIGHT9& pLight)
 {
+	if (!g_options.hasLights)
+	{
+		return;
+	}
+
 	static const int maxLightsPerCall = [&]() {
 		D3DCAPS9 caps{};
 		m_Device->GetDeviceCaps(&caps);
@@ -382,6 +392,11 @@ void LowlevelRenderer::RenderLight(int32_t index, const D3DLIGHT9& pLight)
 
 void LowlevelRenderer::FlushLights()
 {
+	if (!g_options.hasLights)
+	{
+		return;
+	}
+
 	if (m_CanFlushLights)
 	{
 		HRESULT res = S_OK;
@@ -564,7 +579,7 @@ bool LowlevelRenderer::ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint3
 	}
 	if (m_Device)
 	{
-		return ValidateViewport(pWidth, pHeight, pWidth, pHeight);
+		return SetViewport(pWidth, pHeight, pWidth, pHeight);
 	}
 	return false;
 }
@@ -599,48 +614,88 @@ void LowlevelRenderer::SetProjectionMatrix(const D3DMATRIX& pMatrix)
 	}
 }
 
-bool LowlevelRenderer::ValidateViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight)
+bool LowlevelRenderer::SetViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight)
 {
 	if (g_options.enableViewportXYOffsetWorkaround)
 	{
-		pLeft = 0;
-		pTop = 0;
-		pWidth = m_outputSurface.width;
-		pHeight = m_outputSurface.height;
+		m_DesiredViewportLeft = 0;
+		m_DesiredViewportTop = 0;
+		m_DesiredViewportWidth = m_outputSurface.width;
+		m_DesiredViewportHeight = m_outputSurface.height;
+	}
+	else
+	{
+		m_DesiredViewportLeft = pLeft;
+		m_DesiredViewportTop = pTop;
+		m_DesiredViewportWidth = pWidth;
+		m_DesiredViewportHeight = pHeight;
 	}
 
-	if(	(m_CurrentState->m_ViewportLeft != pLeft) ||
-			(m_CurrentState->m_ViewportWidth != pWidth) ||
-			(m_CurrentState->m_ViewportLeft != pTop) ||
-			(m_CurrentState->m_ViewportHeight != pHeight))
+	if (!m_DesiredViewportMinZ)
 	{
-		m_CurrentState->m_ViewportLeft  = pLeft;
-		m_CurrentState->m_ViewportWidth = pWidth;
-		m_CurrentState->m_ViewportLeft  = pTop;
-		m_CurrentState->m_ViewportHeight = pHeight;
+		m_DesiredViewportMinZ = LowlevelRenderer::NearRange;
+	}
+
+	if (!m_DesiredViewportMaxZ)
+	{
+		m_DesiredViewportMaxZ = LowlevelRenderer::FarRange;
+	}
+	return ValidateViewport();
+}
+
+void LowlevelRenderer::SetViewportDepth(float pMinZ, float pMaxZ)
+{
+	m_DesiredViewportMinZ = pMinZ;
+	m_DesiredViewportMaxZ = pMaxZ;
+	ValidateViewport();
+}
+
+void LowlevelRenderer::ResetViewportDepth()
+{
+	m_DesiredViewportMinZ = LowlevelRenderer::NearRange;
+	m_DesiredViewportMaxZ = LowlevelRenderer::FarRange;
+	ValidateViewport();
+}
+
+bool LowlevelRenderer::ValidateViewport()
+{
+	if(	(m_DesiredViewportLeft && (m_CurrentState->m_ViewportLeft != *m_DesiredViewportLeft)) ||
+			(m_DesiredViewportWidth && (m_CurrentState->m_ViewportWidth != *m_DesiredViewportWidth)) ||
+			(m_DesiredViewportTop && (m_CurrentState->m_ViewportLeft != *m_DesiredViewportTop)) ||
+			(m_DesiredViewportHeight && (m_CurrentState->m_ViewportHeight != *m_DesiredViewportHeight)) ||
+			(m_DesiredViewportMinZ && (m_CurrentState->m_ViewportMinZ != *m_DesiredViewportMinZ)) ||
+			(m_DesiredViewportMaxZ && (m_CurrentState->m_ViewportMaxZ != *m_DesiredViewportMaxZ)) 
+		)
+	{
+		m_CurrentState->m_ViewportLeft  = m_DesiredViewportLeft;
+		m_CurrentState->m_ViewportWidth = m_DesiredViewportWidth;
+		m_CurrentState->m_ViewportTop  = m_DesiredViewportTop;
+		m_CurrentState->m_ViewportHeight = m_DesiredViewportHeight;
+		m_CurrentState->m_ViewportMinZ  = m_DesiredViewportMinZ;
+		m_CurrentState->m_ViewportMaxZ = m_DesiredViewportMaxZ;
 
 		/*
 		* Note: sadly RTXRemix honors SetViewport nor SetScissorRect's X/Y values.
 		*/
 
 		D3DVIEWPORT9 d3dViewport;
-		d3dViewport.X = pTop;
-		d3dViewport.Y = pLeft;
-		d3dViewport.Width = pWidth;
-		d3dViewport.Height = pHeight;
-		d3dViewport.MinZ = LowlevelRenderer::NearRange;
-		d3dViewport.MaxZ = LowlevelRenderer::FarRange;
+		d3dViewport.X = *m_CurrentState->m_ViewportLeft;
+		d3dViewport.Y = *m_CurrentState->m_ViewportTop;
+		d3dViewport.Width = *m_CurrentState->m_ViewportWidth;
+		d3dViewport.Height = *m_CurrentState->m_ViewportHeight;
+		d3dViewport.MinZ = *m_CurrentState->m_ViewportMinZ;
+		d3dViewport.MaxZ = *m_CurrentState->m_ViewportMaxZ;
 		if (FAILED(m_Device->SetViewport(&d3dViewport)))
 		{
-			GLog->Logf(L"[EchelonRenderer]\t Failed to resized viewport to %dx%d", pWidth, pHeight);
+			GLog->Logf(L"[EchelonRenderer]\t Failed to resized viewport to %dx%d", d3dViewport.Width, d3dViewport.Height);
 			return false;
 		}
 
 		RECT r;
-		r.left = pLeft;
-		r.top = pTop;
-		r.right = pLeft + pWidth;
-		r.bottom= pTop + pHeight;
+		r.left = d3dViewport.X;
+		r.top = d3dViewport.Y;
+		r.right = d3dViewport.X + d3dViewport.Width;
+		r.bottom= d3dViewport.Y + d3dViewport.Height;
 		m_Device->SetScissorRect(&r);
 	}
 	return true;
@@ -937,7 +992,7 @@ void LowlevelRenderer::PopDeviceState()
 		this->SetWorldMatrix(*(newState->m_WorldMatrix));
 		this->SetViewMatrix(*(newState->m_ViewMatrix));
 		this->SetProjectionMatrix(*(newState->m_ProjectionMatrix));
-		ValidateViewport(*newState->m_ViewportLeft, *newState->m_ViewportTop, *newState->m_ViewportWidth, *newState->m_ViewportHeight);
+		SetViewport(*newState->m_ViewportLeft, *newState->m_ViewportTop, *newState->m_ViewportWidth, *newState->m_ViewportHeight);
 		m_CurrentState--;
 	}
 }

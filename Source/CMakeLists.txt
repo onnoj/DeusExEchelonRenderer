@@ -5,7 +5,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/USER/)
 set(DEUSEX_INT_FILE "DeusExEchelonRenderer.int")
 set(DEUSEX_INI_FILE "DeusExEchelonRenderer.ini")
 set(DEUSEX_RTX_FILE "rtx.conf")
-add_compile_definitions("CONVERT_TO_LEFTHANDED_COORDINATES=1")
+#add_compile_definitions("CONVERT_TO_LEFTHANDED_COORDINATES=1")
 
 #---------------------------------------------------------------------------------------------------
 # Helpers

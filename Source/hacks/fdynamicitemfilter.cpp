@@ -8,6 +8,7 @@
 
 namespace Hacks
 {
+  bool DynamicItemFilterHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> DynamicItemFilterDetours;
   namespace DynamicItemFilterVTableFuncs
   {
@@ -55,13 +56,18 @@ void InstallFDynamicItemFilterHacks()
 {
 #if 1
   using namespace Hacks;
-  HMODULE renderModule = GetModuleHandleA("render.dll");
-  auto origAddress = PVOID(uint64_t(renderModule) + 0x114A); 
-  DynamicItemFilterVTableFuncs::Filter = reinterpret_cast<decltype(DynamicItemFilterVTableFuncs::Filter)>(origAddress);
-  DynamicItemFilterDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&DynamicItemFilterVTableFuncs::Filter, *(uint64_t*)&DynamicItemFilterVTableOverrides::Filter, (uint64_t*)&DynamicItemFilterVTableFuncs::Filter));
-  for (auto& detour : DynamicItemFilterDetours)
+
+  if (!DynamicItemFilterHacksInstalled)
   {
-    detour->hook();
+    DynamicItemFilterHacksInstalled = true;
+    HMODULE renderModule = GetModuleHandleA("render.dll");
+    auto origAddress = PVOID(uint64_t(renderModule) + 0x114A);
+    DynamicItemFilterVTableFuncs::Filter = reinterpret_cast<decltype(DynamicItemFilterVTableFuncs::Filter)>(origAddress);
+    DynamicItemFilterDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&DynamicItemFilterVTableFuncs::Filter, *(uint64_t*)&DynamicItemFilterVTableOverrides::Filter, (uint64_t*)&DynamicItemFilterVTableFuncs::Filter));
+    for (auto& detour : DynamicItemFilterDetours)
+    {
+      detour->hook();
+    }
   }
 #endif
 }
@@ -69,9 +75,14 @@ void InstallFDynamicItemFilterHacks()
 void UninstallFDynamicItemFilterHacks()
 {
   using namespace Hacks;
-  for (auto& detour : DynamicItemFilterDetours)
+
+  if (DynamicItemFilterHacksInstalled)
   {
-    detour->unHook();
+    DynamicItemFilterHacksInstalled = false;
+    for (auto& detour : DynamicItemFilterDetours)
+    {
+      detour->unHook();
+    }
+    DynamicItemFilterDetours.clear();
   }
-  DynamicItemFilterDetours.clear();
 }

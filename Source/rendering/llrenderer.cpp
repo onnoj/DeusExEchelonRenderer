@@ -33,10 +33,17 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 	//m_outputSurface.hwnd = hWnd;
 	if (pFullscreen)
 	{
-		auto res = FindClosestResolution(pWidth, pHeight);
-		GLog->Logf(L"[EchelonRenderer]\t Fullscreen was requested, matched %dx%d to available resolution %dx%d.", pWidth, pHeight, res.Width, res.Height);
-		pWidth = res.Width;
-		pHeight = res.Height;
+    if (auto res = FindClosestResolution(pWidth, pHeight); res)
+    {
+      GLog->Logf(L"[EchelonRenderer]\t Fullscreen was requested, matched %dx%d to available resolution %dx%d.", pWidth, pHeight, res->Width, res->Height);
+      pWidth = res->Width;
+      pHeight = res->Height;
+    }
+    else
+    {
+      GLog->Logf(L"[EchelonRenderer]\t could not find matching fullscreen resolution for %dx%d, possible device returned no modes. Swithing to windowed.", pWidth, pHeight);
+      pFullscreen = false;
+    }
 	}
 
 	ResizeDisplaySurface(0, 0, pWidth, pHeight, pFullscreen);
@@ -1059,20 +1066,31 @@ std::vector<D3DDISPLAYMODE> LowlevelRenderer::GetDisplayModes() const
 	std::sort(displayModes.begin(), displayModes.end(), [](const D3DDISPLAYMODE& pLH, const D3DDISPLAYMODE& pRH) {
 		return ((pLH.Width > pRH.Width) || ((pLH.Width == pRH.Width && pLH.Height > pRH.Height)));
 	});
-	lastDisplayModes = displayModes;
+
+  if (displayModes.size() > lastDisplayModes.size())
+  {
+    lastDisplayModes = displayModes;
+  }
+
 	return displayModes;
 }
 
-D3DDISPLAYMODE LowlevelRenderer::FindClosestResolution(uint32_t pWidth, uint32_t pHeight) const
+std::optional<D3DDISPLAYMODE> LowlevelRenderer::FindClosestResolution(uint32_t pWidth, uint32_t pHeight) const
 {
-	auto displayModes = GetDisplayModes();
-	const int64_t surfaceTarget = pWidth * pHeight;
-	std::sort(displayModes.begin(), displayModes.end(), [&](const D3DDISPLAYMODE& pLH, const D3DDISPLAYMODE& pRH) {
-		int64_t surfaceDeltaLH = std::abs(surfaceTarget - int64_t(pLH.Width * pLH.Height));
-		int64_t surfaceDeltaRH = std::abs(surfaceTarget - int64_t(pRH.Width * pRH.Height));
-		int64_t widthDeltaLH = std::abs(int64_t(pWidth - pLH.Width));
-		int64_t widthDeltaRH = std::abs(int64_t(pWidth - pRH.Width));
-		return (surfaceDeltaLH<surfaceDeltaRH) && (widthDeltaLH < widthDeltaRH);
-	});
-	return displayModes.front();
+  auto displayModes = GetDisplayModes();
+  const int64_t surfaceTarget = pWidth * pHeight;
+  std::sort(displayModes.begin(), displayModes.end(), [&](const D3DDISPLAYMODE& pLH, const D3DDISPLAYMODE& pRH) {
+    int64_t surfaceDeltaLH = std::abs(surfaceTarget - int64_t(pLH.Width * pLH.Height));
+    int64_t surfaceDeltaRH = std::abs(surfaceTarget - int64_t(pRH.Width * pRH.Height));
+    int64_t widthDeltaLH = std::abs(int64_t(pWidth - pLH.Width));
+    int64_t widthDeltaRH = std::abs(int64_t(pWidth - pRH.Width));
+    return (surfaceDeltaLH<surfaceDeltaRH) && (widthDeltaLH < widthDeltaRH);
+    });
+
+  if (!displayModes.empty())
+  {
+    return displayModes.front();
+  }
+
+  return {};
 }

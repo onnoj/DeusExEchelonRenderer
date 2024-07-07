@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
+#include <optional>
 #include <bitset>
 #include "hacks/misc.h"
 
@@ -49,7 +50,7 @@ public:
 	void SetProjectionState();
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	std::vector<D3DDISPLAYMODE> GetDisplayModes() const;
-	D3DDISPLAYMODE FindClosestResolution(uint32_t pWidth, uint32_t pHeight) const;
+  std::optional<D3DDISPLAYMODE> FindClosestResolution(uint32_t pWidth, uint32_t pHeight) const;
 	void ClearDepth() {/*TODO?*/ };
 	void ClearDisplaySurface(const Vec4& clearColor);
 	void RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug);

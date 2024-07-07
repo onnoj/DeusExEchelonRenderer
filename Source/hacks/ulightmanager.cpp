@@ -11,6 +11,7 @@
 
 namespace Hacks
 {  
+  bool ULightManagerHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> ULightManagerDetours;
   namespace ULightManagerVTableFuncs
   {
@@ -48,37 +49,46 @@ void InstallULightManagerHacks()
 {
   using namespace Hacks;
 
-  auto base = reinterpret_cast<uint32_t>(GetModuleHandle(L"Render.dll"));
-  ULightManagerFuncs::AddLight = (void*)(base + 0x1122);
-  ULightManagerDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&ULightManagerFuncs::AddLight, *(uint64_t*)&ULightManagerOverrides::AddLight, (uint64_t*) & ULightManagerFuncs::AddLight));
-  for (auto& detour : ULightManagerDetours)
+  if (!ULightManagerHacksInstalled)
   {
-    detour->hook();
+    ULightManagerHacksInstalled = true;
+
+    auto base = reinterpret_cast<uint32_t>(GetModuleHandle(L"Render.dll"));
+    ULightManagerFuncs::AddLight = (void*)(base + 0x1122);
+    ULightManagerDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&ULightManagerFuncs::AddLight, *(uint64_t*)&ULightManagerOverrides::AddLight, (uint64_t*)&ULightManagerFuncs::AddLight));
+    for (auto& detour : ULightManagerDetours)
+    {
+      detour->hook();
+    }
+
+    /*
+    for (auto& func : ULightManagerMappedVTableFuncs)
+    {
+      auto funcDescriptor = std::get<0>(func);
+      uint32_t* origFuncPtr = reinterpret_cast<uint32_t*>(std::get<1>(func));
+      PLH::VFuncMap* origFuncMap = &std::get<2>(func);
+      origFuncMap->clear();
+      PLH::VFuncMap v = { funcDescriptor };
+      auto ptr = std::make_shared<PLH::VFuncSwapHook>(reinterpret_cast<uint64_t>(aLodMesh), v, origFuncMap);
+      ptr->hook();
+      *origFuncPtr = (*origFuncMap)[funcDescriptor.first];
+      ULightManagerDetours.push_back(std::move(ptr));
+    }*/
   }
-
-  /*
-  for (auto& func : ULightManagerMappedVTableFuncs)
-  {
-    auto funcDescriptor = std::get<0>(func);
-    uint32_t* origFuncPtr = reinterpret_cast<uint32_t*>(std::get<1>(func));
-    PLH::VFuncMap* origFuncMap = &std::get<2>(func);
-    origFuncMap->clear();
-    PLH::VFuncMap v = { funcDescriptor };
-    auto ptr = std::make_shared<PLH::VFuncSwapHook>(reinterpret_cast<uint64_t>(aLodMesh), v, origFuncMap);
-    ptr->hook();
-    *origFuncPtr = (*origFuncMap)[funcDescriptor.first];
-    ULightManagerDetours.push_back(std::move(ptr));
-  }*/
-
 }
 
 void UninstallULightManagerHacks()
 {
   using namespace Hacks;
-  for (auto& detour : ULightManagerDetours)
+
+  if (ULightManagerHacksInstalled)
   {
-    detour->unHook();
+    ULightManagerHacksInstalled = false;
+    for (auto& detour : ULightManagerDetours)
+    {
+      detour->unHook();
+    }
+    //ULightManagerFuncs::GetFrame.Restore();
+    ULightManagerDetours.clear();
   }
-  //ULightManagerFuncs::GetFrame.Restore();
-  ULightManagerDetours.clear();
 }

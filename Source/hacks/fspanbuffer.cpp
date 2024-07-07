@@ -10,6 +10,7 @@
 
 namespace Hacks
 {
+  bool FSpanBufferHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> FSpanBufferDetours;
   namespace FSpanBufferFuncs
   {
@@ -283,27 +284,37 @@ namespace Hacks
 void InstallFSpanBufferHacks()
 {
   using namespace Hacks;
-  FSpanBufferDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSpanBufferFuncs::CopyFromRaster, *(uint64_t*)&FSpanBufferOverrides::CopyFromRaster, &FSpanBufferFuncs::CopyFromRaster.func64));
-  FSpanBufferDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSpanBufferFuncs::CopyFromRasterUpdate, *(uint64_t*)&FSpanBufferOverrides::CopyFromRasterUpdate, &FSpanBufferFuncs::CopyFromRasterUpdate.func64));
-  FSpanBufferDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSpanBufferFuncs::MergeWith, *(uint64_t*)&FSpanBufferOverrides::MergeWith, &FSpanBufferFuncs::MergeWith.func64));
-  FSpanBufferDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSpanBufferFuncs::BoxIsVisible, *(uint64_t*)&FSpanBufferOverrides::BoxIsVisible, &FSpanBufferFuncs::BoxIsVisible.func64));
-  for (auto& detour : FSpanBufferDetours)
+
+  if (!FSpanBufferHacksInstalled)
   {
-    auto result = detour->hook();
-    assert(result);
+    FSpanBufferHacksInstalled = true;
+    FSpanBufferDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSpanBufferFuncs::CopyFromRaster, *(uint64_t*)&FSpanBufferOverrides::CopyFromRaster, &FSpanBufferFuncs::CopyFromRaster.func64));
+    FSpanBufferDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSpanBufferFuncs::CopyFromRasterUpdate, *(uint64_t*)&FSpanBufferOverrides::CopyFromRasterUpdate, &FSpanBufferFuncs::CopyFromRasterUpdate.func64));
+    FSpanBufferDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSpanBufferFuncs::MergeWith, *(uint64_t*)&FSpanBufferOverrides::MergeWith, &FSpanBufferFuncs::MergeWith.func64));
+    FSpanBufferDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSpanBufferFuncs::BoxIsVisible, *(uint64_t*)&FSpanBufferOverrides::BoxIsVisible, &FSpanBufferFuncs::BoxIsVisible.func64));
+    for (auto& detour : FSpanBufferDetours)
+    {
+      auto result = detour->hook();
+      assert(result);
+    }
   }
 }
 
 void UninstallFSpanBufferHacks()
 {
   using namespace Hacks;
-  for (auto& detour : FSpanBufferDetours)
+
+  if (FSpanBufferHacksInstalled)
   {
-    detour->unHook();
-  }
-  FSpanBufferFuncs::CopyFromRaster.Restore();
-  FSpanBufferFuncs::CopyFromRasterUpdate.Restore();
-  FSpanBufferFuncs::BoxIsVisible.Restore();
-  FSpanBufferFuncs::MergeWith.Restore();
-  FSpanBufferDetours.clear();
+    FSpanBufferHacksInstalled = false;
+    for (auto& detour : FSpanBufferDetours)
+    {
+      detour->unHook();
+    }
+    FSpanBufferFuncs::CopyFromRaster.Restore();
+    FSpanBufferFuncs::CopyFromRasterUpdate.Restore();
+    FSpanBufferFuncs::BoxIsVisible.Restore();
+    FSpanBufferFuncs::MergeWith.Restore();
+    FSpanBufferDetours.clear();
+  } 
 }

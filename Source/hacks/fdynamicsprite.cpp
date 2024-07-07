@@ -8,6 +8,7 @@
 
 namespace Hacks
 {
+  bool FDynamicSpriteHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> FDynamicSpriteDetours;
   namespace FDynamicSpriteVTableFuncs
   {
@@ -67,15 +68,19 @@ void InstallFFDynamicSpriteHacks()
   using namespace Hacks;
 
 #if 1
-  auto base = reinterpret_cast<uint32_t>(GetModuleHandle(L"Render.dll"));
-  FDynamicSpriteFuncs::Setup = (void*)(base + 0x10e6);
-  FDynamicSpriteFuncs::Constructor0 = (void*)(base + 0x117c);
-
-  FDynamicSpriteDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FDynamicSpriteFuncs::Setup, *(uint64_t*)&FDynamicSpriteOverrides::Setup, &FDynamicSpriteFuncs::Setup.func64));
-  FDynamicSpriteDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FDynamicSpriteFuncs::Constructor0, *(uint64_t*)&FDynamicSpriteOverrides::Constructor0, &FDynamicSpriteFuncs::Constructor0.func64));
-  for (auto& detour : FDynamicSpriteDetours)
+  if (!FDynamicSpriteHacksInstalled)
   {
-    detour->hook();
+    FDynamicSpriteHacksInstalled = true;
+    auto base = reinterpret_cast<uint32_t>(GetModuleHandle(L"Render.dll"));
+    FDynamicSpriteFuncs::Setup = (void*)*reinterpret_cast<uint32_t*>(base + 0x10e6);
+    FDynamicSpriteFuncs::Constructor0 = (void*)*reinterpret_cast<uint32_t*>(base + 0x117c);
+
+    FDynamicSpriteDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FDynamicSpriteFuncs::Setup, *(uint64_t*)&FDynamicSpriteOverrides::Setup, &FDynamicSpriteFuncs::Setup.func64));
+    FDynamicSpriteDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FDynamicSpriteFuncs::Constructor0, *(uint64_t*)&FDynamicSpriteOverrides::Constructor0, &FDynamicSpriteFuncs::Constructor0.func64));
+    for (auto& detour : FDynamicSpriteDetours)
+    {
+      detour->hook();
+    }
   }
 #endif
 }
@@ -83,10 +88,15 @@ void InstallFFDynamicSpriteHacks()
 void UninstallFFDynamicSpriteHacks()
 {
   using namespace Hacks;
-  for (auto& detour : FDynamicSpriteDetours)
+
+  if (FDynamicSpriteHacksInstalled)
   {
-    detour->unHook();
+    FDynamicSpriteHacksInstalled = false;
+    for (auto& detour : FDynamicSpriteDetours)
+    {
+      detour->unHook();
+    }
+    FDynamicSpriteFuncs::Setup.Restore();
+    FDynamicSpriteFuncs::Constructor0.Restore();
   }
-  FDynamicSpriteFuncs::Setup.Restore();
-  FDynamicSpriteFuncs::Constructor0.Restore();
 }

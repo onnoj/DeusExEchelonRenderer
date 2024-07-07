@@ -8,6 +8,7 @@
 
 namespace Hacks
 {  
+  bool FSceneNodeHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> FSceneNodeDetours;
   namespace FSceneNodeFuncs
   {
@@ -60,10 +61,15 @@ namespace Hacks
 void InstallFSceneNodeHacks()
 {
   using namespace Hacks;
-  FSceneNodeDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSceneNodeFuncs::ComputeRenderSize, *(uint64_t*)&FSceneNodeOverrides::ComputeRenderSize, &FSceneNodeFuncs::ComputeRenderSize.func64));
-  for (auto& detour : FSceneNodeDetours)
+
+  if (!FSceneNodeHacksInstalled)
   {
-    detour->hook();
+    FSceneNodeHacksInstalled = true;
+    FSceneNodeDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSceneNodeFuncs::ComputeRenderSize, *(uint64_t*)&FSceneNodeOverrides::ComputeRenderSize, &FSceneNodeFuncs::ComputeRenderSize.func64));
+    for (auto& detour : FSceneNodeDetours)
+    {
+      detour->hook();
+    }
   }
 
 }
@@ -71,11 +77,16 @@ void InstallFSceneNodeHacks()
 void UninstallFSceneNodeHacks()
 {
   using namespace Hacks;
-  FSceneNodeDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSceneNodeFuncs::ComputeRenderSize, *(uint64_t*)&FSceneNodeOverrides::ComputeRenderSize, &FSceneNodeFuncs::ComputeRenderSize.func64));
-  for (auto& detour : FSceneNodeDetours)
+
+  if (FSceneNodeHacksInstalled)
   {
-    detour->unHook();
+    FSceneNodeHacksInstalled = false;
+    FSceneNodeDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FSceneNodeFuncs::ComputeRenderSize, *(uint64_t*)&FSceneNodeOverrides::ComputeRenderSize, &FSceneNodeFuncs::ComputeRenderSize.func64));
+    for (auto& detour : FSceneNodeDetours)
+    {
+      detour->unHook();
+    }
+    FSceneNodeFuncs::ComputeRenderSize.Restore();
+    FSceneNodeDetours.clear();
   }
-  FSceneNodeFuncs::ComputeRenderSize.Restore();
-  FSceneNodeDetours.clear();
 }

@@ -12,6 +12,7 @@
 
 namespace Hacks
 {
+  bool URenderHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> URenderDetours;
   namespace URenderFuncs
   {
@@ -743,56 +744,61 @@ namespace Hacks
 void InstallURenderHacks()
 {
   using namespace Hacks;
-  URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::OccludeBsp, *(uint64_t*)&URenderOverrides::OccludeBsp, &URenderFuncs::OccludeBsp.func64));
-  URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::DrawFrame, *(uint64_t*)&URenderOverrides::DrawFrame, &URenderFuncs::DrawFrame.func64));
-  URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::OccludeFrame, *(uint64_t*)&URenderOverrides::OccludeFrame, &URenderFuncs::OccludeFrame.func64));
-  URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::DrawMesh, *(uint64_t*)&URenderOverrides::DrawMesh, &URenderFuncs::DrawMesh.func64));
-  URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::SetupDynamics, *(uint64_t*)&URenderOverrides::SetupDynamics, &URenderFuncs::SetupDynamics.func64));
-  URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::ClipBspSurf, *(uint64_t*)&URenderOverrides::ClipBspSurf, &URenderFuncs::ClipBspSurf.func64));
-  for (auto& detour : URenderDetours)
+  
+  if (!URenderHacksInstalled)
   {
-    detour->hook();
-  }
+    URenderHacksInstalled = true;
+    URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::OccludeBsp, *(uint64_t*)&URenderOverrides::OccludeBsp, &URenderFuncs::OccludeBsp.func64));
+    URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::DrawFrame, *(uint64_t*)&URenderOverrides::DrawFrame, &URenderFuncs::DrawFrame.func64));
+    URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::OccludeFrame, *(uint64_t*)&URenderOverrides::OccludeFrame, &URenderFuncs::OccludeFrame.func64));
+    URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::DrawMesh, *(uint64_t*)&URenderOverrides::DrawMesh, &URenderFuncs::DrawMesh.func64));
+    URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::SetupDynamics, *(uint64_t*)&URenderOverrides::SetupDynamics, &URenderFuncs::SetupDynamics.func64));
+    URenderDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&URenderFuncs::ClipBspSurf, *(uint64_t*)&URenderOverrides::ClipBspSurf, &URenderFuncs::ClipBspSurf.func64));
+    for (auto& detour : URenderDetours)
+    {
+      detour->hook();
+    }
 
 
   
-  for (auto& func : URenderMappedVTableFuncs)
-  {
-    auto funcDescriptor = std::get<0>(func);
-    uint32_t* origFuncPtr = reinterpret_cast<uint32_t*>(std::get<1>(func));
-    PLH::VFuncMap* origFuncMap = &std::get<2>(func);
-    origFuncMap->clear();
-    PLH::VFuncMap v = { funcDescriptor };
-    auto ptr = std::make_shared<PLH::VFuncSwapHook>(reinterpret_cast<uint64_t>(GRender), v, origFuncMap);
-    ptr->hook();
-    *origFuncPtr = (*origFuncMap)[funcDescriptor.first];
-    URenderDetours.push_back(std::move(ptr));
-  }
-
-  ///
-  //Hijacking of a specific call to URender::SetupRaster, to force an early-out during occlusion.
-  //SetupRaster is not virtual. 
-  {
-    static bool installedOnce = false;
-    if (!installedOnce)
+    for (auto& func : URenderMappedVTableFuncs)
     {
-      installedOnce = true;
+      auto funcDescriptor = std::get<0>(func);
+      uint32_t* origFuncPtr = reinterpret_cast<uint32_t*>(std::get<1>(func));
+      PLH::VFuncMap* origFuncMap = &std::get<2>(func);
+      origFuncMap->clear();
+      PLH::VFuncMap v = { funcDescriptor };
+      auto ptr = std::make_shared<PLH::VFuncSwapHook>(reinterpret_cast<uint64_t>(GRender), v, origFuncMap);
+      ptr->hook();
+      *origFuncPtr = (*origFuncMap)[funcDescriptor.first];
+      URenderDetours.push_back(std::move(ptr));
+    }
 
-      HMODULE renderModule = GetModuleHandleA("render.dll");
-      DWORD oldProtect;
+    ///
+    //Hijacking of a specific call to URender::SetupRaster, to force an early-out during occlusion.
+    //SetupRaster is not virtual. 
+    {
+      static bool installedOnce = false;
+      if (!installedOnce)
+      {
+        installedOnce = true;
 
-      uint8_t* callinstruction = reinterpret_cast<uint8_t*>(uint32_t(renderModule) + 0x18140);
-      VirtualProtect(callinstruction, sizeof(void*) * 8, PAGE_READWRITE, &oldProtect);
+        HMODULE renderModule = GetModuleHandleA("render.dll");
+        DWORD oldProtect;
 
-      int32_t& callOffset = *(reinterpret_cast<int32_t*>(callinstruction + 1));
-      uint32_t originalCallAddress = callOffset + reinterpret_cast<uint32_t>(callinstruction + 5);
-      URenderFuncs::SetupRaster = reinterpret_cast<decltype(URenderFuncs::SetupRaster)>(originalCallAddress);
-      uint32_t newCalladdress = reinterpret_cast<uint32_t>(&URenderOverride::SetupRaster);
-      int32_t currentAddress = reinterpret_cast<int32_t>(callinstruction + 5);
-      auto newOffset = static_cast<int32_t>(newCalladdress) - currentAddress;
-      callOffset = newOffset;
+        uint8_t* callinstruction = reinterpret_cast<uint8_t*>(uint32_t(renderModule) + 0x18140);
+        VirtualProtect(callinstruction, sizeof(void*) * 8, PAGE_READWRITE, &oldProtect);
 
-      VirtualProtect(callinstruction, sizeof(void*) * 8, oldProtect, &oldProtect);
+        int32_t& callOffset = *(reinterpret_cast<int32_t*>(callinstruction + 1));
+        uint32_t originalCallAddress = callOffset + reinterpret_cast<uint32_t>(callinstruction + 5);
+        URenderFuncs::SetupRaster = reinterpret_cast<decltype(URenderFuncs::SetupRaster)>(originalCallAddress);
+        uint32_t newCalladdress = reinterpret_cast<uint32_t>(&URenderOverride::SetupRaster);
+        int32_t currentAddress = reinterpret_cast<int32_t>(callinstruction + 5);
+        auto newOffset = static_cast<int32_t>(newCalladdress) - currentAddress;
+        callOffset = newOffset;
+
+        VirtualProtect(callinstruction, sizeof(void*) * 8, oldProtect, &oldProtect);
+      }
     }
   }
 }
@@ -801,15 +807,20 @@ void InstallURenderHacks()
 void UninstallURenderHacks()
 {
   using namespace Hacks;
-  for (auto& d : URenderDetours)
+
+  if (URenderHacksInstalled)
   {
-    d->unHook();
+    URenderHacksInstalled = false;
+    for (auto& d : URenderDetours)
+    {
+      d->unHook();
+    }
+    URenderFuncs::OccludeBsp.Restore();
+    URenderFuncs::DrawFrame.Restore();
+    URenderFuncs::OccludeFrame.Restore();
+    URenderFuncs::DrawMesh.Restore();
+    URenderFuncs::ClipBspSurf.Restore();
+    URenderFuncs::SetupDynamics.Restore();
+    URenderDetours.clear();
   }
-  URenderFuncs::OccludeBsp.Restore();
-  URenderFuncs::DrawFrame.Restore();
-  URenderFuncs::OccludeFrame.Restore();
-  URenderFuncs::DrawMesh.Restore();
-  URenderFuncs::ClipBspSurf.Restore();
-  URenderFuncs::SetupDynamics.Restore();
-  URenderDetours.clear();
 }

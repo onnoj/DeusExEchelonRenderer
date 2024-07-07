@@ -12,6 +12,7 @@
 
 namespace Hacks
 {  
+  bool UGameEngineHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> UGameEngineDetours;
   UGameEngine* GEngine = nullptr;
   namespace UGameEngineVTableFuncs
@@ -63,36 +64,47 @@ namespace Hacks
 void InstallUGameEngineHacks()
 {
   using namespace Hacks;
-  for (auto& detour : UGameEngineDetours)
-  {
-    detour->hook();
-  }
 
-  TObjectIterator<UGameEngine> EngineIt;
-  GEngine = *EngineIt;
-  for (auto& func : UGameEngineMappedVTableFuncs)
+  if (!UGameEngineHacksInstalled)
   {
-    auto funcDescriptor = std::get<0>(func);
-    uint32_t* origFuncPtr = reinterpret_cast<uint32_t*>(std::get<1>(func));
-    PLH::VFuncMap* origFuncMap = &std::get<2>(func);
-    origFuncMap->clear();
-    PLH::VFuncMap v = { funcDescriptor };
-    auto ptr = std::make_shared<PLH::VFuncSwapHook>(reinterpret_cast<uint64_t>(GEngine), v, origFuncMap);
-    ptr->hook();
-    *origFuncPtr = (*origFuncMap)[funcDescriptor.first];
-    UGameEngineDetours.push_back(std::move(ptr));
-  }
+    UGameEngineHacksInstalled = true;
 
-  //Force directinput on, otherwise we're not able to interact with the RTX menu.
-  GConfig->SetBool(L"WinDrv.WindowsClient", L"UseDirectInput", TRUE);
+    for (auto& detour : UGameEngineDetours)
+    {
+      detour->hook();
+    }
+
+    TObjectIterator<UGameEngine> EngineIt;
+    GEngine = *EngineIt;
+    for (auto& func : UGameEngineMappedVTableFuncs)
+    {
+      auto funcDescriptor = std::get<0>(func);
+      uint32_t* origFuncPtr = reinterpret_cast<uint32_t*>(std::get<1>(func));
+      PLH::VFuncMap* origFuncMap = &std::get<2>(func);
+      origFuncMap->clear();
+      PLH::VFuncMap v = { funcDescriptor };
+      auto ptr = std::make_shared<PLH::VFuncSwapHook>(reinterpret_cast<uint64_t>(GEngine), v, origFuncMap);
+      ptr->hook();
+      *origFuncPtr = (*origFuncMap)[funcDescriptor.first];
+      UGameEngineDetours.push_back(std::move(ptr));
+    }
+
+    //Force directinput on, otherwise we're not able to interact with the RTX menu.
+    GConfig->SetBool(L"WinDrv.WindowsClient", L"UseDirectInput", TRUE);
+  }
 }
 
 void UninstallUGameEngineHacks()
 {
   using namespace Hacks;
-  for (auto& detour : UGameEngineDetours)
+
+  if (UGameEngineHacksInstalled)
   {
-    detour->unHook();
+    UGameEngineHacksInstalled = false;
+    for (auto& detour : UGameEngineDetours)
+    {
+      detour->unHook();
+    }
+    UGameEngineDetours.clear();
   }
-  UGameEngineDetours.clear();
 }

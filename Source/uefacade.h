@@ -41,7 +41,9 @@ protected: //implementations of URenderDevice class
 	virtual void SetSceneNode( FSceneNode* Frame ) final;
 	virtual void PrecacheTexture( FTextureInfo& Info, DWORD PolyFlags ) final;
 	virtual void EndFlash() final;
+public:
+  static std::mutex m_Lock; //share lock between instances
 private:
-	static LowlevelRenderer m_LLRenderer;
-	static HighlevelRenderer m_HLRenderer;
+	static LowlevelRenderer m_LLRenderer; //keep between reinitializations
+	static HighlevelRenderer m_HLRenderer; //keep between reinitializations
 };

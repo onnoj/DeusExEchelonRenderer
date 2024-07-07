@@ -24,6 +24,7 @@ IMPLEMENT_CLASS(UD3D9FPRenderDevice);
 
 LowlevelRenderer UD3D9FPRenderDevice::m_LLRenderer;
 HighlevelRenderer UD3D9FPRenderDevice::m_HLRenderer;
+std::mutex UD3D9FPRenderDevice::m_Lock;
 
 class FLogOutImpl : public FOutputDevice
 {
@@ -73,6 +74,8 @@ UD3D9FPRenderDevice::UD3D9FPRenderDevice()
 
 UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t pHeight, int32_t pColorBytes, UBOOL pFullscreen)
 {
+  std::unique_lock lock(m_Lock);
+  
 	if (GetClass() == nullptr)
 	{
 		return FALSE;
@@ -167,6 +170,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport,int32_t pWidth, int32_t p
 
 void UD3D9FPRenderDevice::Exit()
 {
+  std::unique_lock lock(m_Lock);
 	GLog->Log(L"[EchelonRenderer]\t Direct3D 9 Fixed-Function Pipeline renderer exiting.");
 	g_DebugMenu.Shutdown();
 	m_HLRenderer.Shutdown();
@@ -200,9 +204,17 @@ UBOOL UD3D9FPRenderDevice::SetRes(INT pWidth, INT pHeight, INT pColorBytes, UBOO
 
 	if (pFullscreen)
 	{
-		auto res = m_LLRenderer.FindClosestResolution(pWidth, pHeight);
-		pWidth = res.Width;
-		pHeight = res.Height;
+    if (auto res = m_LLRenderer.FindClosestResolution(pWidth, pHeight); res)
+    {
+      GLog->Logf(L"[EchelonRenderer]\t Fullscreen Setres was requested, and matched %dx%d to available resolution %dx%d.", pWidth, pHeight, res->Width, res->Height);
+      pWidth = res->Width;
+      pHeight = res->Height;
+    }
+    else
+    {
+      pFullscreen = false;
+      GLog->Logf(L"[EchelonRenderer]\t SetRes failed, could not find matching fullscreen resolution for %dx%d, possible device returned no modes. Swithing to windowed.", pWidth, pHeight);
+    }
 	}
 
 	const auto blitType = (pFullscreen ? (BLIT_Fullscreen | BLIT_Direct3D) : (BLIT_HardwarePaint | BLIT_Direct3D));
@@ -377,12 +389,32 @@ UBOOL UD3D9FPRenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar)
 			return 1;
 		}
 		else if (ParseCommand(&Cmd, L"GetRes"))
-		{
-			GLog->Log(L"[EchelonRenderer]\t Getting the list of resolutions (not implemented)");
-			//TODO:
-			//TCHAR* resolutions=m_LLRenderer.getModes();
-			//Ar.Log(resolutions);
-			//delete [] resolutions;
+		{		
+      std::wstring displayModeString;
+
+      auto count = 0;
+      auto displayModes = m_LLRenderer.GetDisplayModes();
+
+      for (const auto& m : displayModes)
+      {
+        wchar_t tmpString[100]{ 0 };
+        swprintf_s(tmpString, L"%dx%d", m.Width, m.Height);
+        displayModeString += tmpString;
+        
+        if (count++ >= 16)
+        {
+          break;
+        }
+        else
+        {
+          displayModeString += L" ";
+        }
+      }
+
+      if (!displayModeString.empty())
+      {
+        Ar.Log(displayModeString.c_str());
+      }
 			return 1;
 		}
 		else if ((ptr = (wchar_t*)wcswcs(Cmd, L"Brightness"))) //Brightness is sent as "brightness [val]".

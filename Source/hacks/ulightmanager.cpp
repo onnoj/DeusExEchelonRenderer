@@ -10,7 +10,7 @@
 
 
 namespace Hacks
-{  
+{
   bool ULightManagerHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> ULightManagerDetours;
   namespace ULightManagerVTableFuncs

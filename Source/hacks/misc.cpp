@@ -34,7 +34,7 @@ namespace Misc
 
 bool Misc::IsNvRemixAttached(bool pReevaluate)
 {
- const auto func = []() {
+  const auto func = []() {
     HANDLE hProcess = GetCurrentProcess();
     HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hSnap == INVALID_HANDLE_VALUE) {

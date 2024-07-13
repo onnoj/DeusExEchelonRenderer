@@ -13,7 +13,7 @@ namespace Hacks
   namespace DynamicItemFilterVTableFuncs
   {
     void(__thiscall* Filter)(FDynamicItem* pThis, UViewport* Viewport, FSceneNode* Frame, INT iNode, INT Outside) = nullptr;
-    void(__thiscall* PreRender)(FDynamicFinalChunk* pThis, UViewport* Viewport,  FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics );
+    void(__thiscall* PreRender)(FDynamicFinalChunk* pThis, UViewport* Viewport, FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics);
   }
   class FakeDynamicItemFilter
   {
@@ -38,8 +38,8 @@ namespace Hacks
 
   namespace DynamicItemFilterVTableOverrides
   {
-    void(FakeDynamicItemFilter::*Filter)(UViewport* Viewport, FSceneNode* Frame, INT iNode, INT Outside) = &FakeDynamicItemFilter::Filter;
-    void(FakeFDynamicFinalChunk::*PreRender)(UViewport* Viewport, FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics) = &FakeFDynamicFinalChunk::PreRender;
+    void(FakeDynamicItemFilter::* Filter)(UViewport* Viewport, FSceneNode* Frame, INT iNode, INT Outside) = &FakeDynamicItemFilter::Filter;
+    void(FakeFDynamicFinalChunk::* PreRender)(UViewport* Viewport, FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics) = &FakeFDynamicFinalChunk::PreRender;
   }
 
   /*
@@ -49,7 +49,7 @@ namespace Hacks
   std::tuple<PLH::VFuncMap::value_type, uint64_t, PLH::VFuncMap> FDynamicFinalChunkVTableFuncs[] = { {}
     /*{{(uint16_t)21, *(uint64_t*)&DynamicItemFilterVTableOverrides::PreRender}, (uint64_t)&DynamicItemFilterVTableFuncs::PreRender, {}},*/
   };
-/////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////
 }
 
 void InstallFDynamicItemFilterHacks()

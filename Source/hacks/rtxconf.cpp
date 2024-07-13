@@ -24,7 +24,7 @@ void InstallRTXConfigPatches()
       {L"d3d9.maxEnabledLights", L"65000"},
       {L"rtx.suppressLightKeeping", L"True"},
     };
-    bool hasOptions[std::size(defaultConfigOptions)]{false};
+    bool hasOptions[std::size(defaultConfigOptions)]{ false };
 
     auto rtxConfFile = modulePath.replace_filename("rtx.conf");
     if (std::filesystem::exists(rtxConfFile))

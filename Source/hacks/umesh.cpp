@@ -10,12 +10,12 @@
 
 
 namespace Hacks
-{  
+{
   bool UMeshHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> UMeshDetours;
   namespace UMeshVTableFuncs
   {
-    void(__thiscall *GetFrame)(ULodMesh* pThis, FVector* Verts, INT Size, FCoords Coords, AActor* Owner) = nullptr;
+    void(__thiscall* GetFrame)(ULodMesh* pThis, FVector* Verts, INT Size, FCoords Coords, AActor* Owner) = nullptr;
   }
   namespace ULodMeshFuncs
   {

@@ -64,7 +64,7 @@ void DebugMenu::Init()
   ImGui_ImplWin32_EnableDpiAwareness();
 
   ImGui_ImplSDL2_InitForD3D(m_SDLWindow);
-  ImGui_ImplDX11_Init(m_D3DDevice, m_D3DDeviceContext); 
+  ImGui_ImplDX11_Init(m_D3DDevice, m_D3DDeviceContext);
   m_Initialized = true;
 }
 
@@ -177,84 +177,84 @@ const char* DebugMenu::getTypeFormat(DebugMenuTypes pType)
 {
   switch (pType)
   {
-    case DebugMenuTypes::Integer: return "%d";
-    case DebugMenuTypes::Float:return "%f";
-    case DebugMenuTypes::Boolean:return "%d";
-    case DebugMenuTypes::Vector3f: return "%f, %f, %f";
-    case DebugMenuTypes::Vector4f:return "%f, %f, %f, %f";
-    case DebugMenuTypes::FPlane:return "X:%f, Y:%f, Z:%f, W:%f";
-    case DebugMenuTypes::UETexture:return "%d";
-    case DebugMenuTypes::String: return "%s";
-    case DebugMenuTypes::Lambda: return nullptr;
-    case DebugMenuTypes::Undefined: [[fallthrough]];
-    default:  assert(false); return "{}";
+  case DebugMenuTypes::Integer: return "%d";
+  case DebugMenuTypes::Float:return "%f";
+  case DebugMenuTypes::Boolean:return "%d";
+  case DebugMenuTypes::Vector3f: return "%f, %f, %f";
+  case DebugMenuTypes::Vector4f:return "%f, %f, %f, %f";
+  case DebugMenuTypes::FPlane:return "X:%f, Y:%f, Z:%f, W:%f";
+  case DebugMenuTypes::UETexture:return "%d";
+  case DebugMenuTypes::String: return "%s";
+  case DebugMenuTypes::Lambda: return nullptr;
+  case DebugMenuTypes::Undefined: [[fallthrough]];
+  default:  assert(false); return "{}";
   }
 }
 
 void DebugMenu::getTypeVaListRead(std::function<void(std::va_list& outList)> pFunctor, DebugMenuTypes pType, void* pData)
 {
   auto recombinator = [&](int dummy, ...)
-  {
-    std::va_list args;
-    va_start(args, dummy);
-    pFunctor(args);
-    va_end(args);
-  };
+    {
+      std::va_list args;
+      va_start(args, dummy);
+      pFunctor(args);
+      va_end(args);
+    };
 
   switch (pType)
   {
-    case DebugMenuTypes::Integer: recombinator(1, *reinterpret_cast<int*>(pData)); break;
-    case DebugMenuTypes::Float: recombinator(1, *reinterpret_cast<float*>(pData)); break;
-    case DebugMenuTypes::Vector3f:  recombinator(3, 
-      reinterpret_cast<float*>(pData)[0],
-      reinterpret_cast<float*>(pData)[1],
-      reinterpret_cast<float*>(pData)[2]
-    ); break;
-    case DebugMenuTypes::Vector4f: recombinator(4, 
-      reinterpret_cast<float*>(pData)[0],
-      reinterpret_cast<float*>(pData)[1],
-      reinterpret_cast<float*>(pData)[2],
-      reinterpret_cast<float*>(pData)[3]
-    ); break;
-    case DebugMenuTypes::FPlane: recombinator(4,
-      reinterpret_cast<FPlane*>(pData)->X,
-      reinterpret_cast<FPlane*>(pData)->Y,
-      reinterpret_cast<FPlane*>(pData)->Z,
-      reinterpret_cast<FPlane*>(pData)->W
-    ); break;
-    case DebugMenuTypes::Boolean: recombinator(1, *reinterpret_cast<bool*>(pData)); break;
-    case DebugMenuTypes::UETexture: recombinator(1, *reinterpret_cast<int*>(pData)); break;
-    case DebugMenuTypes::String: {
-      const char* source = reinterpret_cast<std::string*>(pData)->c_str();
-      
-      recombinator(1, source);
-    } break;
-    case DebugMenuTypes::Lambda: break;
-    case DebugMenuTypes::Undefined: [[fallthrough]];
-    default: assert(false);
+  case DebugMenuTypes::Integer: recombinator(1, *reinterpret_cast<int*>(pData)); break;
+  case DebugMenuTypes::Float: recombinator(1, *reinterpret_cast<float*>(pData)); break;
+  case DebugMenuTypes::Vector3f:  recombinator(3,
+    reinterpret_cast<float*>(pData)[0],
+    reinterpret_cast<float*>(pData)[1],
+    reinterpret_cast<float*>(pData)[2]
+  ); break;
+  case DebugMenuTypes::Vector4f: recombinator(4,
+    reinterpret_cast<float*>(pData)[0],
+    reinterpret_cast<float*>(pData)[1],
+    reinterpret_cast<float*>(pData)[2],
+    reinterpret_cast<float*>(pData)[3]
+  ); break;
+  case DebugMenuTypes::FPlane: recombinator(4,
+    reinterpret_cast<FPlane*>(pData)->X,
+    reinterpret_cast<FPlane*>(pData)->Y,
+    reinterpret_cast<FPlane*>(pData)->Z,
+    reinterpret_cast<FPlane*>(pData)->W
+  ); break;
+  case DebugMenuTypes::Boolean: recombinator(1, *reinterpret_cast<bool*>(pData)); break;
+  case DebugMenuTypes::UETexture: recombinator(1, *reinterpret_cast<int*>(pData)); break;
+  case DebugMenuTypes::String: {
+    const char* source = reinterpret_cast<std::string*>(pData)->c_str();
+
+    recombinator(1, source);
+  } break;
+  case DebugMenuTypes::Lambda: break;
+  case DebugMenuTypes::Undefined: [[fallthrough]];
+  default: assert(false);
   }
 }
 
 void DebugMenu::getTypeVaListWrite(std::function<void(std::va_list& outList)> pFunctor, DebugMenuTypes pType, void* pData)
 {
   auto recombinator = [&](int dummy, ...)
-  {
-    std::va_list args;
-    va_start(args, dummy);
-    pFunctor(args);
-    va_end(args);
-  };
+    {
+      std::va_list args;
+      va_start(args, dummy);
+      pFunctor(args);
+      va_end(args);
+    };
 
   switch (pType)
   {
   case DebugMenuTypes::Integer: recombinator(1, reinterpret_cast<int*>(pData)); break;
   case DebugMenuTypes::Float: recombinator(1, reinterpret_cast<float*>(pData)); break;
-  case DebugMenuTypes::Vector3f:  recombinator(1, 
+  case DebugMenuTypes::Vector3f:  recombinator(1,
     &reinterpret_cast<float*>(pData)[0],
     &reinterpret_cast<float*>(pData)[1],
     &reinterpret_cast<float*>(pData)[2]
   ); break;
-  case DebugMenuTypes::Vector4f: recombinator(1, 
+  case DebugMenuTypes::Vector4f: recombinator(1,
     &reinterpret_cast<float*>(pData)[0],
     &reinterpret_cast<float*>(pData)[1],
     &reinterpret_cast<float*>(pData)[2],
@@ -307,7 +307,7 @@ void DebugMenu::Update()
     //io.DisplayFramebufferScale.x = dpiScale;
     //io.DisplayFramebufferScale.y = dpiScale;
   }
-  
+
 
 
 #if 1
@@ -320,7 +320,7 @@ void DebugMenu::Update()
     if (ImGui::CollapsingHeader(categoryName.c_str(), expanded ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None))
     {
       expanded = true;
-      
+
       for (auto& itemPair : debugItems)
       {
         const auto& item = itemPair.second;
@@ -399,7 +399,7 @@ void DebugMenu::Update()
                 ImGui::SameLine();
                 ImGui::TextColored(ImColor(0xFF0000FF), "Invalid Data!");
               }
-            };
+              };
             getTypeVaListRead(handler, item->storageType, item->storage);
           }
         }
@@ -454,9 +454,9 @@ void DebugMenu::VisitTexture(FTextureInfo* pUETextureInfo)
   texDesc.ArraySize = 1;
   switch (textureHandle->format)
   {
-    case D3DFMT_A8R8G8B8: texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; break;
-    case D3DFMT_DXT1: texDesc.Format = DXGI_FORMAT_BC1_UNORM; break;
-    default: return;
+  case D3DFMT_A8R8G8B8: texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; break;
+  case D3DFMT_DXT1: texDesc.Format = DXGI_FORMAT_BC1_UNORM; break;
+  default: return;
   }
   texDesc.SampleDesc.Count = 1;
   texDesc.SampleDesc.Quality = 0;
@@ -464,9 +464,9 @@ void DebugMenu::VisitTexture(FTextureInfo* pUETextureInfo)
   texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
   texDesc.CPUAccessFlags = 0;
   texDesc.MiscFlags = 0;
-  
+
   auto& textureData = m_TextureData[m_FreeTextureIndex];
-  
+
   if (textureData.m_TextureResource != nullptr)
   {
     textureData.m_TextureSRV->Release();
@@ -479,7 +479,7 @@ void DebugMenu::VisitTexture(FTextureInfo* pUETextureInfo)
   if (SUCCEEDED(hr))
   {
     m_D3DDeviceContext->UpdateSubresource(textureData.m_TextureResource, 0, nullptr, textureHandle->textureDataPtr, textureHandle->textureDataPitch, 0);
-  
+
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     ZeroMemory(&srvDesc, sizeof(srvDesc));
     srvDesc.Format = texDesc.Format; // BC1 compressed format
@@ -490,5 +490,5 @@ void DebugMenu::VisitTexture(FTextureInfo* pUETextureInfo)
     check(SUCCEEDED(hr));
     textureData.m_TextureID = pUETextureInfo->CacheID;
   }
-  
+
 }

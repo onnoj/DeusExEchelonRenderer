@@ -109,41 +109,41 @@ void TextureManager::ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlag
 
   switch (pUETextureInfo->Format)
   {
-    case TEXF_P8: 
-    {
-      handle->format = D3DFMT_A8R8G8B8;  
-      handle->textureDataPtr = nullptr; //set by ConvertFrom8bpp
-      handle->textureDataPitch = 0; //set by ConvertFrom8bpp
-      handle->ConvertFrom8bpp(pUETextureInfo, pFlags);
-    }; break;
-    case TEXF_RGBA7: 
-    {
-      handle->format = D3DFMT_A8R8G8B8; //Can I assign rgba7 to rgba8?
-      handle->textureDataPtr = textureMip0->DataPtr;
-      handle->textureDataPitch = textureMip0->USize * sizeof(uint8_t) * 4;
-    }; break;
-    case TEXF_DXT1:
-    {
-      const auto blockSize = 4;
-      const auto pixelsPerBlock = 8;
-      handle->format = D3DFMT_DXT1;
-      handle->textureDataPtr = textureMip0->DataPtr;
-      handle->textureDataPitch = textureMip0->USize / 2;//max(1, ((textureMip0->USize * pixelsPerBlock) / blockSize));
-      handle->md.width += pUETextureInfo->USize % blockSize;
-      handle->md.height += pUETextureInfo->VSize % blockSize;
-    } break;
-    case TEXF_RGBA8:
-    {
-      handle->format = D3DFMT_A8R8G8B8;
-      handle->textureDataPtr = textureMip0->DataPtr;
-      handle->textureDataPitch = textureMip0->USize * sizeof(uint8_t) * 4;
-    } break;
-    case TEXF_RGB8: [[fallthrough]];
-    case TEXF_RGB16: [[fallthrough]];
-    default:
-    {
-      assert(false); //unsupported
-    } break;
+  case TEXF_P8:
+  {
+    handle->format = D3DFMT_A8R8G8B8;
+    handle->textureDataPtr = nullptr; //set by ConvertFrom8bpp
+    handle->textureDataPitch = 0; //set by ConvertFrom8bpp
+    handle->ConvertFrom8bpp(pUETextureInfo, pFlags);
+  }; break;
+  case TEXF_RGBA7:
+  {
+    handle->format = D3DFMT_A8R8G8B8; //Can I assign rgba7 to rgba8?
+    handle->textureDataPtr = textureMip0->DataPtr;
+    handle->textureDataPitch = textureMip0->USize * sizeof(uint8_t) * 4;
+  }; break;
+  case TEXF_DXT1:
+  {
+    const auto blockSize = 4;
+    const auto pixelsPerBlock = 8;
+    handle->format = D3DFMT_DXT1;
+    handle->textureDataPtr = textureMip0->DataPtr;
+    handle->textureDataPitch = textureMip0->USize / 2;//max(1, ((textureMip0->USize * pixelsPerBlock) / blockSize));
+    handle->md.width += pUETextureInfo->USize % blockSize;
+    handle->md.height += pUETextureInfo->VSize % blockSize;
+  } break;
+  case TEXF_RGBA8:
+  {
+    handle->format = D3DFMT_A8R8G8B8;
+    handle->textureDataPtr = textureMip0->DataPtr;
+    handle->textureDataPitch = textureMip0->USize * sizeof(uint8_t) * 4;
+  } break;
+  case TEXF_RGB8: [[fallthrough]];
+  case TEXF_RGB16: [[fallthrough]];
+  default:
+  {
+    assert(false); //unsupported
+  } break;
   };
 }
 

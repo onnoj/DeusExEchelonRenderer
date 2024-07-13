@@ -11,13 +11,13 @@
 #include <deusex/ConSys/Inc/ConCamera.h>
 
 namespace Hacks
-{  
+{
   bool UGameEngineHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> UGameEngineDetours;
   UGameEngine* GEngine = nullptr;
   namespace UGameEngineVTableFuncs
   {
-    void(__thiscall *Tick)(UGameEngine* pThis, FLOAT DeltaSeconds) = nullptr;
+    void(__thiscall* Tick)(UGameEngine* pThis, FLOAT DeltaSeconds) = nullptr;
   }
 
   struct UGameEngineOverride
@@ -33,7 +33,7 @@ namespace Hacks
         if (obj->ConPlay)
         {
           static bool lastIsInCutscene = false;
-          bool isInCutscene = *(((char*)obj->ConPlay) + 41)!=0;
+          bool isInCutscene = *(((char*)obj->ConPlay) + 41) != 0;
           if (isInCutscene != lastIsInCutscene)
           {
             int x = 1;
@@ -49,7 +49,7 @@ namespace Hacks
   namespace UGameEngineVTableOverrides
   {
     void(UGameEngineOverride::* Tick)(FLOAT DeltaSeconds) = &UGameEngineOverride::Tick;
-   
+
   }
 
   /*

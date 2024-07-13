@@ -26,11 +26,11 @@ namespace Hacks
   }
   namespace URenderVTableFuncs
   {
-    FSceneNode* (__thiscall *CreateMasterFrame)(URender* pThis, UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds) = nullptr;
-    UBOOL(__thiscall *BoundVisible)(URender* pThis,FSceneNode* Frame, FBox* Bound, FSpanBuffer* SpanBuffer, FScreenBounds& Result) = nullptr;
-    void(__thiscall *PreRender)(URender*,FSceneNode*) = nullptr;
-    void(__thiscall *PostRender)(URender*,FSceneNode*) = nullptr;
-    void(__thiscall *DrawWorld)(URender*,FSceneNode*) = nullptr;
+    FSceneNode* (__thiscall* CreateMasterFrame)(URender* pThis, UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds) = nullptr;
+    UBOOL(__thiscall* BoundVisible)(URender* pThis, FSceneNode* Frame, FBox* Bound, FSpanBuffer* SpanBuffer, FScreenBounds& Result) = nullptr;
+    void(__thiscall* PreRender)(URender*, FSceneNode*) = nullptr;
+    void(__thiscall* PostRender)(URender*, FSceneNode*) = nullptr;
+    void(__thiscall* DrawWorld)(URender*, FSceneNode*) = nullptr;
   }
 
   class URenderOverride
@@ -47,12 +47,12 @@ namespace Hacks
     * PostRender
     */
   public:
-    /*virtual*/ void PreRender(FSceneNode* Frame) 
+    /*virtual*/ void PreRender(FSceneNode* Frame)
     {
       Misc::g_Facade->GetHLRenderer()->OnRenderingBegin(Frame);
       URenderVTableFuncs::PreRender(GRender, Frame);
     };
-    /*virtual*/ void PostRender(FSceneNode* Frame) 
+    /*virtual*/ void PostRender(FSceneNode* Frame)
     {
       URenderVTableFuncs::PostRender(GRender, Frame);
       Misc::g_Facade->GetHLRenderer()->OnRenderingEnd(Frame);
@@ -73,14 +73,14 @@ namespace Hacks
     };
     /*virtual*/ FSceneNode* CreateMasterFrame(UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds)
     {
-      g_DebugMenu.DebugVar("Global", "FOV Angle", DebugMenuUniqueID(), Viewport->Actor->FovAngle, {DebugMenuValueOptions::editor::slider, 0.0f, 180.0f});
-      g_DebugMenu.DebugVar("Global", "Frame X", DebugMenuUniqueID(), Viewport->SizeX, {DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, -8000, 8000});
-      g_DebugMenu.DebugVar("Global", "Frame Y", DebugMenuUniqueID(), Viewport->SizeY, {DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 1, 2880});
-      g_DebugMenu.DebugVar("Global", "Orthozoom", DebugMenuUniqueID(), Viewport->Actor->OrthoZoom, {DebugMenuValueOptions::editor::slider, -1000000.0f, 1000000.0f});
-      
+      g_DebugMenu.DebugVar("Global", "FOV Angle", DebugMenuUniqueID(), Viewport->Actor->FovAngle, { DebugMenuValueOptions::editor::slider, 0.0f, 180.0f });
+      g_DebugMenu.DebugVar("Global", "Frame X", DebugMenuUniqueID(), Viewport->SizeX, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, -8000, 8000 });
+      g_DebugMenu.DebugVar("Global", "Frame Y", DebugMenuUniqueID(), Viewport->SizeY, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 1, 2880 });
+      g_DebugMenu.DebugVar("Global", "Orthozoom", DebugMenuUniqueID(), Viewport->Actor->OrthoZoom, { DebugMenuValueOptions::editor::slider, -1000000.0f, 1000000.0f });
+
       FVector LocationOffset{ 0.0f,0.0f,0.0f };
       g_DebugMenu.DebugVar("Global", "Frame Position Offset", DebugMenuUniqueID(), LocationOffset);
-      FSceneNode* Frame = URenderVTableFuncs::CreateMasterFrame(GRender, Viewport, Location+LocationOffset, Rotation, Bounds);
+      FSceneNode* Frame = URenderVTableFuncs::CreateMasterFrame(GRender, Viewport, Location + LocationOffset, Rotation, Bounds);
       return Frame;
     }
 
@@ -105,7 +105,7 @@ namespace Hacks
     void OccludeBsp(FSceneNode* Frame);
     void OccludeFrame(FSceneNode* Frame);
     void DrawMesh(FSceneNode* Frame, AActor* Owner, AActor* LightSink, FSpanBuffer* SpanBuffer, AZoneInfo* Zone, const FCoords& Coords, FVolActorLink* LeafLights, FActorLink* Volumetrics, DWORD PolyFlags);
-    void SetupDynamics( FSceneNode* Frame, AActor* Exclude );
+    void SetupDynamics(FSceneNode* Frame, AActor* Exclude);
     void ComputeRenderSize(FSceneNode* Frame);
     void DrawFrame(FSceneNode* Frame);
     INT ClipBspSurf(INT iNode, FTransform**& Result);
@@ -123,7 +123,7 @@ namespace Hacks
     {
       return;
     }
-   
+
     FrameContextManager::ScopedContext ctx;
     ctx->frameSceneNode = Frame;
     (GRender->*URenderFuncs::OccludeBsp)(Frame);
@@ -181,9 +181,9 @@ namespace Hacks
     g_DebugMenu.DebugVar("Culling", "Backwards Occlusion Enabled", DebugMenuUniqueID(), g_options.backwardsOcclusionPass);
     if (g_options.backwardsOcclusionPass && Frame->Parent == nullptr && !isInCutscene)
     {
-      const FColor angleColors[] = {FColor(255,0,0), FColor(0,255,0), FColor(0,0,255)};
+      const FColor angleColors[] = { FColor(255,0,0), FColor(0,255,0), FColor(0,0,255) };
       //constexpr float angles[] = {0.66f, 0.33f, 0.0f};
-      constexpr float angles[] = {0.50f, 0.0f};
+      constexpr float angles[] = { 0.50f, 0.0f };
       //constexpr float angles[] = {0.0f};
 
       auto originalSpan = Frame->Span;
@@ -197,7 +197,7 @@ namespace Hacks
         lines.clear();
       }
 
-      for (int i=0; i < std::size(angles); i++)
+      for (int i = 0; i < std::size(angles); i++)
       {
         const bool isLast = ((i + 1) == std::size(angles));
         const float& angle = angles[i];
@@ -208,7 +208,7 @@ namespace Hacks
           ctx->overrides.bypassSetupDynamics = !isLast;
 
           float fov = 155.0f;
-          g_DebugMenu.DebugVar("Culling", "Backwards Occlusion FOV", DebugMenuUniqueID(), fov, {DebugMenuValueOptions::editor::slider, 0.0f, 179.999f});
+          g_DebugMenu.DebugVar("Culling", "Backwards Occlusion FOV", DebugMenuUniqueID(), fov, { DebugMenuValueOptions::editor::slider, 0.0f, 179.999f });
 
           Frame->Viewport->Actor->FovAngle = fov;
           if (!isLast)
@@ -222,7 +222,7 @@ namespace Hacks
           }
 
           float backwardsAdjustment = 100.0f;
-          g_DebugMenu.DebugVar("Culling", "Backwards Occlusion Adjustment", DebugMenuUniqueID(), backwardsAdjustment, {DebugMenuValueOptions::editor::slider, -100.0f, 1000.0f});
+          g_DebugMenu.DebugVar("Culling", "Backwards Occlusion Adjustment", DebugMenuUniqueID(), backwardsAdjustment, { DebugMenuValueOptions::editor::slider, -100.0f, 1000.0f });
           auto newRotation = origRot + FRotator(0.0f, 65536.0f * angle, 0.0f);
 
           auto newPosition = origPos;
@@ -253,18 +253,18 @@ namespace Hacks
               FVector(TempSigns[i] / Frame->FX2, 0, 0.0f).UnsafeNormal().TransformVectorBy(Frame->Uncoords)
             );
           }
-          Frame->PrjXM = (0  - Frame->FX2)*(-Frame->RProj.Z);
-          Frame->PrjXP = (Frame->FX - Frame->FX2)* (+Frame->RProj.Z);
-          Frame->PrjYM = (0  - Frame->FY2)*(-Frame->RProj.Z);
-          Frame->PrjYP = (Frame->FY - Frame->FY2)*(+Frame->RProj.Z);
+          Frame->PrjXM = (0 - Frame->FX2) * (-Frame->RProj.Z);
+          Frame->PrjXP = (Frame->FX - Frame->FX2) * (+Frame->RProj.Z);
+          Frame->PrjYM = (0 - Frame->FY2) * (-Frame->RProj.Z);
+          Frame->PrjYP = (Frame->FY - Frame->FY2) * (+Frame->RProj.Z);
 #endif
           if (drawLines)
           {
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + newRotation.Vector()*100.0f, angleColors[i]});
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[0] * 1000.0f), angleColors[i]});
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[1] * 1000.0f), angleColors[i]});
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[2] * 1000.0f), angleColors[i]});
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[3] * 1000.0f), angleColors[i]});
+            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + newRotation.Vector() * 100.0f, angleColors[i] });
+            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[0] * 1000.0f), angleColors[i] });
+            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[1] * 1000.0f), angleColors[i] });
+            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[2] * 1000.0f), angleColors[i] });
+            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[3] * 1000.0f), angleColors[i] });
           }
           (GRender->*URenderFuncs::OccludeFrame)(Frame);
         }
@@ -290,38 +290,38 @@ namespace Hacks
   void URenderOverride::ComputeRenderSize(FSceneNode* Frame)
   {
     float fovangle = Frame->Viewport->Actor->FovAngle;
-    Frame->FX 			= (FLOAT)Frame->X; 
-    Frame->FY 			= (FLOAT)Frame->Y;   
-    Frame->FX2			= Frame->FX * 0.5;
-    Frame->FY2			= Frame->FY * 0.5;	
-    Frame->FX15		= (Frame->FX+1.0001) * 0.5;
-    Frame->FY15		= (Frame->FY+1.0001) * 0.5;	
-    Frame->Proj		= FVector( 0.5-0.5*Frame->FX, 0.5-0.5*Frame->FY, 0.5*Frame->FX / appTan(fovangle * PI/360.0) );
-    Frame->RProj		= FVector( 1/Frame->Proj.X, 1/Frame->Proj.Y, 1/Frame->Proj.Z );
-    Frame->Zoom 		= Frame->Viewport->Actor->OrthoZoom / (Frame->FX * 15.0);
-    Frame->PrjXM		= (       0  - Frame->FX2)*(-Frame->RProj.Z);
-    Frame->PrjXP		= (Frame->FX - Frame->FX2)*(+Frame->RProj.Z);
-    Frame->PrjYM		= (       0  - Frame->FY2)*(-Frame->RProj.Z);
-    Frame->PrjYP		= (Frame->FY - Frame->FY2)*(+Frame->RProj.Z);
+    Frame->FX = (FLOAT)Frame->X;
+    Frame->FY = (FLOAT)Frame->Y;
+    Frame->FX2 = Frame->FX * 0.5;
+    Frame->FY2 = Frame->FY * 0.5;
+    Frame->FX15 = (Frame->FX + 1.0001) * 0.5;
+    Frame->FY15 = (Frame->FY + 1.0001) * 0.5;
+    Frame->Proj = FVector(0.5 - 0.5 * Frame->FX, 0.5 - 0.5 * Frame->FY, 0.5 * Frame->FX / appTan(fovangle * PI / 360.0));
+    Frame->RProj = FVector(1 / Frame->Proj.X, 1 / Frame->Proj.Y, 1 / Frame->Proj.Z);
+    Frame->Zoom = Frame->Viewport->Actor->OrthoZoom / (Frame->FX * 15.0);
+    Frame->PrjXM = (0 - Frame->FX2) * (-Frame->RProj.Z);
+    Frame->PrjXP = (Frame->FX - Frame->FX2) * (+Frame->RProj.Z);
+    Frame->PrjYM = (0 - Frame->FY2) * (-Frame->RProj.Z);
+    Frame->PrjYP = (Frame->FY - Frame->FY2) * (+Frame->RProj.Z);
 
 
     // Precompute side info.
-    FLOAT TempSigns[2]={-1.0,+1.0};
-    for( INT i=0; i<2; i++ )
+    FLOAT TempSigns[2] = { -1.0,+1.0 };
+    for (INT i = 0; i < 2; i++)
     {
-      for( INT j=0; j<2; j++ )
+      for (INT j = 0; j < 2; j++)
       {
-        Frame->ViewSides[i*2+j] = FVector(TempSigns[i] * Frame->FX2, TempSigns[j] * Frame->FY2, Frame->Proj.Z).UnsafeNormal().TransformVectorBy(Frame->Uncoords);
+        Frame->ViewSides[i * 2 + j] = FVector(TempSigns[i] * Frame->FX2, TempSigns[j] * Frame->FY2, Frame->Proj.Z).UnsafeNormal().TransformVectorBy(Frame->Uncoords);
       }
       Frame->ViewPlanes[i] = FPlane
       (
         Frame->Coords.Origin,
-        FVector(0,TempSigns[i] / Frame->FY2,1.0/Frame->Proj.Z).UnsafeNormal().TransformVectorBy(Frame->Uncoords)
+        FVector(0, TempSigns[i] / Frame->FY2, 1.0 / Frame->Proj.Z).UnsafeNormal().TransformVectorBy(Frame->Uncoords)
       );
-      Frame->ViewPlanes[i+2] = FPlane
+      Frame->ViewPlanes[i + 2] = FPlane
       (
         Frame->Coords.Origin,
-        FVector(TempSigns[i] / Frame->FX2,0,1.0/Frame->Proj.Z).UnsafeNormal().TransformVectorBy(Frame->Uncoords)
+        FVector(TempSigns[i] / Frame->FX2, 0, 1.0 / Frame->Proj.Z).UnsafeNormal().TransformVectorBy(Frame->Uncoords)
       );
     }
 
@@ -358,7 +358,7 @@ namespace Hacks
     auto& GVerts = Model->Verts;
     auto& GVertPoints = Model->Points;
     auto* GFrame = ctx->frameSceneNode;
-    auto* GPoints	= &Model->Points(0);
+    auto* GPoints = &Model->Points(0);
 
     bool overrideClipBsp = false;
     g_DebugMenu.DebugVar("Culling", "Override ClipBSP", DebugMenuUniqueID(), overrideClipBsp, {});
@@ -369,25 +369,25 @@ namespace Hacks
 
     static FTransform* LocalPts[FBspNode::MAX_FINAL_VERTICES];
     FLOAT Dot[FBspNode::MAX_FINAL_VERTICES];
-    auto Pipe = []( FTransform& Result, const FSceneNode* Frame, const FVector& InVector ) {
-      static FLOAT Half=0.5;
+    auto Pipe = [](FTransform& Result, const FSceneNode* Frame, const FVector& InVector) {
+      static FLOAT Half = 0.5;
       static FLOAT ClipXM, ClipXP, ClipYM, ClipYP;
-      static const BYTE OutXMinTab [2] = { 0, FVF_OutXMin };
-      static const BYTE OutXMaxTab [2] = { 0, FVF_OutXMax };
-      static const BYTE OutYMinTab [2] = { 0, FVF_OutYMin };
-      static const BYTE OutYMaxTab [2] = { 0, FVF_OutYMax };
-      Result.Point = InVector.TransformPointBy( Frame->Coords );
+      static const BYTE OutXMinTab[2] = { 0, FVF_OutXMin };
+      static const BYTE OutXMaxTab[2] = { 0, FVF_OutXMax };
+      static const BYTE OutYMinTab[2] = { 0, FVF_OutYMin };
+      static const BYTE OutYMaxTab[2] = { 0, FVF_OutYMax };
+      Result.Point = InVector.TransformPointBy(Frame->Coords);
 
       ClipXM = Frame->PrjXM * Result.Point.Z + Result.Point.X;
       ClipXP = Frame->PrjXP * Result.Point.Z - Result.Point.X;
       ClipYM = Frame->PrjYM * Result.Point.Z + Result.Point.Y;
       ClipYP = Frame->PrjYP * Result.Point.Z - Result.Point.Y;
 
-      Result.Flags  =
-        (	OutXMinTab [ClipXM < 0.0]
-          +	OutXMaxTab [ClipXP < 0.0]
-          +	OutYMinTab [ClipYM < 0.0]
-          +	OutYMaxTab [ClipYP < 0.0]);
+      Result.Flags =
+        (OutXMinTab[ClipXM < 0.0]
+          + OutXMaxTab[ClipXP < 0.0]
+          + OutYMinTab[ClipYM < 0.0]
+          + OutYMaxTab[ClipYP < 0.0]);
 
       bool forceNoClip = false;
       g_DebugMenu.DebugVar("Culling", "Force ClipBSP off", DebugMenuUniqueID(), forceNoClip, {});
@@ -399,44 +399,44 @@ namespace Hacks
       if (!Result.Flags)
       {
         Result.RZ = Frame->Proj.Z / Result.Point.Z;
-        Result.ScreenX =  std::clamp<float>((Result.Point.X * Result.RZ + Frame->FX15), 0, Frame->FX);
+        Result.ScreenX = std::clamp<float>((Result.Point.X * Result.RZ + Frame->FX15), 0, Frame->FX);
         Result.ScreenY = std::clamp<float>((Result.Point.Y * Result.RZ + Frame->FY15), 0, Frame->FY);
         Result.IntY = std::clamp<INT>(appFloor(Result.ScreenY), 0, Frame->Y);
       }
     };
 
-    auto Clip = [&Dot,&GFrame]( FTransform** Dest, FTransform** Src, INT SrcNum ) {
-      INT DestNum=0;
-      for( INT i=0,j=SrcNum-1; i<SrcNum; j=i++ )
+    auto Clip = [&Dot, &GFrame](FTransform** Dest, FTransform** Src, INT SrcNum) {
+      INT DestNum = 0;
+      for (INT i = 0, j = SrcNum - 1; i < SrcNum; j = i++)
       {
-        if( *(INT*)(Dot+j) >= 0 )
+        if (*(INT*)(Dot + j) >= 0)
         {
           Dest[DestNum++] = Src[j];
         }
-        if( (*(INT*)(Dot+j) ^ *(INT*)(Dot+i)) < 0 )
+        if ((*(INT*)(Dot + j) ^ *(INT*)(Dot + i)) < 0)
         {
-          FTransform* T = Dest[DestNum++] = New<FTransform>( GSceneMem );
+          FTransform* T = Dest[DestNum++] = New<FTransform>(GSceneMem);
           *T = *Src[j];
         }
 #if 0
-        if( *(INT*)(Dot+j) >= 0 )
+        if (*(INT*)(Dot + j) >= 0)
         {
           Dest[DestNum++] = Src[j];
         }
 #if 1
-        if( (*(INT*)(Dot+j) ^ *(INT*)(Dot+i)) < 0 )
+        if ((*(INT*)(Dot + j) ^ *(INT*)(Dot + i)) < 0)
         {
-          FTransform* T = Dest[DestNum++] = New<FTransform>( GSceneMem );
-          FLOAT Alpha   = Dot[j] / (Dot[j]-Dot[i]);
-          T->Point.X    = Src[j]->Point.X + (Src[i]->Point.X-Src[j]->Point.X) * Alpha;
-          T->Point.Y    = Src[j]->Point.Y + (Src[i]->Point.Y-Src[j]->Point.Y) * Alpha;
-          T->Point.Z    = Src[j]->Point.Z + (Src[i]->Point.Z-Src[j]->Point.Z) * Alpha;
-          T->Project( GFrame );
+          FTransform* T = Dest[DestNum++] = New<FTransform>(GSceneMem);
+          FLOAT Alpha = Dot[j] / (Dot[j] - Dot[i]);
+          T->Point.X = Src[j]->Point.X + (Src[i]->Point.X - Src[j]->Point.X) * Alpha;
+          T->Point.Y = Src[j]->Point.Y + (Src[i]->Point.Y - Src[j]->Point.Y) * Alpha;
+          T->Point.Z = Src[j]->Point.Z + (Src[i]->Point.Z - Src[j]->Point.Z) * Alpha;
+          T->Project(GFrame);
         }
 #else
-        if( (*(INT*)(Dot+j) ^ *(INT*)(Dot+i)) < 0 )
+        if ((*(INT*)(Dot + j) ^ *(INT*)(Dot + i)) < 0)
         {
-          FTransform* T = Dest[DestNum++] = New<FTransform>( GSceneMem );
+          FTransform* T = Dest[DestNum++] = New<FTransform>(GSceneMem);
           *T = *Src[j];
         }
 #endif
@@ -446,87 +446,87 @@ namespace Hacks
     };
 
     // Transform.
-    FBspNode* Node		= &GNodes(iNode);
-    INT       NumPts    = Node->NumVertices;
-    FVert*	  VertPool	= &GVerts(Node->iVertPool);
-    BYTE      Outcode   = FVF_OutReject;
-    BYTE      AllCodes  = 0;
-    for( INT i=0; i<NumPts; i++ )
+    FBspNode* Node = &GNodes(iNode);
+    INT       NumPts = Node->NumVertices;
+    FVert* VertPool = &GVerts(Node->iVertPool);
+    BYTE      Outcode = FVF_OutReject;
+    BYTE      AllCodes = 0;
+    for (INT i = 0; i < NumPts; i++)
     {
       INT pPoint = VertPool[i].pVertex;
       URender::FStampedPoint& S = URender::PointCache[pPoint];
-      if( S.Stamp != URender::Stamp )
+      if (S.Stamp != URender::Stamp)
       {
         S.Stamp = URender::Stamp;
         S.Point = new(URender::VectorMem)FTransform;
-        Pipe( *S.Point, GFrame, GPoints[pPoint] );
+        Pipe(*S.Point, GFrame, GPoints[pPoint]);
       }
       LocalPts[i] = S.Point;
-      BYTE Flags  = S.Point->Flags; 
-      Outcode    &= Flags;
-      AllCodes   |= Flags;
+      BYTE Flags = S.Point->Flags;
+      Outcode &= Flags;
+      AllCodes |= Flags;
     }
     //if( Outcode )
     //  return 0;
 
     // Clip.
     FTransform** Pts = LocalPts;
-    if( AllCodes )
+    if (AllCodes)
     {
-      if( AllCodes & FVF_OutXMin )
+      if (AllCodes & FVF_OutXMin)
       {
         static FTransform* LocalPts[FBspNode::MAX_FINAL_VERTICES];
-        for( INT i=0; i<NumPts; i++ )
+        for (INT i = 0; i < NumPts; i++)
           Dot[i] = GFrame->PrjXM * Pts[i]->Point.Z + Pts[i]->Point.X;
-        NumPts = Clip( LocalPts, Pts, NumPts );
-        if( !NumPts )
+        NumPts = Clip(LocalPts, Pts, NumPts);
+        if (!NumPts)
           return 0;
         Pts = LocalPts;
       }
-      if( AllCodes & FVF_OutXMax )
+      if (AllCodes & FVF_OutXMax)
       {
         static FTransform* LocalPts[FBspNode::MAX_FINAL_VERTICES];
-        for( INT i=0; i<NumPts; i++ )
+        for (INT i = 0; i < NumPts; i++)
           Dot[i] = GFrame->PrjXP * Pts[i]->Point.Z - Pts[i]->Point.X;
-        NumPts = Clip( LocalPts, Pts, NumPts );
-        if( !NumPts )
+        NumPts = Clip(LocalPts, Pts, NumPts);
+        if (!NumPts)
           return 0;
         Pts = LocalPts;
       }
-      if( AllCodes & FVF_OutYMin )
+      if (AllCodes & FVF_OutYMin)
       {
         static FTransform* LocalPts[FBspNode::MAX_FINAL_VERTICES];
-        for( INT i=0; i<NumPts; i++ )
+        for (INT i = 0; i < NumPts; i++)
           Dot[i] = GFrame->PrjYM * Pts[i]->Point.Z + Pts[i]->Point.Y;
-        NumPts = Clip( LocalPts, Pts, NumPts );
-        if( !NumPts )
+        NumPts = Clip(LocalPts, Pts, NumPts);
+        if (!NumPts)
           return 0;
         Pts = LocalPts;
       }
-      if( AllCodes & FVF_OutYMax )
+      if (AllCodes & FVF_OutYMax)
       {
         static FTransform* LocalPts[FBspNode::MAX_FINAL_VERTICES];
-        for( INT i=0; i<NumPts; i++ )
+        for (INT i = 0; i < NumPts; i++)
           Dot[i] = GFrame->PrjYP * Pts[i]->Point.Z - Pts[i]->Point.Y;
-        NumPts = Clip( LocalPts, Pts, NumPts );
-        if( !NumPts )
+        NumPts = Clip(LocalPts, Pts, NumPts);
+        if (!NumPts)
           return 0;
         Pts = LocalPts;
       }
     }
-    if( GFrame->NearClip.W != 0.0 )
+    if (GFrame->NearClip.W != 0.0)
     {
-      UBOOL Clipped=0;
-      for( INT i=0; i<NumPts; i++ )
+      UBOOL Clipped = 0;
+      for (INT i = 0; i < NumPts; i++)
       {
         Dot[i] = GFrame->NearClip.PlaneDot(Pts[i]->Point);
-        Clipped |= (Dot[i]<0.0);
+        Clipped |= (Dot[i] < 0.0);
       }
-      if( Clipped )
+      if (Clipped)
       {
         static FTransform* LocalPts[FBspNode::MAX_FINAL_VERTICES];
-        NumPts = Clip( LocalPts, Pts, NumPts );
-        if( !NumPts )
+        NumPts = Clip(LocalPts, Pts, NumPts);
+        if (!NumPts)
           return 0;
         Pts = LocalPts;
       }
@@ -715,22 +715,22 @@ namespace Hacks
 
   /*
   * VTable for URender:
-  *  [22] URender::Init           
-     [23] URender::PreRender      
-     [24] URender::PostRender     
+  *  [22] URender::Init
+     [23] URender::PreRender
+     [24] URender::PostRender
      [25] URender::CreateMasterFrame
      [26] URender::CreateChildFrame
      [27] URender::FinishMasterFrame
-     [28] URender::DrawWorld      
-     [29] URender::DrawActor      
-     [30] URender::Project        
-     [31] URender::Deproject      
-     [32] URender::BoundVisible   
-     [33] URender::GetVisibleSurfs 
-     [34] URender::GlobalLighting 
-     [35] URender::Precache       
-     [36] URender::DrawCircle     
-     [37] URender::DrawBox        
+     [28] URender::DrawWorld
+     [29] URender::DrawActor
+     [30] URender::Project
+     [31] URender::Deproject
+     [32] URender::BoundVisible
+     [33] URender::GetVisibleSurfs
+     [34] URender::GlobalLighting
+     [35] URender::Precache
+     [36] URender::DrawCircle
+     [37] URender::DrawBox
   */
   std::tuple<PLH::VFuncMap::value_type, uint64_t, PLH::VFuncMap> URenderMappedVTableFuncs[] = {
     {{(uint16_t)23, *(uint64_t*)&URenderVTableOverrides::PreRender}, (uint64_t)&URenderVTableFuncs::PreRender, {}},
@@ -744,7 +744,7 @@ namespace Hacks
 void InstallURenderHacks()
 {
   using namespace Hacks;
-  
+
   if (!URenderHacksInstalled)
   {
     URenderHacksInstalled = true;
@@ -760,7 +760,7 @@ void InstallURenderHacks()
     }
 
 
-  
+
     for (auto& func : URenderMappedVTableFuncs)
     {
       auto funcDescriptor = std::get<0>(func);

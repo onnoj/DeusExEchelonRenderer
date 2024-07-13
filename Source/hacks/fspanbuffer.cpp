@@ -34,7 +34,7 @@ namespace Hacks
   {
     /*
     * TODO
-    * 
+    *
     * Drive this whole thing with overrides in the frame context
     * On level change, we force the entire level to render, cache all static geometry.
     * Then, we return to normal culling, but still render the cached static geometry (and anything else we didn't pick up)
@@ -59,18 +59,18 @@ namespace Hacks
       return ret;
     }
     return (reinterpret_cast<FSpanBuffer*>(this)->*FSpanBufferFuncs::CopyFromRaster)(Screen, RasterStartY, RasterEndY, Raster);
-     
+
 #if 0
     uint32_t** ebpValue;
     __asm {
       mov ebpValue, ebp
-    }  
+    }
     uint32_t* retAddress = *(ebpValue + 1);
 
     //Only override things if this function is called from the OccludeBSP function.
     if (Misc::IsInDLL<Misc::DeusExDLLs::Render>(retAddress, 0x18315, 0x18337))
     {
-      FBspNode* processedBspNode = *(FBspNode**)((*(uint32_t*)ebpValue)-0x1c);
+      FBspNode* processedBspNode = *(FBspNode**)((*(uint32_t*)ebpValue) - 0x1c);
       auto ctx = g_ContextManager.GetContext();
       auto Model = ctx->frameSceneNode->Level->Model;
       auto& GSurfs = Model->Surfs;
@@ -128,8 +128,8 @@ namespace Hacks
 
     return (reinterpret_cast<FSpanBuffer*>(this)->*FSpanBufferFuncs::CopyFromRasterUpdate)(Screen, RasterStartY, RasterEndY, Raster);
 #if 0
-    int startY = Min(pThis->StartY,Screen.StartY);
-    int endY   = Max(pThis->EndY,  Screen.EndY);
+    int startY = Min(pThis->StartY, Screen.StartY);
+    int endY = Max(pThis->EndY, Screen.EndY);
     int height = endY - startY;
 
     int thisWidth = ((pThis->Index != nullptr) ? pThis->Index[pThis->StartY]->End : 0);
@@ -141,7 +141,7 @@ namespace Hacks
     }
 
     auto mem = ((pThis->Mem != nullptr) ? pThis->Mem : Screen.Mem);
-    pThis->AllocIndexForScreen( width, height, (mem != nullptr ? mem : &GSceneMem) );
+    pThis->AllocIndexForScreen(width, height, (mem != nullptr ? mem : &GSceneMem));
 #endif
 
     return 1;
@@ -149,21 +149,21 @@ namespace Hacks
     uint32_t** ebpValue;
     __asm {
       mov ebpValue, ebp
-    }  
+    }
     uint32_t* retAddress = *(ebpValue + 1);
 
     //Only override things if this function is called from the OccludeBSP function.
     if (Misc::IsInDLL<Misc::DeusExDLLs::Render>(retAddress, 0x18315, 0x1833C))
     {
-      FBspNode* processedBspNode = *(FBspNode**)((*(uint32_t*)ebpValue)-0x1c);
+      FBspNode* processedBspNode = *(FBspNode**)((*(uint32_t*)ebpValue) - 0x1c);
       auto ctx = g_ContextManager.GetContext();
       auto Model = ctx->frameSceneNode->Level->Model;
       auto& GSurfs = Model->Surfs;
-      
+
       if ((GSurfs(processedBspNode->iSurf).PolyFlags & PF_Portal) != 0)
       {
         auto pThis = reinterpret_cast<FSpanBuffer*>(this);
-        pThis->AllocIndexForScreen( ctx->frameSceneNode->Viewport->SizeX, ctx->frameSceneNode->Viewport->SizeY, &GSceneMem );
+        pThis->AllocIndexForScreen(ctx->frameSceneNode->Viewport->SizeX, ctx->frameSceneNode->Viewport->SizeY, &GSceneMem);
         return (reinterpret_cast<FSpanBuffer*>(this)->*FSpanBufferFuncs::CopyFromRasterUpdate)(Screen, RasterStartY, RasterEndY, Raster);
       }
 
@@ -205,12 +205,12 @@ namespace Hacks
 #if 0
     auto pThis = reinterpret_cast<FSpanBuffer*>(this);
     auto pOther = const_cast<FSpanBuffer*>(&Other);
-    if (Other.StartY<pThis->StartY || Other.EndY>pThis->EndY )
+    if (Other.StartY<pThis->StartY || Other.EndY>pThis->EndY)
     { //We need to always have one valid (writable) line, otherwise we get culled
       auto ctx = g_ContextManager.GetContext();
 
-      int startY = Min(pThis->StartY,Other.StartY);
-      int endY   = Max(pThis->EndY,  Other.EndY);
+      int startY = Min(pThis->StartY, Other.StartY);
+      int endY = Max(pThis->EndY, Other.EndY);
       int height = endY - startY;
 
       SWORD thisStart, thisEnd;
@@ -226,14 +226,14 @@ namespace Hacks
       }
 
       auto mem = ((pThis->Mem != nullptr) ? pThis->Mem : Other.Mem);
-      pThis->AllocIndexForScreen( width, height, (mem != nullptr ? mem : &GSceneMem) );
+      pThis->AllocIndexForScreen(width, height, (mem != nullptr ? mem : &GSceneMem));
     }
 #endif
 #if 0
     uint32_t** ebpValue;
     __asm {
       mov ebpValue, ebp
-    } 
+    }
     uint32_t* retAddress = *(ebpValue + 1);
     //
     if (Misc::IsInDLL<Misc::DeusExDLLs::Render>(retAddress, 0x19394, 0x193a6))
@@ -247,7 +247,7 @@ namespace Hacks
         if (pThis->ValidLines == 0)
         { //We need to always have one valid (writable) line, otherwise we get culled
           auto ctx = g_ContextManager.GetContext();
-          pThis->AllocIndexForScreen( ctx->frameSceneNode->Viewport->SizeX, ctx->frameSceneNode->Viewport->SizeY, &GSceneMem );
+          pThis->AllocIndexForScreen(ctx->frameSceneNode->Viewport->SizeX, ctx->frameSceneNode->Viewport->SizeY, &GSceneMem);
         }
         return;
       }
@@ -261,23 +261,23 @@ namespace Hacks
 #endif
   }
 
-  INT FSpanBufferOverride::BoxIsVisible(INT X1, INT Y1, INT X2, INT Y2) 
-  { 
+  INT FSpanBufferOverride::BoxIsVisible(INT X1, INT Y1, INT X2, INT Y2)
+  {
     auto ctx = g_ContextManager.GetContext();
     if (ctx->overrides.bypassSpanBufferRasterization)
     {
       return 1;
     }
-    
+
     return (reinterpret_cast<FSpanBuffer*>(this)->*FSpanBufferFuncs::BoxIsVisible)(X1, Y1, X2, Y2);
   };
 
   namespace FSpanBufferOverrides
   {
-    INT(FSpanBufferOverride::*CopyFromRaster)(FSpanBuffer& ScreenSpanBuffer, INT RasterStartY, INT RasterEndY, FRasterSpan* Raster) = &FSpanBufferOverride::CopyFromRaster;
-    INT(FSpanBufferOverride::*CopyFromRasterUpdate)(FSpanBuffer& ScreenSpanBuffer, INT RasterStartY, INT RasterEndY, FRasterSpan* Raster) = &FSpanBufferOverride::CopyFromRasterUpdate;
-    void(FSpanBufferOverride::*MergeWith)(const FSpanBuffer& Other) = &FSpanBufferOverride::MergeWith;
-    INT(FSpanBufferOverride::*BoxIsVisible)(INT X1, INT Y1, INT X2, INT Y2) = &FSpanBufferOverride::BoxIsVisible;
+    INT(FSpanBufferOverride::* CopyFromRaster)(FSpanBuffer& ScreenSpanBuffer, INT RasterStartY, INT RasterEndY, FRasterSpan* Raster) = &FSpanBufferOverride::CopyFromRaster;
+    INT(FSpanBufferOverride::* CopyFromRasterUpdate)(FSpanBuffer& ScreenSpanBuffer, INT RasterStartY, INT RasterEndY, FRasterSpan* Raster) = &FSpanBufferOverride::CopyFromRasterUpdate;
+    void(FSpanBufferOverride::* MergeWith)(const FSpanBuffer& Other) = &FSpanBufferOverride::MergeWith;
+    INT(FSpanBufferOverride::* BoxIsVisible)(INT X1, INT Y1, INT X2, INT Y2) = &FSpanBufferOverride::BoxIsVisible;
   }
 }
 
@@ -316,5 +316,5 @@ void UninstallFSpanBufferHacks()
     FSpanBufferFuncs::BoxIsVisible.Restore();
     FSpanBufferFuncs::MergeWith.Restore();
     FSpanBufferDetours.clear();
-  } 
+  }
 }

@@ -16,7 +16,7 @@ namespace Hacks
   namespace FDynamicSpriteFuncs
   {
     HookableFunction<UBOOL(__thiscall FDynamicSprite::*)(FSceneNode* Frame)> Setup = nullptr;
-    HookableFunction<FDynamicSprite*(__thiscall FDynamicSprite::*)(FSceneNode* Frame, int NodeIndex, AActor* Actor)> Constructor0 = nullptr;
+    HookableFunction<FDynamicSprite* (__thiscall FDynamicSprite::*)(FSceneNode* Frame, int NodeIndex, AActor* Actor)> Constructor0 = nullptr;
   }
   class FakeFDynamicSprite
   {
@@ -60,7 +60,7 @@ namespace Hacks
     auto Setup = &FakeFDynamicSprite::Setup;
     auto Constructor0 = &FakeFDynamicSprite::Constructor0;
   }
-/////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////
 }
 
 void InstallFFDynamicSpriteHacks()

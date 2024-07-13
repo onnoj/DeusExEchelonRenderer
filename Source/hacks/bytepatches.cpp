@@ -9,7 +9,7 @@ namespace
   decltype(&galaxyMalloc) originalGalaxyMalloc;
   void* galaxyMalloc(size_t Size)
   {
-    return originalGalaxyMalloc(Size*2);
+    return originalGalaxyMalloc(Size * 2);
   }
 }
 
@@ -62,9 +62,9 @@ void InstallBytePatches()
     if (true)
     {
       uint32_t coreModule = reinterpret_cast<uint32_t>(GetModuleHandleA("render.dll"));
-      constexpr std::pair<uint32_t,uint32_t> patches[] = {
+      constexpr std::pair<uint32_t, uint32_t> patches[] = {
         {0x0000C52A, 0x90}, /*outcode rejection in RenderSubsurface*/
-        {0x0000C52B, 0x90}, 
+        {0x0000C52B, 0x90},
         {0x0000C571, 0xEB}, /*backface rejection in RenderSubsurface*/
         {0x0000C592, 0xE9}, /*clipping following outcode for all three vertices,  in RenderSubsurface*/
         {0x0000C593, 0x79},
@@ -122,20 +122,20 @@ void InstallBytePatches()
     if (g_options.galaxyMallocFix)
     {
       std::thread([]() {
-          do
+        do
+        {
+          uint32_t module = reinterpret_cast<uint32_t>(GetModuleHandleA("galaxy.dll"));
+          if (module != 0)
           {
-            uint32_t module = reinterpret_cast<uint32_t>(GetModuleHandleA("galaxy.dll"));
-            if (module != 0)
-            {
-              uint32_t** galaxyMallocPtr = reinterpret_cast<uint32_t**>(module + 0x20D81 + 2);
-              uint32_t overridePtr = reinterpret_cast<uint32_t>(&galaxyMalloc);
-              originalGalaxyMalloc = reinterpret_cast<decltype(originalGalaxyMalloc)>(**galaxyMallocPtr);
-              **galaxyMallocPtr = overridePtr;
-              return;
-            }
-            ::Sleep(1000);
-          } while (true);
-        }).detach();
+            uint32_t** galaxyMallocPtr = reinterpret_cast<uint32_t**>(module + 0x20D81 + 2);
+            uint32_t overridePtr = reinterpret_cast<uint32_t>(&galaxyMalloc);
+            originalGalaxyMalloc = reinterpret_cast<decltype(originalGalaxyMalloc)>(**galaxyMallocPtr);
+            **galaxyMallocPtr = overridePtr;
+            return;
+          }
+          ::Sleep(1000);
+        } while (true);
+      }).detach();
     }
   }
 }

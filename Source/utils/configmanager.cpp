@@ -7,7 +7,7 @@ ConfigManager g_ConfigManager;
 
 void ConfigManager::LoadConfig()
 {
-  Utils::ScopedCall scopedFileManager {
+  Utils::ScopedCall scopedFileManager{
     [&]() { Utils::PushOriginalFileManager(); },
     [&]() { Utils::PopOriginalFileManager(); }
   };
@@ -17,10 +17,10 @@ void ConfigManager::LoadConfig()
   //The array is read greedily, we will add each entry to an array until either the key does not exist or
   //the entry is empty. When saving, we always generate an empty entry so that there is a default entry.
   {
-    wchar_t buffer[32]{0};
+    wchar_t buffer[32]{ 0 };
     uint32_t index = 0;
     FString str;
-    for(auto index = 0; ; index++)
+    for (auto index = 0; ; index++)
     {
       _itow_s(index, buffer, 10);
 
@@ -50,7 +50,7 @@ void ConfigManager::LoadConfig()
 
 void ConfigManager::SaveConfig()
 {
-  Utils::ScopedCall scopedFileManager {
+  Utils::ScopedCall scopedFileManager{
     [&]() { Utils::PushOriginalFileManager(); },
     [&]() { Utils::PopOriginalFileManager(); }
   };

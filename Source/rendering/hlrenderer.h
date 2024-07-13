@@ -36,7 +36,7 @@ public:
 	void OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
 	void OnDrawGeometryEnd(FSceneNode* Frame);
 	void OnDrawMeshBegin(FSceneNode* Frame, AActor* Owner);
-	void OnDrawMesh(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span);
+	void OnDrawMeshPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span);
 	void OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner);
 	void OnDrawUIBegin(FSceneNode* Frame);
 	void OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZDepth, FPlane pColor, FPlane pFog, DWORD pPolyFlags);

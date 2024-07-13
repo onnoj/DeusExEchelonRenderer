@@ -569,7 +569,7 @@ namespace Hacks
 #endif
   }
 
-  void URenderOverride::DrawMesh(FSceneNode* Frame, AActor* Owner, AActor* LightSink, FSpanBuffer* SpanBuffer, AZoneInfo* Zone, const FCoords& Coords, FVolActorLink* LeafLights, FActorLink* Volumetrics, DWORD PolyFlags)
+  void URenderOverride::DrawMesh(FSceneNode* Frame, AActor* Actor, AActor* LightSink, FSpanBuffer* SpanBuffer, AZoneInfo* Zone, const FCoords& Coords, FVolActorLink* LeafLights, FActorLink* Volumetrics, DWORD PolyFlags)
   {
     /*
     * notes!
@@ -617,10 +617,19 @@ namespace Hacks
 
     if (g_options.hasObjectMeshes)
     {
+      static UBOOL& HasSpecialCoords = []() -> UBOOL& {
+        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+        return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
+      }();
+      static FCoords& SpecialCoords = []() -> FCoords& {
+        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+        return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
+      }();
+
       FrameContextManager::ScopedContext ctx;
       ctx->frameSceneNode = Frame;
       ctx->drawcallInfo.emplace();
-      ctx->drawcallInfo->Owner = Owner;
+      ctx->drawcallInfo->Owner = Actor;
       ctx->drawcallInfo->LightSink = LightSink;
       ctx->drawcallInfo->SpanBuffer = SpanBuffer;
       ctx->drawcallInfo->Zone = Zone;
@@ -628,22 +637,26 @@ namespace Hacks
       ctx->drawcallInfo->LeafLights = LeafLights;
       ctx->drawcallInfo->Volumetrics = Volumetrics;
       ctx->drawcallInfo->PolyFlags = PolyFlags;
+      if (HasSpecialCoords)
+      {
+        ctx->drawcallInfo->SpecialCoords = SpecialCoords;
+      }
 
       //For LOD meshes (which are most meshes in game), disable the lodding system
       //and always render the highest level of detail.
-      const bool isLodMesh = Owner->Mesh->IsA(ULodMesh::StaticClass());
+      const bool isLodMesh = Actor->Mesh->IsA(ULodMesh::StaticClass());
       if (isLodMesh)
       {
-        ((ULodMesh*)Owner->Mesh)->LODStrength = 0.0;
-        ((ULodMesh*)Owner->Mesh)->LODMorph = 1.0;
-        ((ULodMesh*)Owner->Mesh)->LODMinVerts = ((ULodMesh*)Owner->Mesh)->Verts.Num();
+        ((ULodMesh*)Actor->Mesh)->LODStrength = 0.0;
+        ((ULodMesh*)Actor->Mesh)->LODMorph = 1.0;
+        ((ULodMesh*)Actor->Mesh)->LODMinVerts = ((ULodMesh*)Actor->Mesh)->Verts.Num();
       }
 
       //Store the transformation details. We'll set them to origin
       //so that UE renders the model in local/model space.
-      auto origLocation = Owner->Location;
-      auto origPrePivot = Owner->PrePivot;
-      auto origRotation = Owner->Rotation;
+      auto origLocation = Actor->Location;
+      auto origPrePivot = Actor->PrePivot;
+      auto origRotation = Actor->Rotation;
       auto origFrameCoords = Frame->Coords;
       auto origUncoords = Frame->Uncoords;
       auto origCoords = Coords;
@@ -651,31 +664,31 @@ namespace Hacks
       //Render the player body mesh (with an offset)
       auto playerPawn = Frame->Viewport->Actor;
       FVector offset{ 0.0f, 0.0f, 0.0f };
-      if (g_ConfigManager.GetRenderPlayerBody() && Owner == playerPawn)
+      if (g_ConfigManager.GetRenderPlayerBody() && Actor == playerPawn)
       {
         offset = FVector(-playerPawn->CollisionRadius, 0.0f, 0.0f);
       }
 
       //Inform high-level renderer we're about to draw a mesh
-      ::Misc::g_Facade->GetHLRenderer()->OnDrawMeshBegin(Frame, Owner);
+      ::Misc::g_Facade->GetHLRenderer()->OnDrawMeshBegin(Frame, Actor);
 
       //Disable view transformations and move the rendered mesh to origin with no rotation.
       //We'll do the transformations in the fixed-function pipeline.
       //This way, RTX Remix can pick up the mesh, so that we can replace static meshes.
       Frame->Coords = FCoords(FVector(0.0f, 0.0f, 0.0f));
       Frame->Uncoords = FCoords(FVector(0.0f, 0.0f, 0.0f));
-      Owner->Location = FVector(0.0f, 0.0f, 0.0f) + offset;
-      Owner->Rotation = FRotator(0, 0, 0);
+      Actor->Location = FVector(0.0f, 0.0f, 0.0f) + offset;
+      Actor->Rotation = FRotator(0, 0, 0);
       const_cast<FCoords&>(Coords) = FCoords(FVector(0.0f, 0.0f, 0.0f));;
-      (GRender->*URenderFuncs::DrawMesh)(Frame, Owner, LightSink, SpanBuffer, Zone, Coords, LeafLights, Volumetrics, PolyFlags);
+      (GRender->*URenderFuncs::DrawMesh)(Frame, Actor, LightSink, SpanBuffer, Zone, Coords, LeafLights, Volumetrics, PolyFlags);
       const_cast<FCoords&>(Coords) = origCoords;
-      Owner->Location = origLocation;
-      Owner->Rotation = origRotation;
+      Actor->Location = origLocation;
+      Actor->Rotation = origRotation;
       Frame->Coords = origFrameCoords;
       Frame->Uncoords = origUncoords;
 
       //Inform the high-level renderer that we're done, and can submit the vertex buffer for rendering.
-      ::Misc::g_Facade->GetHLRenderer()->OnDrawMeshEnd(Frame, Owner);
+      ::Misc::g_Facade->GetHLRenderer()->OnDrawMeshEnd(Frame, Actor);
     }
   }
 

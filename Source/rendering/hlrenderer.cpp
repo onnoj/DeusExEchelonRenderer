@@ -745,7 +745,7 @@ void HighlevelRenderer::OnDrawMeshBegin(FSceneNode* Frame, AActor* Owner)
   }
 }
 
-void HighlevelRenderer::OnDrawMesh(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span)
+void HighlevelRenderer::OnDrawMeshPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span)
 {
   if (g_options.renderingDisabled)
   {
@@ -775,6 +775,9 @@ void HighlevelRenderer::OnDrawMesh(FSceneNode* Frame, FTextureInfo& Info, FTrans
     //}
   }
 
+  //This is being called multiple times per mesh. We're splitting up the mesh into submeshes for each permutation of texture+flags.
+  //Once this mesh is done, we'll render all mesh instances. This is done to be able to easily (in RTX Remix) handle things like
+  //translucency (different flags) and textures (90s style multitexturing) if we want to.
   DynamicMeshesValue& mesh = [&]() -> DynamicMeshesValue& {
     const auto key = reinterpret_cast<DynamicMeshesKey>(renderContext->drawcallInfo->Owner);
     for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
@@ -808,7 +811,7 @@ void HighlevelRenderer::OnDrawMesh(FSceneNode* Frame, FTextureInfo& Info, FTrans
 
       auto fixSigned0 = [](float& value) {
         if (value >= 0.0f && std::signbit(value)) { value = std::abs(value); }
-      };
+        };
       auto d3dvtx0 = LowlevelRenderer::VertexPos3Norm3Tex0{ {vtx[0].X, vtx[0].Y, vtx[0].Z}, {nrm[0].X, nrm[0].Y, nrm[0].Z}, {md.multU * Pts[0]->U,			  md.multV * Pts[0]->V } };
       auto d3dvtx1 = LowlevelRenderer::VertexPos3Norm3Tex0{ {vtx[1].X, vtx[1].Y, vtx[1].Z}, {nrm[1].X, nrm[1].Y, nrm[1].Z}, {md.multU * Pts[i - 1]->U,  md.multV * Pts[i - 1]->V } };
       auto d3dvtx2 = LowlevelRenderer::VertexPos3Norm3Tex0{ {vtx[2].X, vtx[2].Y, vtx[2].Z}, {nrm[2].X, nrm[2].Y, nrm[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V } };
@@ -820,7 +823,7 @@ void HighlevelRenderer::OnDrawMesh(FSceneNode* Frame, FTextureInfo& Info, FTrans
     }
 }
 
-void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
+void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Actor)
 {
   auto renderContext = g_ContextManager.GetContext();
   if (!renderContext->drawcallInfo)
@@ -830,6 +833,46 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
   }
   auto& callInfo = *renderContext->drawcallInfo;
 
+  auto actor = Actor;
+  auto parent = actor->Owner;
+  const bool isPawn = actor->bIsPawn;
+  const bool parentIsPawn = (parent && parent->bIsPawn);
+  APawn* thisPawn = (isPawn ? Cast<APawn>(actor) : nullptr);
+  APawn* parentPawn = (parentIsPawn ? Cast<APawn>(parent) : nullptr);
+  const bool isWeapon = Cast<AWeapon>(actor);//(parentPawn ? parentPawn->Weapon == actor : false);
+  const bool isPlayerWeapon = (parent == Frame->Viewport->Actor);
+
+  auto wmCoords = GMath.UnitCoords;
+  wmCoords = wmCoords * actor->Location * actor->Rotation;
+
+  if (renderContext->drawcallInfo->SpecialCoords && isWeapon)
+  {
+    if (parent != nullptr && !isPlayerWeapon)
+    {
+      wmCoords = wmCoords * parent->Rotation;
+    }
+    wmCoords = wmCoords * renderContext->drawcallInfo->SpecialCoords->Inverse();
+  }
+
+  for (auto light = callInfo.LeafLights; light != nullptr; light = light->Next)
+  {
+    m_LightManager.AddFrameLight(light->Actor, &light->Location);
+  }
+
+  D3DXMATRIX wm;
+  SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
+  SetViewState(Frame, ViewType::game);
+  wm = UECoordsToMatrix(wmCoords);
+
+  //Override viewport depth to signal rtxremix that we're rendering a viewmodel (weapon).
+  //Otherwise, it will show up in reflections and shadow.
+  Utils::ScopedCall scopedFileManager{
+    [&]() { if (actor->bOnlyOwnerSee) { m_LLRenderer->SetViewportDepth(0.0f, 0.5f); } },
+    [&]() { if (actor->bOnlyOwnerSee) { m_LLRenderer->ResetViewportDepth(); }  }
+  };
+
+  //The mesh was split up per texture+flag permutation. We have to render them all.
+  bool firstMeshRendered = true;
   const auto key = reinterpret_cast<DynamicMeshesKey>(callInfo.Owner);
   for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
   {
@@ -848,51 +891,13 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner)
       vertexSum += std::abs(vtx.Pos.z);
     }
 
-    auto wmCoords = GMath.UnitCoords;
-    wmCoords = wmCoords * Owner->Location * Owner->Rotation;
-
-    static UBOOL& HasSpecialCoords = []() -> UBOOL& {
-      uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
-      return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
-    }();
-    
-    static FCoords& SpecialCoords = []() -> FCoords& {
-        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
-        return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
-    }();
-
-    bool isPlayerWeapon = (Owner->Owner == Frame->Viewport->Actor);
-    auto actor = Owner;
-    auto parent = Owner->Owner;
-    if (parent != nullptr && !isPlayerWeapon)
-    {
-      wmCoords = wmCoords * parent->Rotation * SpecialCoords.Inverse();
-    }
-
-    for (auto light = callInfo.LeafLights; light != nullptr; light = light->Next)
-    {
-      m_LightManager.AddFrameLight(light->Actor, &light->Location);
-    }
-
-    D3DXMATRIX wm;
-    SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
-    SetViewState(Frame, ViewType::game);
-    wm = UECoordsToMatrix(wmCoords);
-
-    //Override viewport depth to signal rtxremix that we're rendering a viewmodel (weapon).
-    //Otherwise, it will show up in reflections and shadow.
-    Utils::ScopedCall scopedFileManager{
-      [&]() { if (isPlayerWeapon) { m_LLRenderer->SetViewportDepth(0.0f, 0.5f); } },
-      [&]() { if (isPlayerWeapon) { m_LLRenderer->ResetViewportDepth(); }  }
-    };
-
     callInfo.worldMatrix = wm;
     const bool isEmissive = (callInfo.PolyFlags & PF_Unlit) != 0;
     for (int i = 0; i < (isEmissive ? 3 : 1); i++)
     {
-      const auto meshIndex = Owner->Mesh->GetIndex();
+      const auto meshIndex = actor->Mesh->GetIndex();
       float diff = std::abs(dynamicMeshInfo.lastVertexSum - vertexSum);
-      bool isAnimating = Owner->AnimRate > 0.0f;
+      bool isAnimating = actor->AnimRate > 0.0f;
 
       if (i >= 1)
       {

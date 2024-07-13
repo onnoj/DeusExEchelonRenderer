@@ -45,6 +45,7 @@ public:
       FSpanBuffer* SpanBuffer = nullptr;
       AZoneInfo* Zone = nullptr;
       FCoords Coords;
+      std::optional<FCoords> SpecialCoords;
       FVolActorLink* LeafLights = nullptr;
       FActorLink* Volumetrics = nullptr;
       DWORD PolyFlags = 0;

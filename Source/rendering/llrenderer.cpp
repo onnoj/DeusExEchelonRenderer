@@ -1068,7 +1068,7 @@ std::vector<D3DDISPLAYMODE> LowlevelRenderer::GetDisplayModes() const
 
   std::sort(displayModes.begin(), displayModes.end(), [](const D3DDISPLAYMODE& pLH, const D3DDISPLAYMODE& pRH) {
     return ((pLH.Width > pRH.Width) || ((pLH.Width == pRH.Width && pLH.Height > pRH.Height)));
-  });
+    });
 
   if (displayModes.size() > lastDisplayModes.size())
   {

@@ -311,7 +311,7 @@ void UD3D9FPRenderDevice::Tick(FLOAT DeltaTime)
 
 void UD3D9FPRenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span)
 {
-  m_HLRenderer.OnDrawMesh(Frame, Info, Pts, NumPts, PolyFlags, Span);
+  m_HLRenderer.OnDrawMeshPolygon(Frame, Info, Pts, NumPts, PolyFlags, Span);
 }
 
 void UD3D9FPRenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet)

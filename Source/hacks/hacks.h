@@ -1,5 +1,7 @@
 #pragma once
 
+extern UGameEngine* GEngine;
+
 extern void InstallFSceneNodeHacks();
 extern void InstallFSpanBufferHacks();
 extern void InstallURenderHacks();
@@ -11,6 +13,7 @@ extern void InstallULightManagerHacks();
 extern void InstallThreadAffinityHacks();
 extern void InstallBytePatches();
 extern void InstallRTXConfigPatches();
+extern void InstallUConsoleHacks();
 
 extern void UninstallFSceneNodeHacks();
 extern void UninstallFSpanBufferHacks();
@@ -23,6 +26,7 @@ extern void UninstallFDynamicItemFilterHacks();
 extern void UninstallThreadAffinityHacks();
 extern void UninstallBytePatches();
 extern void UninstallRTXConfigPatches();
+extern void UninstallUConsoleHacks();
 ///
 
 template<typename TFuncPtr>

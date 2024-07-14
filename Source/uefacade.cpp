@@ -16,7 +16,9 @@
 
 #include "MurmurHash3.h"
 #include "utils/debugmenu.h"
+#include "utils/demomanager.h"
 #include "utils/configmanager.h"
+#include "utils/commandmanager.h"
 #include "hacks/hacks.h"
 #include "hacks/misc.h"
 IMPLEMENT_PACKAGE(DeusExEchelonRenderer);
@@ -84,6 +86,9 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   g_ConfigManager.LoadConfig();
   g_ConfigManager.SaveConfig(); //save file again so that we have the defaults
 
+  g_CommandManager.Initialize();
+  g_DemoManager.Initialize();
+
   InstallRTXConfigPatches();
   InstallBytePatches();
   InstallThreadAffinityHacks();
@@ -95,6 +100,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   InstallFFDynamicSpriteHacks();
   InstallFDynamicItemFilterHacks();
   InstallULightManagerHacks();
+  InstallUConsoleHacks();
 
   Misc::setRendererFacade(this);
   GLog->Log(L"[EchelonRenderer]\t Initializing Direct3D 9 Fixed-Function Pipeline renderer.");
@@ -172,6 +178,8 @@ void UD3D9FPRenderDevice::Exit()
 {
   std::unique_lock lock(m_Lock);
   GLog->Log(L"[EchelonRenderer]\t Direct3D 9 Fixed-Function Pipeline renderer exiting.");
+  g_CommandManager.Shutdown();
+  g_DemoManager.Shutdown();
   g_DebugMenu.Shutdown();
   m_HLRenderer.Shutdown();
   m_LLRenderer.Shutdown();
@@ -188,6 +196,7 @@ void UD3D9FPRenderDevice::Exit()
   UninstallThreadAffinityHacks();
   UninstallUGameEngineHacks();
   UninstallBytePatches();
+  UninstallUConsoleHacks();
 }
 
 UBOOL UD3D9FPRenderDevice::SetRes(INT pWidth, INT pHeight, INT pColorBytes, UBOOL pFullscreen)

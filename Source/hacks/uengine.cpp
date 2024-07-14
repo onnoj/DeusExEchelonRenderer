@@ -4,29 +4,47 @@
 #include "misc.h"
 #include "hacks.h"
 #include "uefacade.h"
+#include "utils/commandmanager.h"
 #include "utils/debugmenu.h"
+#include "utils/demomanager.h"
 #include <polyhook2/Detour/NatDetour.hpp>
 #include <polyhook2/Virtuals/VFuncSwapHook.hpp>
 #include <deusex/ConSys/Inc/ConSys.h>
 #include <deusex/ConSys/Inc/ConCamera.h>
 
+UGameEngine* GEngine = nullptr;
+
 namespace Hacks
 {
   bool UGameEngineHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> UGameEngineDetours;
-  UGameEngine* GEngine = nullptr;
   namespace UGameEngineVTableFuncs
   {
     void(__thiscall* Tick)(UGameEngine* pThis, FLOAT DeltaSeconds) = nullptr;
+    void(__thiscall* NotifyLevelChange)(UGameEngine* pThis) = nullptr;
+  }
+
+  namespace UGameEngineFuncs
+  {
   }
 
   struct UGameEngineOverride
   {
+    void NotifyLevelChange()
+    {
+      UGameEngineVTableFuncs::NotifyLevelChange(GEngine);
+      g_DemoManager.OnNotifyLevelChange();
+    }
+
     void Tick(FLOAT DeltaSeconds)
     {
       UGameEngineVTableFuncs::Tick(GEngine, DeltaSeconds);
       ::Misc::g_Facade->Tick(DeltaSeconds);
+      g_CommandManager.OnTick(DeltaSeconds);
+      g_DemoManager.OnTick(DeltaSeconds);
 
+      #if 0
+      //For debugging cutscene states
       for (TObjectIterator<ADeusExPlayer> objs; objs; objs.operator++())
       {
         auto obj = *objs;
@@ -42,6 +60,7 @@ namespace Hacks
         }
         int x = 1;
       }
+      #endif
 
     }
   };
@@ -49,7 +68,7 @@ namespace Hacks
   namespace UGameEngineVTableOverrides
   {
     void(UGameEngineOverride::* Tick)(FLOAT DeltaSeconds) = &UGameEngineOverride::Tick;
-
+    void(UGameEngineOverride::* NotifyLevelChange)() = &UGameEngineOverride::NotifyLevelChange;
   }
 
   /*
@@ -58,6 +77,7 @@ namespace Hacks
   */
   std::tuple<PLH::VFuncMap::value_type, uint64_t, PLH::VFuncMap> UGameEngineMappedVTableFuncs[] = {
     {{(uint16_t)21, *(uint64_t*)&UGameEngineVTableOverrides::Tick}, (uint64_t)&UGameEngineVTableFuncs::Tick, {}},
+    {{(uint16_t)49, *(uint64_t*)&UGameEngineVTableOverrides::NotifyLevelChange}, (uint64_t)&UGameEngineVTableFuncs::NotifyLevelChange, {}},
   };
 }
 
@@ -68,7 +88,6 @@ void InstallUGameEngineHacks()
   if (!UGameEngineHacksInstalled)
   {
     UGameEngineHacksInstalled = true;
-
     for (auto& detour : UGameEngineDetours)
     {
       detour->hook();

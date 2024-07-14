@@ -36,6 +36,7 @@
 #include <deusex/Extension/Inc/ExtensionCore.h>
 #include <deusex/Extension/Inc/ExtPlayerPawn.h>
 #include <deusex/DeusEx/Inc/DeusEx.h>
+#include <deusex/Engine/Inc/UnCon.h>
 #pragma pack(pop)
 
 //Undo unreal ifdefs:

@@ -205,7 +205,7 @@ namespace Hacks
         {
           ctx->frameSceneNode = Frame;
           ctx->overrides.skipDynamicFiltering = false; //keep off; otherwise meshes are culled from reflections as well.
-          ctx->overrides.bypassSetupDynamics = !isLast;
+          ctx->overrides.bypassSetupDynamics =  false; //!isLast; //gives a perf boost when disabled, but we lose reflections of actors behind us.
 
           float fov = 155.0f;
           g_DebugMenu.DebugVar("Culling", "Backwards Occlusion FOV", DebugMenuUniqueID(), fov, { DebugMenuValueOptions::editor::slider, 0.0f, 179.999f });
@@ -695,11 +695,6 @@ namespace Hacks
   void URenderOverride::SetupDynamics(FSceneNode* Frame, AActor* Exclude)
   {
     auto ctx = g_ContextManager.GetContext();
-    if (g_ConfigManager.GetRenderPlayerBody() && Exclude == Frame->Viewport->Actor)
-    {
-      Exclude = nullptr;
-      ctx->overrides.bypassSetupDynamics = false;
-    }
 
     if (!ctx->overrides.bypassSetupDynamics)
     {

@@ -18,7 +18,7 @@ public:
 	struct VertexPos3Tex0to4;
 	struct VertexPos4Color0Tex0;
 	struct VertexPos3Color0;
-	static constexpr float NearRange = 0.5f;
+	static constexpr float NearRange = 0.501f;
 	static constexpr float FarRange = 32768.0f;
 public:
 	bool Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen);

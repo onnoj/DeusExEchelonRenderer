@@ -17,6 +17,7 @@
 #include <type_traits>
 
 #include "hacks/misc.h"
+#include "utils/configmanager.h"
 #include "utils/debugmenu.h"
 #include "MurmurHash3.h"
 
@@ -241,6 +242,42 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
     m_DebugMesh.primitiveCount = 0;
     m_LLRenderer->PopDeviceState();
   };
+
+
+  //Draw player body.
+  if (Frame->Parent == nullptr && g_ConfigManager.GetRenderPlayerBody())
+  {
+    static UBOOL& HasSpecialCoords = []() -> UBOOL& {
+        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+        return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
+      }();
+    static FCoords& SpecialCoords = []() -> FCoords& {
+        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+        return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
+      }();
+
+    auto player = Frame->Viewport->Actor;
+
+    BOOL originalHasSpecialCoords = HasSpecialCoords;
+    BITFIELD originalBehindView = player->bBehindView;
+    {
+      HasSpecialCoords = 0;
+      player->bBehindView = 1;
+      GRender->DrawMesh(
+        Frame,
+        player,
+        player,
+        nullptr,
+        nullptr,
+        Frame->Coords,
+        nullptr,
+        nullptr,
+        PF_TwoSided|PF_NoMerge
+      );
+    }
+    player->bBehindView = originalBehindView;
+    HasSpecialCoords = originalHasSpecialCoords;
+  }
 
   //Render Remix warning screen
   if (!IsDebuggerPresent())
@@ -866,9 +903,9 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Actor)
 
   //Override viewport depth to signal rtxremix that we're rendering a viewmodel (weapon).
   //Otherwise, it will show up in reflections and shadow.
-  Utils::ScopedCall scopedFileManager{
-    [&]() { if (actor->bOnlyOwnerSee) { m_LLRenderer->SetViewportDepth(0.0f, 0.5f); } },
-    [&]() { if (actor->bOnlyOwnerSee) { m_LLRenderer->ResetViewportDepth(); }  }
+  Utils::ScopedCall scopedViewmodelDepth {
+    [&]() { if (isPlayerWeapon || actor->bOnlyOwnerSee) { m_LLRenderer->SetViewportDepth(0.0f, 0.5f); } },
+    [&]() { if (isPlayerWeapon || actor->bOnlyOwnerSee) { m_LLRenderer->ResetViewportDepth(); }  }
   };
 
   //The mesh was split up per texture+flag permutation. We have to render them all.

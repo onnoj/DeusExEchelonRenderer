@@ -82,8 +82,11 @@ namespace
 
 void MaterialDebugger::Update(FSceneNode* Frame)
 {
+  static bool debugMenuEnabled = false;
+  g_DebugMenu.DebugVar("Modding - Inspector", "Enabled", DebugMenuUniqueID(), debugMenuEnabled);
+  if(!debugMenuEnabled)
   {
-
+    return;
   }
   ///
   FVector dir = -(Frame->Coords.XAxis ^ Frame->Coords.YAxis);

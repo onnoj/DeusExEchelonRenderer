@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hacks/hacks.h" //for g_Engine
+#include <deque>
 
 class CommandManager
 {

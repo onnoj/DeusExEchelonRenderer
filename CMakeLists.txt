@@ -43,7 +43,7 @@ include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/xxHash/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/json/include/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/CLI11/include/")
 include_directories(AFTER "${CMAKE_SOURCE_DIR}/EXTERNAL/scnlib/include/")
-include_directories(AFTER "${CMAKE_SOURCE_DIR}/SOURCE")
+include_directories(AFTER "${CMAKE_SOURCE_DIR}/Source")
 
 set (CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};${CMAKE_SOURCE_DIR}/LIB/")
 set (CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};${CMAKE_SOURCE_DIR}/LIB/DeusEx/Core/Lib")
@@ -71,7 +71,8 @@ add_subdirectory ("EXTERNAL/scnlib" EXCLUDE_FROM_ALL)
 
 
 unset(CMAKE_FOLDER)
-add_subdirectory (Source)
+add_subdirectory (Source/Core)
+add_subdirectory (Source/Renderer)
 add_subdirectory (TOOLS/ingestionhelper)
 
 

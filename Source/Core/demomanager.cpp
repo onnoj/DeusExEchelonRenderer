@@ -1,7 +1,7 @@
-#include "DeusExEchelonRenderer_PCH.h"
+#include "DeusExEchelonCore_PCH.h"
 #pragma hdrstop
 
-#include "hacks/hacks.h"
+#include "coreutils.h"
 #include "demomanager.h"
 #include "commandmanager.h"
 

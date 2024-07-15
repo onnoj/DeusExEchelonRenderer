@@ -1,5 +1,7 @@
 #pragma once
 
+#include "DeusExEchelonCore.h"
+
 //Windows
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -38,6 +40,7 @@
 #include <deusex/DeusEx/Inc/DeusEx.h>
 #include <deusex/Engine/Inc/UnCon.h>
 #pragma pack(pop)
+extern UGameEngine* GEngine;
 
 //Undo unreal ifdefs:
 #undef M0  
@@ -68,38 +71,6 @@
 #undef _ebx
 #undef _esi
 #undef _edi
-
-#include "utils/utils.h"
-
-//Globals:
-#define g_RendererName L"DeusExEchelonRenderer"
-
-static const std::wstring g_ConfigFilename = []() {
-  std::wstring systemFolder = Utils::GetProcessFolder();
-  systemFolder += (g_RendererName L".ini");
-  return systemFolder;
-}();
-
-//Convenience:
-#include <d3dx9math.h>
-#define SAFE_RELEASE(p)      { if(p) { (p)->Release(); (p)=NULL; } }
-#define CLAMP(p,min,max)	{ if(p < min) p = min; else if (p>max) p = max; }
-const FCoords UnrealCoordsIndentity(FVector(0.0f, 0.0f, 0.0f));
-using UnrealBlendFlags = decltype(PF_Translucent|PF_NotSolid);
-using UnrealPolyFlags = decltype(PF_Translucent|PF_NotSolid);
-using Vec3 = D3DXVECTOR3;
-using Vec4 = D3DXVECTOR4;
-inline bool UEFloatEquals(float pValue, float pComparison) { return (pValue > (pComparison-KINDA_SMALL_NUMBER)) && (pValue < (pComparison+KINDA_SMALL_NUMBER)); }
-
-//Frequently used headers
-#include "hacks/misc.h"
-
-//IMGUI
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include <imgui.h>
-#include <backends/imgui_impl_sdl2.h>
-#include <backends/imgui_impl_dx11.h>
-
 
 
 #if !defined(NDEBUG)

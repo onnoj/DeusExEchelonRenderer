@@ -1,6 +1,7 @@
-#include "DeusExEchelonRenderer_PCH.h"
+#include "DeusExEchelonCore_PCH.h"
 #pragma hdrstop
 
+#include "coreutils.h"
 #include "commandmanager.h"
 
 CommandManager g_CommandManager;

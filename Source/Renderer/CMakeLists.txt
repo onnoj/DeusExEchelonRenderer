@@ -1,6 +1,7 @@
 #---------------------------------------------------------------------------------------------------
 #General project settings:
 add_definitions(-D_DLL -DEE_LIBDLL -DDEUSEX=1) 
+include_directories(AFTER "${CMAKE_SOURCE_DIR}/Source/Renderer/")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/USER/)
 set(DEUSEX_INT_FILE "DeusExEchelonRenderer.int")
 set(DEUSEX_INI_FILE "DeusExEchelonRenderer.ini")
@@ -59,8 +60,6 @@ set(SRC_BASE
 	"rendering/dxtexturemanager.cpp"
 	"rendering/lightmanager.cpp"
 	"utils/configmanager.cpp"
-	"utils/commandmanager.cpp"
-	"utils/demomanager.cpp"
 	"utils/utils.cpp"
 	"utils/debugmenu.cpp"
 	"utils/memory.cpp"
@@ -90,8 +89,6 @@ set(HDR_BASE
 	"rendering/dxtexturemanager.h"
 	"rendering/lightmanager.h"
 	"utils/configmanager.h"
-	"utils/commandmanager.h"
-	"utils/demomanager.h"
 	"utils/utils.h"
 	"utils/debugmenu.h"
 	"utils/memory.h"
@@ -122,7 +119,7 @@ set(DEUSEX_LIBS
 	"winmm.lib" "comctl32.lib"
 	"${LIB_D3D9}" "${LIB_D3DX9}" "${LIB_SDL2}"
 	)
-target_link_libraries (DeusExEchelonRenderer ${DEUSEX_LIBS})
+target_link_libraries (DeusExEchelonRenderer DeusExEchelonCore ${DEUSEX_LIBS})
 target_link_libraries(DeusExEchelonRenderer PolyHook_2)
 
 if(MSVC)
@@ -148,13 +145,13 @@ target_precompile_headers(DeusExEchelonRenderer
 
 #---------------------------------------------------------------------------------------------------
 # Configure IDE
-source_group(TREE "${CMAKE_SOURCE_DIR}/Source" PREFIX "Source Files" FILES ${SRC_BASE})
-source_group(TREE "${CMAKE_SOURCE_DIR}/Source" PREFIX "Header Files" FILES ${HDR_BASE})
+source_group(TREE "${CMAKE_SOURCE_DIR}/Source/Renderer" PREFIX "Source Files" FILES ${SRC_BASE})
+source_group(TREE "${CMAKE_SOURCE_DIR}/Source/Renderer" PREFIX "Header Files" FILES ${HDR_BASE})
 
 #---------------------------------------------------------------------------------------------------
 # Configure INSTALL target
 install(DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" DESTINATION "${EE_DEUSEXFOLDER}")
-install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_INI_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
-install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_INT_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
-install(FILES "${CMAKE_SOURCE_DIR}/Source/${DEUSEX_RTX_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
+install(FILES "${CMAKE_SOURCE_DIR}/Source/Renderer/${DEUSEX_INI_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
+install(FILES "${CMAKE_SOURCE_DIR}/Source/Renderer/${DEUSEX_INT_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
+install(FILES "${CMAKE_SOURCE_DIR}/Source/Renderer/${DEUSEX_RTX_FILE}" DESTINATION 	"${EE_DEUSEXFOLDER}")
 install(FILES "${CMAKE_SOURCE_DIR}/EXTERNAL/${SDL2_VERSION}/lib/x86/SDL2.dll" DESTINATION 	"${EE_DEUSEXFOLDER}")

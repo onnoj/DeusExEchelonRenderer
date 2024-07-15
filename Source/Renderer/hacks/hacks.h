@@ -1,7 +1,5 @@
 #pragma once
 
-extern UGameEngine* GEngine;
-
 extern void InstallFSceneNodeHacks();
 extern void InstallFSpanBufferHacks();
 extern void InstallURenderHacks();

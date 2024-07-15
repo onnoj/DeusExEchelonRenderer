@@ -4,9 +4,9 @@
 #include "misc.h"
 #include "hacks.h"
 #include "uefacade.h"
-#include "utils/commandmanager.h"
+#include <Core/commandmanager.h>
+#include <Core/demomanager.h>
 #include "utils/debugmenu.h"
-#include "utils/demomanager.h"
 #include <polyhook2/Detour/NatDetour.hpp>
 #include <polyhook2/Virtuals/VFuncSwapHook.hpp>
 #include <deusex/ConSys/Inc/ConSys.h>
@@ -93,8 +93,6 @@ void InstallUGameEngineHacks()
       detour->hook();
     }
 
-    TObjectIterator<UGameEngine> EngineIt;
-    GEngine = *EngineIt;
     for (auto& func : UGameEngineMappedVTableFuncs)
     {
       auto funcDescriptor = std::get<0>(func);

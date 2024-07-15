@@ -16,9 +16,9 @@
 
 #include "MurmurHash3.h"
 #include "utils/debugmenu.h"
-#include "utils/demomanager.h"
+#include <Core/demomanager.h>
+#include <Core/commandmanager.h>
 #include "utils/configmanager.h"
-#include "utils/commandmanager.h"
 #include "hacks/hacks.h"
 #include "hacks/misc.h"
 IMPLEMENT_PACKAGE(DeusExEchelonRenderer);
@@ -77,11 +77,12 @@ UD3D9FPRenderDevice::UD3D9FPRenderDevice()
 UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t pHeight, int32_t pColorBytes, UBOOL pFullscreen)
 {
   std::unique_lock lock(m_Lock);
-
   if (GetClass() == nullptr)
   {
     return FALSE;
   }
+
+  InitializeEchelonCore();
 
   g_ConfigManager.LoadConfig();
   g_ConfigManager.SaveConfig(); //save file again so that we have the defaults
@@ -197,6 +198,8 @@ void UD3D9FPRenderDevice::Exit()
   UninstallUGameEngineHacks();
   UninstallBytePatches();
   UninstallUConsoleHacks();
+
+  ShutdownEchelonCore();
 }
 
 UBOOL UD3D9FPRenderDevice::SetRes(INT pWidth, INT pHeight, INT pColorBytes, UBOOL pFullscreen)

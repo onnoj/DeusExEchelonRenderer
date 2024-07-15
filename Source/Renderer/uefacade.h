@@ -47,3 +47,11 @@ private:
 	static LowlevelRenderer m_LLRenderer; //keep between reinitializations
 	static HighlevelRenderer m_HLRenderer; //keep between reinitializations
 };
+
+
+class UBenchmark:public AInfo
+{
+  DECLARE_CLASS(UBenchmark, AInfo, 0)
+public:
+  UBenchmark();
+};

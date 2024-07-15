@@ -21,8 +21,10 @@
 #include "utils/configmanager.h"
 #include "hacks/hacks.h"
 #include "hacks/misc.h"
+
 IMPLEMENT_PACKAGE(DeusExEchelonRenderer);
 IMPLEMENT_CLASS(UD3D9FPRenderDevice);
+IMPLEMENT_CLASS(UBenchmark);
 
 LowlevelRenderer UD3D9FPRenderDevice::m_LLRenderer;
 HighlevelRenderer UD3D9FPRenderDevice::m_HLRenderer;
@@ -462,4 +464,22 @@ void UD3D9FPRenderDevice::PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags)
 
 void  UD3D9FPRenderDevice::EndFlash()
 {
+}
+
+///
+
+UBenchmark::UBenchmark()
+{
+  static bool initialized = false;
+  if (!initialized)
+  {
+    InitializeEchelonCore();
+    InstallUGameEngineHacks();
+    InstallUConsoleHacks();
+
+    g_CommandManager.Initialize();
+    g_DemoManager.Initialize();
+
+  }
+  g_DemoManager.RunBenchmark();
 }

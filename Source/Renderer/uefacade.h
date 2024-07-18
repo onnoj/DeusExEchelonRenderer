@@ -20,6 +20,7 @@ public:
 	HighlevelRenderer* GetHLRenderer() { return &m_HLRenderer; }
 public:
 	virtual void Tick(FLOAT DeltaTime) final;
+  void OnLevelChange();
 protected: //implementations of URenderDevice class
 	virtual UBOOL Init(UViewport* pInViewport,int32_t pWidth, int32_t pHeight, int32_t pColorBytes, UBOOL pFullscreen) final;
 	virtual UBOOL SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen) final;
@@ -44,6 +45,7 @@ protected: //implementations of URenderDevice class
 public:
   static std::mutex m_Lock; //share lock between instances
 private:
+  bool m_NotifyLevelHasChanged = false;
 	static LowlevelRenderer m_LLRenderer; //keep between reinitializations
 	static HighlevelRenderer m_HLRenderer; //keep between reinitializations
 };

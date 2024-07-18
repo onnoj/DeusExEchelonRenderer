@@ -68,7 +68,6 @@ set(SRC_BASE
 	"hacks/uconsole.cpp"
 	"hacks/urender.cpp"
 	"hacks/umesh.cpp"
-	"hacks/uengine.cpp"
 	"hacks/ulightmanager.cpp"
 	"hacks/fdynamicitemfilter.cpp"
 	"hacks/fdynamicsprite.cpp"

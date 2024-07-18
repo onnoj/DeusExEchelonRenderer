@@ -35,7 +35,7 @@ void TextureManager::Initialize(LowlevelRenderer* pLLRenderer)
 
   for (const auto& textureName : g_ConfigManager.GetHijackedTextureNames())
   {
-    m_HijackableTextures.insert(Utils::ConvertUtf8ToWc(textureName));
+    m_HijackableTextures.insert(textureName);
   }
 }
 

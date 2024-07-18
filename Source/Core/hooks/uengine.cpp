@@ -1,22 +1,17 @@
-#include "DeusExEchelonRenderer_PCH.h"
+#include "DeusExEchelonCore_PCH.h"
 #pragma hdrstop
 
-#include "misc.h"
-#include "hacks.h"
-#include "uefacade.h"
-#include <Core/commandmanager.h>
-#include <Core/demomanager.h>
-#include "utils/debugmenu.h"
 #include <polyhook2/Detour/NatDetour.hpp>
 #include <polyhook2/Virtuals/VFuncSwapHook.hpp>
-#include <deusex/ConSys/Inc/ConSys.h>
-#include <deusex/ConSys/Inc/ConCamera.h>
+
+#include "hooks.h"
+
 
 UGameEngine* GEngine = nullptr;
 
-namespace Hacks
+namespace Hooks
 {
-  bool UGameEngineHacksInstalled = false;
+  bool UGameEngineHooksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> UGameEngineDetours;
   namespace UGameEngineVTableFuncs
   {
@@ -33,15 +28,19 @@ namespace Hacks
     void NotifyLevelChange()
     {
       UGameEngineVTableFuncs::NotifyLevelChange(GEngine);
-      g_DemoManager.OnNotifyLevelChange();
+      for (auto& [key,func] : UGameEngineCallbacks::OnNotifyLevelChange) 
+      {
+        func();
+      }
     }
 
     void Tick(FLOAT DeltaSeconds)
     {
       UGameEngineVTableFuncs::Tick(GEngine, DeltaSeconds);
-      ::Misc::g_Facade->Tick(DeltaSeconds);
-      g_CommandManager.OnTick(DeltaSeconds);
-      g_DemoManager.OnTick(DeltaSeconds);
+      for (auto& [key,func]: UGameEngineCallbacks::OnTick) 
+      {
+        func(DeltaSeconds);
+      }
 
       #if 0
       //For debugging cutscene states
@@ -81,13 +80,13 @@ namespace Hacks
   };
 }
 
-void InstallUGameEngineHacks()
+void InstallUGameEngineHooks()
 {
-  using namespace Hacks;
+  using namespace Hooks;
 
-  if (!UGameEngineHacksInstalled)
+  if (!UGameEngineHooksInstalled)
   {
-    UGameEngineHacksInstalled = true;
+    UGameEngineHooksInstalled = true;
     for (auto& detour : UGameEngineDetours)
     {
       detour->hook();
@@ -111,13 +110,13 @@ void InstallUGameEngineHacks()
   }
 }
 
-void UninstallUGameEngineHacks()
+void UninstallUGameEngineHooks()
 {
-  using namespace Hacks;
+  using namespace Hooks;
 
-  if (UGameEngineHacksInstalled)
+  if (UGameEngineHooksInstalled)
   {
-    UGameEngineHacksInstalled = false;
+    UGameEngineHooksInstalled = false;
     for (auto& detour : UGameEngineDetours)
     {
       detour->unHook();

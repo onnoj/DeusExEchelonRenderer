@@ -15,10 +15,11 @@
 #include <chrono>
 
 #include "MurmurHash3.h"
-#include "utils/debugmenu.h"
+#include <Core/hooks/hooks.h>
 #include <Core/demomanager.h>
 #include <Core/commandmanager.h>
 #include "utils/configmanager.h"
+#include "utils/debugmenu.h"
 #include "hacks/hacks.h"
 #include "hacks/misc.h"
 
@@ -38,6 +39,7 @@ public:
     char b[1024]{};
     WideCharToMultiByte(CP_ACP, 0, V, -1, &b[0], std::size(b), NULL, NULL);
     printf("[%d] %s\n", int(Event), b);
+    fflush(stdout);
   }
 } LogOutImpl;
 
@@ -49,25 +51,14 @@ public:
     char b[1024]{};
     WideCharToMultiByte(CP_ACP, 0, V, -1, &b[0], std::size(b), NULL, NULL);
     printf("[NORMALLY-FATAL][%d] %s\n", int(Event), b);
+    fflush(stdout);
   }
   void HandleError() {};
 } ErrOutImpl;
 
 void UD3D9FPRenderDevice::StaticConstructor()
 {
-  if (!g_options.renderingDisabled)
-  {
-    //Create a console to print debug stuff to.
-#if !defined(RELEASE_CONFIG)
-    AllocConsole();
-    freopen("CONOUT$", "w", stdout);
-    printf("Hello world\n");
-
-    GNull = &LogOutImpl;
-    GLog = &LogOutImpl;
-    GError = &ErrOutImpl;
-#endif
-  }
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE);
 }
 
 UD3D9FPRenderDevice::UD3D9FPRenderDevice()
@@ -84,6 +75,23 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
     return FALSE;
   }
 
+#if !defined(RELEASE_CONFIG)
+  //AllocConsole();
+  //freopen("CONOUT$", "w", stdout);
+  //GNull = &LogOutImpl;
+  //GLog = &LogOutImpl;
+  //GError = &ErrOutImpl;
+  //if( GLogWindow )
+  //{
+  //  GLogWindow->Show(1);
+  //  SetFocus( *GLogWindow );
+  //  GLogWindow->Display.ScrollCaret();
+  //}
+  pInViewport->Exec(L"showlog");
+  GNull = GLog;
+  GError = &ErrOutImpl;
+#endif
+
   InitializeEchelonCore();
 
   g_ConfigManager.LoadConfig();
@@ -99,11 +107,14 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   InstallFSpanBufferHacks();
   InstallURenderHacks();
   InstallUMeshHacks();
-  InstallUGameEngineHacks();
+  InstallUGameEngineHooks();
   InstallFFDynamicSpriteHacks();
   InstallFDynamicItemFilterHacks();
   InstallULightManagerHacks();
   InstallUConsoleHacks();
+
+  Hooks::UGameEngineCallbacks::OnTick.insert({this, [&](FLOAT deltaTime){ Tick(deltaTime);}});
+  Hooks::UGameEngineCallbacks::OnNotifyLevelChange.insert({this, [&](){ OnLevelChange();}});
 
   Misc::setRendererFacade(this);
   GLog->Log(L"[EchelonRenderer]\t Initializing Direct3D 9 Fixed-Function Pipeline renderer.");
@@ -189,6 +200,10 @@ void UD3D9FPRenderDevice::Exit()
 #if !defined(RELEASE_CONFIG)
   FreeConsole();
 #endif
+
+  Hooks::UGameEngineCallbacks::OnTick.erase(this);
+  Hooks::UGameEngineCallbacks::OnNotifyLevelChange.erase(this);
+
   UninstallULightManagerHacks();
   UninstallFDynamicItemFilterHacks();
   UninstallFFDynamicSpriteHacks();
@@ -197,7 +212,7 @@ void UD3D9FPRenderDevice::Exit()
   UninstallFSpanBufferHacks();
   UninstallFSceneNodeHacks();
   UninstallThreadAffinityHacks();
-  UninstallUGameEngineHacks();
+  UninstallUGameEngineHooks();
   UninstallBytePatches();
   UninstallUConsoleHacks();
 
@@ -275,8 +290,14 @@ void UD3D9FPRenderDevice::Lock(FPlane FlashScale, FPlane FlashFog, FPlane Screen
     static uint32_t lastHash = 0;
     static uint32_t frameIdx = 0;
     char fileName[255]{ 0 };
+    //
+    if (m_NotifyLevelHasChanged)
+    {
+      GetLLRenderer()->OnLevelChange();
+      GetHLRenderer()->OnLevelChange();
+      m_NotifyLevelHasChanged = false;
+    }
 
-    //imGUI
     m_LLRenderer.BeginFrame();
   }
 
@@ -462,8 +483,13 @@ void UD3D9FPRenderDevice::PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags)
 {
 }
 
-void  UD3D9FPRenderDevice::EndFlash()
+void UD3D9FPRenderDevice::EndFlash()
 {
+}
+
+void UD3D9FPRenderDevice::OnLevelChange()
+{
+  m_NotifyLevelHasChanged = true;
 }
 
 ///
@@ -474,9 +500,8 @@ UBenchmark::UBenchmark()
   if (!initialized)
   {
     InitializeEchelonCore();
-    InstallUGameEngineHacks();
-    InstallUConsoleHacks();
-
+    InstallUGameEngineHooks();
+    
     g_CommandManager.Initialize();
     g_DemoManager.Initialize();
 

@@ -66,11 +66,6 @@ public:
       bool bypassSetupDynamics = false;
       bool disableFDynamicSpriteSetup = false;
     } overrides;
-
-    struct
-    {
-      float brightness = 1.0f;
-    } uservalues;
   };
   struct ScopedContext
   {

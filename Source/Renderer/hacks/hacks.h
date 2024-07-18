@@ -4,7 +4,6 @@ extern void InstallFSceneNodeHacks();
 extern void InstallFSpanBufferHacks();
 extern void InstallURenderHacks();
 extern void InstallUMeshHacks();
-extern void InstallUGameEngineHacks();
 extern void InstallFFDynamicSpriteHacks();
 extern void InstallFDynamicItemFilterHacks();
 extern void InstallULightManagerHacks();
@@ -17,7 +16,6 @@ extern void UninstallFSceneNodeHacks();
 extern void UninstallFSpanBufferHacks();
 extern void UninstallURenderHacks();
 extern void UninstallUMeshHacks();
-extern void UninstallUGameEngineHacks();
 extern void UninstallULightManagerHacks();
 extern void UninstallFFDynamicSpriteHacks();
 extern void UninstallFDynamicItemFilterHacks();
@@ -25,7 +23,6 @@ extern void UninstallThreadAffinityHacks();
 extern void UninstallBytePatches();
 extern void UninstallRTXConfigPatches();
 extern void UninstallUConsoleHacks();
-///
 
 template<typename TFuncPtr>
 struct HookableFunction

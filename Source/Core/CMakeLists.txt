@@ -28,6 +28,8 @@ set(SRC_BASE
 	"coreutils.cpp"
 	"commandmanager.cpp"
 	"demomanager.cpp"
+	"hooks/hooks.cpp"
+	"hooks/uengine.cpp"
 )
 
 set(HDR_BASE
@@ -36,6 +38,7 @@ set(HDR_BASE
 	"coreutils.h"
 	"commandmanager.h"
 	"demomanager.h"
+	"hooks/hooks.h"
 )
 
 #---------------------------------------------------------------------------------------------------

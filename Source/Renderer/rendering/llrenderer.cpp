@@ -28,6 +28,10 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
       return false;
     }
   }
+  else
+  {
+    GLog->Log(L"[EchelonRenderer]\t Already had api, didn't (re)initalize.");
+  }
 
   m_outputSurface.colorBytes = pColorBytes;
   //m_outputSurface.hwnd = hWnd;
@@ -48,8 +52,7 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 
   ResizeDisplaySurface(0, 0, pWidth, pHeight, pFullscreen);
 
-  D3DPRESENT_PARAMETERS d3dpp;
-  ZeroMemory(&d3dpp, sizeof(d3dpp));
+  D3DPRESENT_PARAMETERS d3dpp{0};
   d3dpp.Windowed = !pFullscreen;
   d3dpp.hDeviceWindow = hWnd;
   d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
@@ -62,6 +65,7 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
   d3dpp.Flags = 0;// D3DPRESENT_DONOTWAIT;//D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
   d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT; // D3DPRESENT_INTERVAL_IMMEDIATE;
   d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+  GLog->Logf(L"D3DPRESENT_PARAMETERS: fullscreen:%d w:%d h:%d", pFullscreen ? 1 : 0, d3dpp.BackBufferWidth, d3dpp.BackBufferHeight);
   if (m_Device == nullptr)
   {
     hr = m_API->CreateDevice(

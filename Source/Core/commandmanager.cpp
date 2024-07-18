@@ -1,6 +1,7 @@
 #include "DeusExEchelonCore_PCH.h"
 #pragma hdrstop
 
+#include "hooks/hooks.h"
 #include "coreutils.h"
 #include "commandmanager.h"
 
@@ -62,7 +63,6 @@ void CommandManager::OnTick(FLOAT DeltaTime)
       cmd->m_OnInit();
       
       m_WaitForCommandToFinish = true;
-      OnTick(DeltaTime);
     }
   }
 }
@@ -81,10 +81,12 @@ UBOOL CommandManager::OnExec(const TCHAR* Cmd, FOutputDevice& Ar)
 void CommandManager::Initialize()
 {
   g_LocalHook.Connect();
+  Hooks::UGameEngineCallbacks::OnTick.insert({this, [&](FLOAT pTime){ OnTick(pTime); }});
 }
 
 void CommandManager::Shutdown()
 {
+  Hooks::UGameEngineCallbacks::OnTick.erase(this);
   g_LocalHook.Disconnect();
 }
 

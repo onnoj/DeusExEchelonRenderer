@@ -39,9 +39,6 @@ void LightManager::Shutdown()
 void LightManager::Update(FSceneNode* Frame)
 {
   assert(m_LLRenderer != nullptr);
-  auto& ctx = *g_ContextManager.GetContext();
-
-
 }
 
 void LightManager::Render(FSceneNode* Frame)
@@ -49,7 +46,6 @@ void LightManager::Render(FSceneNode* Frame)
   Update(Frame); //move to hlrenderer
   //
   assert(m_LLRenderer != nullptr);
-  auto& ctx = *g_ContextManager.GetContext();
 
   //Mark lights that were rendered in the previous frame, but not this frame, as inactive.
   //push to renderer, and then wipe the list for use for the next frame.
@@ -172,7 +168,6 @@ void LightManager::Render(FSceneNode* Frame)
 
 bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& pmInfo)
 {
-  auto& ctx = *g_ContextManager.GetContext();
   if (pActor == nullptr ||
     pActor->bSpecialLit ||
     pActor->LightType != ELightType::LT_Steady ||
@@ -187,10 +182,10 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
   static uint32_t frameCount = 0;
   frameCount++;
   FVector pos = pActor->Location + FVector(0.0f, 0.0f, (frameCount % 2) ? 0.01f : 0.0f);
-  auto radius = pActor->WorldLightRadius() * ctx.uservalues.brightness;
+  auto radius = pActor->WorldLightRadius() * (float(GEngine->Client->Brightness) * 2.0f);
   auto brightness = pActor->LightBrightness / 255.f;
   FPlane floatColor{};
-  GRender->GlobalLighting((ctx.frameSceneNode->Viewport->Actor->ShowFlags & SHOW_PlayerCtrl) != 0, pActor, brightness, floatColor);
+  GRender->GlobalLighting(1, pActor, brightness, floatColor);
 
   floatColor *= brightness * pActor->Level->Brightness;
   floatColor.X = min(floatColor.X, 1.0f);
@@ -232,9 +227,9 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
     * The following is probably mathemathically bullshit, but, it seems to best approach
     * the original lighting formula.
     */
-    d3dLight.Attenuation0 = 0.5f;
-    d3dLight.Attenuation1 = 1.0f / radius;
-    d3dLight.Attenuation2 = 0.0f;
+    d3dLight.Attenuation0 = 0.0f;//0.5f;
+    d3dLight.Attenuation1 = 0.004f;//1.0f / radius;
+    d3dLight.Attenuation2 = 0.0f;//0.0f;
 
     g_DebugMenu.DebugVar("Lighting", "pointlight Attenuation0", DebugMenuUniqueID(), d3dLight.Attenuation0);
     g_DebugMenu.DebugVar("Lighting", "pointlight Attenuation1", DebugMenuUniqueID(), d3dLight.Attenuation1);
@@ -292,9 +287,12 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
 
 void LightManager::CacheLights()
 {
-  auto& ctx = *g_ContextManager.GetContext();
+  if (GEngine->GLevel == nullptr)
+  {
+    return;
+  }
 
-  UModel* Model = ctx.frameSceneNode->Level->Model;
+  UModel* Model = GEngine->GLevel->Model;
   auto& GSurfs = Model->Surfs;
   auto& GNodes = Model->Nodes;
   auto& GVerts = Model->Verts;
@@ -343,7 +341,7 @@ void LightManager::CacheLights()
   }
 
   //Find JC's flashlight
-  ADeusExPlayer* player = Cast<ADeusExPlayer>(ctx.frameSceneNode->Viewport->Actor);
+  ADeusExPlayer* player = Cast<ADeusExPlayer>(GEngine->Client->Viewports(0)->Actor);
   for (auto augmentation = player->AugmentationSystem->FirstAug; m_lightAugmentation == nullptr && augmentation != nullptr; augmentation = augmentation->Next)
   {
     std::wstring augName = *(augmentation->GetClass()->FriendlyName);
@@ -462,8 +460,7 @@ void LightManager::effectDisco(uint32_t pLightIndex, AActor* pLight, D3DLIGHT9& 
   std::mt19937 mt(pLightIndex);
   std::uniform_real_distribution urd(0.0f, float(PI) * 2.0f);
 
-  auto& ctx = *g_ContextManager.GetContext();
-  auto levelInfo = ctx.frameSceneNode->Level->GetLevelInfo();
+  auto levelInfo = GEngine->GLevel->GetLevelInfo();
   float scaleY = (std::sinf(urd(mt) + (levelInfo->TimeSeconds * 0.50f)));
   float scaleP = (std::sinf(urd(mt) + (levelInfo->TimeSeconds * 0.50f)));
   float scaleR = (std::sinf(urd(mt) + (levelInfo->TimeSeconds * 0.50f)));

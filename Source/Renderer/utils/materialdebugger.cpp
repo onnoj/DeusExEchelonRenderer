@@ -294,7 +294,7 @@ void MaterialDebugger::Update(FSceneNode* Frame)
 
 void MaterialDebugger::renderAllTextures()
 {
-  auto facade = static_cast<UD3D9FPRenderDevice*>(GRenderDevice);
+  auto facade = dynamic_cast<UD3D9FPRenderDevice*>(GRenderDevice);
   auto llRenderer = facade->GetLLRenderer();
   auto hlRenderer = facade->GetHLRenderer();
   auto& textureManager = hlRenderer->GetTextureManager();
@@ -350,7 +350,7 @@ void MaterialDebugger::renderAllTextures()
 
 void MaterialDebugger::exportHashMappings(bool pLoadAllTextures)
 {
-  auto facade = static_cast<UD3D9FPRenderDevice*>(GRenderDevice);
+  auto facade = dynamic_cast<UD3D9FPRenderDevice*>(GRenderDevice);
   auto llRenderer = facade->GetLLRenderer();
   auto hlRenderer = facade->GetHLRenderer();
   auto& textureManager = hlRenderer->GetTextureManager();

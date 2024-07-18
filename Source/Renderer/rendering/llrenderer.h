@@ -29,6 +29,7 @@ public:
 	void EndScene();
 	void BeginFrame();
 	void EndFrame();
+  void OnLevelChange() {};
 	
 	void SetWorldMatrix(const D3DMATRIX& pMatrix);
 	void SetViewMatrix(const D3DMATRIX& pMatrix);

@@ -75,8 +75,9 @@ void InstallFFDynamicSpriteHacks()
     FDynamicSpriteFuncs::Setup = (void*)*reinterpret_cast<uint32_t*>(base + 0x10e6);
     FDynamicSpriteFuncs::Constructor0 = (void*)*reinterpret_cast<uint32_t*>(base + 0x117c);
 
-    FDynamicSpriteDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FDynamicSpriteFuncs::Setup, *(uint64_t*)&FDynamicSpriteOverrides::Setup, &FDynamicSpriteFuncs::Setup.func64));
-    FDynamicSpriteDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FDynamicSpriteFuncs::Constructor0, *(uint64_t*)&FDynamicSpriteOverrides::Constructor0, &FDynamicSpriteFuncs::Constructor0.func64));
+    //Bugged:
+    //FDynamicSpriteDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FDynamicSpriteFuncs::Setup, *(uint64_t*)&FDynamicSpriteOverrides::Setup, &FDynamicSpriteFuncs::Setup.func64));
+    //FDynamicSpriteDetours.push_back(std::make_shared<PLH::NatDetour>(*(uint64_t*)&FDynamicSpriteFuncs::Constructor0, *(uint64_t*)&FDynamicSpriteOverrides::Constructor0, &FDynamicSpriteFuncs::Constructor0.func64));
     for (auto& detour : FDynamicSpriteDetours)
     {
       detour->hook();

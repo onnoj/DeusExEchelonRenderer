@@ -36,12 +36,14 @@ uint32_t Utils::HashWc(const wchar_t* pString)
 
 std::string Utils::ConvertWcToUtf8(const std::wstring& pString)
 {
-  return std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(pString);
+  static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+  return converter.to_bytes(pString);
 }
 
 std::wstring Utils::ConvertUtf8ToWc(const std::string& pString)
 {
-  return std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(pString);
+  static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+  return converter.from_bytes(pString);
 }
 
 std::optional<decltype(GFileManager)> g_OriginalFileManager;
@@ -93,8 +95,8 @@ void Utils::Screenshot(HWND pHwnd, std::filesystem::path pFilePath)
   BITMAP bmp;
   GetObject(hbmWindow, sizeof(BITMAP), &bmp);
 
-  BITMAPFILEHEADER bmfHeader;
-  BITMAPINFOHEADER bi;
+  BITMAPFILEHEADER bmfHeader{0};
+  BITMAPINFOHEADER bi{0};
 
   bi.biSize = sizeof(BITMAPINFOHEADER);
   bi.biWidth = bmp.bmWidth;

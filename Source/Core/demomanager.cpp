@@ -1,6 +1,7 @@
 #include "DeusExEchelonCore_PCH.h"
 #pragma hdrstop
 
+#include "hooks/hooks.h"
 #include "coreutils.h"
 #include "demomanager.h"
 #include "commandmanager.h"
@@ -9,6 +10,9 @@ DemoManager g_DemoManager;
 
 void DemoManager::Initialize()
 {
+  Hooks::UGameEngineCallbacks::OnTick.insert(std::make_pair(this, [&](FLOAT pTime){ OnTick(pTime); }));
+  Hooks::UGameEngineCallbacks::OnNotifyLevelChange.insert(std::make_pair(this, [&](){ OnNotifyLevelChange(); }));
+  
   g_CommandManager.RegisterConsoleCommand(L"bm", [&](){
     RunBenchmark();
   });
@@ -31,6 +35,9 @@ void DemoManager::Shutdown()
 {
   g_CommandManager.UnregisterConsoleCommand(L"bm");
   g_CommandManager.UnregisterConsoleCommand(L"printori");
+  Hooks::UGameEngineCallbacks::OnTick.erase(this);
+  Hooks::UGameEngineCallbacks::OnNotifyLevelChange.erase(this);
+
 }
 
 void DemoManager::OnTick(FLOAT DeltaTime)
@@ -111,10 +118,11 @@ void DemoManager::RunBenchmark()
         std::filesystem::path p = Utils::GetProcessFolder();
         p /= std::get<0>(location);
         p += ".bmp";
-
-        Utils::Screenshot((HWND)GRenderDevice->Viewport->GetWindow(), (p ));
+        auto viewport = GEngine->Client->Viewports(0);
+        Utils::Screenshot((HWND)viewport->GetWindow(), (p ));
       },
       [&](){ return true; }
     ));
+    g_CommandManager.QueueCommand<WaitTimeCommand>(100);
   }
 }

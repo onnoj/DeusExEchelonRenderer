@@ -78,10 +78,10 @@ void UninstallUConsoleHacks()
   if (UConsoleHacksInstalled)
   {
     UConsoleHacksInstalled = false;
-    //for (auto& detour : UConsoleDetours)
-    //{
-    //  detour->unHook();
-    //}
+    for (auto& detour : UConsoleDetours)
+    {
+      detour->unHook();
+    }
     UConsoleFuncs::EventNotifyLevelChange.Restore();
     UConsoleDetours.clear();
   }

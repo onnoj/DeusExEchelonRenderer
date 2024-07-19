@@ -228,7 +228,7 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
     * the original lighting formula.
     */
     d3dLight.Attenuation0 = 0.0f;//0.5f;
-    d3dLight.Attenuation1 = 0.004f;//1.0f / radius;
+    d3dLight.Attenuation1 = 0.0035f;//1.0f / radius;
     d3dLight.Attenuation2 = 0.0f;//0.0f;
 
     g_DebugMenu.DebugVar("Lighting", "pointlight Attenuation0", DebugMenuUniqueID(), d3dLight.Attenuation0);

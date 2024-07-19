@@ -1,6 +1,7 @@
 BUILD_WIN32/CMAKE/*
 BUILD_WIN32/*.sln
 BIN/*
+TOOLS/screenshotcomparison/*.exe
 ReverseEngineering/*
 Source/kentie/
 PACKAGE/

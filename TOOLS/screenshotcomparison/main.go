@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"image"
@@ -18,10 +19,14 @@ import (
 type (
 	HTMLTemplateData struct {
 		FileNames []string
-		DataSets  []struct {
-			Id        string
-			HumanName string
-		}
+		DataSets  []Descriptor
+	}
+
+	Descriptor struct {
+		FolderName  string
+		Identifier  string `json:"id"`
+		Description string `json:"description,omitempty"`
+		Default     string `json:"default,omitempty"`
 	}
 )
 
@@ -30,6 +35,8 @@ var (
 )
 
 func main() {
+	log.Println("Working...")
+
 	err := processFolders("./imagesets/")
 	if err != nil {
 		log.Fatalf("Error processing folders: %v", err)
@@ -51,10 +58,13 @@ func processFolders(root string) error {
 
 		if info.IsDir() {
 			if path != root {
-				GlobalTemplateData.DataSets = append(GlobalTemplateData.DataSets, struct {
-					Id        string
-					HumanName string
-				}{info.Name(), info.Name()})
+				if b, err := os.ReadFile(filepath.Join(path, string(filepath.Separator), "descriptor.json")); err == nil {
+					var descriptor Descriptor
+					if err := json.Unmarshal(b, &descriptor); err == nil {
+						descriptor.FolderName = info.Name()
+						GlobalTemplateData.DataSets = append(GlobalTemplateData.DataSets, descriptor)
+					}
+				}
 			}
 			return nil
 		}

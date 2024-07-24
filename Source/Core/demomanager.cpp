@@ -12,9 +12,12 @@ void DemoManager::Initialize()
 {
   Hooks::UGameEngineCallbacks::OnTick.insert(std::make_pair(this, [&](FLOAT pTime){ OnTick(pTime); }));
   Hooks::UGameEngineCallbacks::OnNotifyLevelChange.insert(std::make_pair(this, [&](){ OnNotifyLevelChange(); }));
-  
-  g_CommandManager.RegisterConsoleCommand(L"bm", [&](){
-    RunBenchmark();
+
+  g_CommandManager.RegisterConsoleCommand(L"bml" /*benchmark lighting*/, [&]() {
+    RunBenchmark(true, false, 1000);
+  });
+  g_CommandManager.RegisterConsoleCommand(L"demoloop" /*loop the scenes*/, [&]() {
+    RunBenchmark(false, true, 4000);
   });
   g_CommandManager.RegisterConsoleCommand(L"printori", [&](){
     auto viewport = GEngine->Client->Viewports(0);
@@ -33,7 +36,8 @@ void DemoManager::Initialize()
 
 void DemoManager::Shutdown()
 {
-  g_CommandManager.UnregisterConsoleCommand(L"bm");
+  g_CommandManager.UnregisterConsoleCommand(L"bml");
+  g_CommandManager.UnregisterConsoleCommand(L"demoloop");
   g_CommandManager.UnregisterConsoleCommand(L"printori");
   Hooks::UGameEngineCallbacks::OnTick.erase(this);
   Hooks::UGameEngineCallbacks::OnNotifyLevelChange.erase(this);
@@ -54,7 +58,7 @@ void DemoManager::OnNotifyLevelChange()
 //  void TryRenderDevice( const TCHAR* ClassName, INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen );
 //};
 
-void DemoManager::RunBenchmark()
+void DemoManager::RunBenchmark(bool pMakeScreenshots, bool pLoop, uint32_t pDelayMs)
 {
   static const std::tuple<const wchar_t*, const wchar_t*, FVector, FRotator, FRotator> locations[] =
   {
@@ -112,17 +116,32 @@ void DemoManager::RunBenchmark()
       },
       [&](){ return true; }
     ));
-    g_CommandManager.QueueCommand<WaitTimeCommand>(1000);
-    g_CommandManager.QueueCommand(std::make_unique<CommandManager::Command>(
-      [=](){
-        std::filesystem::path p = Utils::GetProcessFolder();
-        p /= std::get<0>(location);
-        p += ".bmp";
-        auto viewport = GEngine->Client->Viewports(0);
-        Utils::Screenshot((HWND)viewport->GetWindow(), (p ));
-      },
-      [&](){ return true; }
-    ));
+    g_CommandManager.QueueCommand<WaitTimeCommand>(pDelayMs);
+
+    if (pMakeScreenshots)
+    {
+      g_CommandManager.QueueCommand(std::make_unique<CommandManager::Command>(
+        [=]() {
+          std::filesystem::path p = Utils::GetProcessFolder();
+          p /= std::get<0>(location);
+          p += ".bmp";
+          auto viewport = GEngine->Client->Viewports(0);
+          Utils::Screenshot((HWND)viewport->GetWindow(), (p));
+        },
+        [&]() { return true; }
+      ));
+    }
+
     g_CommandManager.QueueCommand<WaitTimeCommand>(100);
+  }
+
+  if (pLoop)
+  {
+    g_CommandManager.QueueCommand(std::make_unique<CommandManager::Command>(
+      [=]() {
+        RunBenchmark(pMakeScreenshots, pLoop, pDelayMs);
+      },
+      [&]() { return true; }
+    ));
   }
 }

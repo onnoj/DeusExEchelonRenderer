@@ -40,6 +40,8 @@ public:
   void Initialize(LowlevelRenderer* pLLRenderer);
   void Shutdown();
 
+  void FlushTextures();
+
   DeusExD3D9TextureHandle ProcessTexture(UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo);
   void ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);
   void ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);

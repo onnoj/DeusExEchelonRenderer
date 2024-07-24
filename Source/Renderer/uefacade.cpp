@@ -506,5 +506,5 @@ UBenchmark::UBenchmark()
     g_DemoManager.Initialize();
 
   }
-  g_DemoManager.RunBenchmark();
+  g_DemoManager.RunBenchmark(true, false, 1000);
 }

@@ -6,7 +6,7 @@ public:
   void Initialize();
   void Shutdown();
 
-  void RunBenchmark();
+  void RunBenchmark(bool pMakeScreenshots, bool pLoop, uint32_t pDelayMs);
 
   void OnTick(FLOAT DeltaTime);
   void OnNotifyLevelChange();

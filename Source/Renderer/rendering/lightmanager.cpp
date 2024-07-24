@@ -206,6 +206,12 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
   d3dLight.Diffuse.r = floatColor.X;
   d3dLight.Diffuse.g = floatColor.Y;
   d3dLight.Diffuse.b = floatColor.Z;
+  d3dLight.Ambient.r = floatColor.X;
+  d3dLight.Ambient.g = floatColor.Y;
+  d3dLight.Ambient.b = floatColor.Z;
+  d3dLight.Specular.r = floatColor.X;
+  d3dLight.Specular.g = floatColor.Y;
+  d3dLight.Specular.b = floatColor.Z;
 
   d3dLight.Attenuation0 = 1.0f;
   d3dLight.Attenuation1 = 0.0f;
@@ -227,9 +233,9 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
     * The following is probably mathemathically bullshit, but, it seems to best approach
     * the original lighting formula.
     */
-    d3dLight.Attenuation0 = 0.0f;//0.5f;
-    d3dLight.Attenuation1 = 0.0035f;//1.0f / radius;
-    d3dLight.Attenuation2 = 0.0f;//0.0f;
+    d3dLight.Attenuation0 = 0.0000f;
+    d3dLight.Attenuation1 = 0.0004f;
+    d3dLight.Attenuation2 = 0.0000f;
 
     g_DebugMenu.DebugVar("Lighting", "pointlight Attenuation0", DebugMenuUniqueID(), d3dLight.Attenuation0);
     g_DebugMenu.DebugVar("Lighting", "pointlight Attenuation1", DebugMenuUniqueID(), d3dLight.Attenuation1);

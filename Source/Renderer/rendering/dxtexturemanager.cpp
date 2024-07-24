@@ -3,6 +3,8 @@
 
 #pragma comment(lib, "d3dx9.lib")
 
+#include <Core/hooks/hooks.h>
+
 #include "utils/configmanager.h"
 #include "utils/utils.h"
 #include "rendering/dxtexturemanager.h"
@@ -37,11 +39,29 @@ void TextureManager::Initialize(LowlevelRenderer* pLLRenderer)
   {
     m_HijackableTextures.insert(textureName);
   }
+
+  Hooks::UGameEngineCallbacks::OnNotifyLevelChange.insert(std::make_pair(this, [&]() { FlushTextures(); }));
 }
 
 void TextureManager::Shutdown()
 {
   m_llrenderer = nullptr;
+  Hooks::UGameEngineCallbacks::OnNotifyLevelChange.erase(this);
+}
+
+void TextureManager::FlushTextures()
+{
+  for (auto& p : m_TextureCache)
+  {
+    p.second->textureD3D9->Release();
+  }
+  m_TextureCache.clear();
+
+  for (auto& p : m_InstanceCache)
+  {
+    p.second->textureD3D9->Release();
+  }
+  m_InstanceCache.clear();
 }
 
 DeusExD3D9TextureHandle TextureManager::ProcessTexture(UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo)

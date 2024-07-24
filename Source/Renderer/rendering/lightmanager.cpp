@@ -70,7 +70,7 @@ void LightManager::Render(FSceneNode* Frame)
 
       if (light.isDisco)
       {
-        light.d3dLight.Range *= 2.0f;
+        light.d3dLight.Range *= 3.0f;
         for (uint8_t i = 0; i < light.lightExtraCount; i++)
         {
           uint32_t discoReservedIndex = LevelLightsExtraRange.lower + light.lightExtraIndex + i;
@@ -168,8 +168,12 @@ void LightManager::Render(FSceneNode* Frame)
 
 bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& pmInfo)
 {
+  const bool isDisco = (pActor->LightEffect == ELightEffect::LE_Disco);
+  const bool isSpotlight = (pActor->LightEffect == ELightEffect::LE_Spotlight || pActor->LightEffect == ELightEffect::LE_StaticSpot);
+  const bool isPointlight = !pmInfo.isSpotlight && !pmInfo.isDisco; //(pActor->LightEffect == ELightEffect::LE_None || pActor->LightEffect == ELightEffect::LE_NonIncidence);
+
   if (pActor == nullptr ||
-    pActor->bSpecialLit ||
+    (pActor->bSpecialLit && !isDisco) ||
     pActor->LightType != ELightType::LT_Steady ||
     pActor->LightBrightness <= 0)
   {

@@ -125,7 +125,10 @@ func convertBmpToPng(bmpPath string) error {
 	defer pngFile.Close()
 
 	// Encode the image to PNG format
-	if err := png.Encode(pngFile, img); err != nil {
+	pngEncoder := png.Encoder{
+		CompressionLevel: png.BestCompression,
+	}
+	if err := pngEncoder.Encode(pngFile, img); err != nil {
 		return fmt.Errorf("failed to encode PNG file %s: %v", pngPath, err)
 	}
 

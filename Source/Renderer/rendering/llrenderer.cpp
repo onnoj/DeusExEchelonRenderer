@@ -948,7 +948,7 @@ void LowlevelRenderer::ConfigureSamplerState(int pStageID, UnrealPolyFlags pFlag
 void LowlevelRenderer::PushDeviceState()
 {
   const bool canPush = ((m_CurrentState + 1) < &m_States[std::size(m_States) - 1]);
-  check(canPush);
+  check(canPush); //fails if there's an unmatched pop for a push.
   if (canPush)
   {
     m_CurrentState++;

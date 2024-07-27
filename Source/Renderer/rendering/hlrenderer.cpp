@@ -33,7 +33,7 @@ void HighlevelRenderer::Initialize(LowlevelRenderer* pLLRenderer)
 void HighlevelRenderer::Shutdown()
 {
   m_renderingScope.release();
-  m_DrawnNodes.clear();
+  for(auto& n : m_DrawnNodes) n.clear();
   m_dynamicMeshes.clear();
   m_staticMeshes.clear();
   m_DebugMesh = {};
@@ -44,6 +44,7 @@ void HighlevelRenderer::Shutdown()
   GLog->Log(L"[EchelonRenderer]\t HLRenderer shutdown");
 }
 
+//OnRenderingBegin is called before Deus Ex starts rendering the scene graph.
 void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
 {
   m_renderingScope = std::make_unique<FrameContextManager::ScopedContext>();
@@ -61,6 +62,7 @@ void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
   }
 
   ctx.overrides.bypassSpanBufferRasterization = levelChanged;
+  ctx.overrides.levelChanged = levelChanged;
   g_DebugMenu.DebugVar("Rendering", "Bypass SpanBuffer Rasterization", DebugMenuUniqueID(), ctx.overrides.bypassSpanBufferRasterization);
 
   //m_LLRenderer->beginScene();
@@ -103,30 +105,39 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
   m_renderingScope.reset();
 }
 
+//OnSceneBegin is called when Deus Ex starts rendering a specific scene (as determined by a camera)
+//In modern rasterization engines, games with multiple cameras would render each camera to texture
+//and then in then finally those textures would be used in the final frame.
+//In UE1, multiple cameras is done through portal rendering. When the renderer encounters a
+//portal surface, it switches camera and continues to draw within the shape of the portal surface.
+//Sadly, camera switching is not quite supported with RTX Remix.
 void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
 {
-  m_LLRenderer->PushDeviceState();
   SetViewState(Frame, ViewType::game);
   SetProjectionState(Frame, ProjectionType::perspective);
 }
 
 void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 {
+  auto& ctx = *g_ContextManager.GetContext();
+  
+
   UModel* Model = Frame->Level->Model;
   auto& GSurfs = Model->Surfs;
   auto& GNodes = Model->Nodes;
   auto& GVerts = Model->Verts;
   auto& GVertPoints = Model->Points;
 
-  //Render all static geometry
-  {
+  {  //Render all static geometry
     enum class pass { solid, translucent };
     constexpr pass passes[] = { pass::solid, pass::translucent };
-
+    
     for (auto pass : passes)
     {
       for (auto& cachedMeshInfoIt : m_staticMeshes)
       {
+        Utils::ScopedCall scopedRenderStatePushPop{ [&](){ m_LLRenderer->PushDeviceState();}, [&]() {m_LLRenderer->PopDeviceState(); } };
+
         auto& info = cachedMeshInfoIt.second;
         auto& vtxBuffer = *info.buffer.get();
         if (vtxBuffer.empty())
@@ -134,10 +145,32 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
           continue;
         }
 
+        if (!info.zoneIndices.test(Frame->ZoneNumber))
+        {
+          continue;
+        }
+
         auto flags = info.flags;
         const bool isTranslucent = (flags & PF_Translucent) != 0;
-        const bool isUnlitEmissive = (flags & PF_Unlit) != 0;
+        const bool isUnlitEmissive = ((flags & PF_Unlit) != 0) || ctx.frameIsSkybox;
         auto wm = info.worldMatrix;
+
+        if (ctx.frameIsSkybox)
+        {
+          flags |= PF_Unlit;
+          flags &= ~PF_Masked;
+
+          m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+          m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+        }
+        else
+        {
+          if ((flags & PF_FakeBackdrop) != 0)
+          {
+            continue;
+          }
+        }
+
         if (pass == pass::solid)
         {
           if (isTranslucent)
@@ -160,11 +193,15 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
           if (isUnlitEmissive)
           {
             D3DXMATRIX s;
-            D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
-            D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
-            SetWorldTransformState(wm);
-            m_TextureManager.BindTexture(flags, info.textureHandle);
-            m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+
+            if (!ctx.frameIsSkybox)
+            {
+              D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
+              D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+              SetWorldTransformState(wm);
+              m_TextureManager.BindTexture(flags, info.textureHandle);
+              m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+            }
 
             D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
             D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
@@ -181,21 +218,14 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
       }
     }
   }
+
   m_MaterialDebugger.Update(Frame);
-
-#if 0
-  //Kept as an example
-  g_DebugMenu.DebugVar("Rendering", "Test Button", DebugMenuUniqueID(), std::function<void()>([&]() {
-    MessageBoxA(NULL, "Hello world", "", MB_OK);
-    }));
-#endif
-
   bool clearEachFrame = false;
   g_DebugMenu.DebugVar("Rendering", "Wipe Render Cache", DebugMenuUniqueID(), clearEachFrame);
   if (clearEachFrame)
   {
     m_staticMeshes.clear();
-    m_DrawnNodes.clear();
+    for(auto& n : m_DrawnNodes) n.clear();
   }
 
   //Render real-time lights
@@ -283,8 +313,6 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
   {
     //DrawFullscreenQuad(Frame, m_TextureManager.GetFakeTexture());
   }
-
-  m_LLRenderer->PopDeviceState();
 }
 
 void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, const DeusExD3D9TextureHandle& pTexture, float Size/*=1.0f*/)
@@ -442,19 +470,13 @@ void HighlevelRenderer::OnLevelChange()
 {
   m_staticMeshes.clear();
   m_dynamicMeshes.clear();
-  m_DrawnNodes.clear();
+  for(auto& n : m_DrawnNodes) n.clear();
   m_UIMeshes.clear();
   m_LightManager.OnLevelChange();
 }
 
-void HighlevelRenderer::GetViewMatrix(FSceneNode* Frame, D3DXMATRIX& viewMatrix)
+void HighlevelRenderer::GetViewMatrix(const FCoords& FrameCoords, D3DXMATRIX& viewMatrix)
 {
-  FCoords FrameCoords = Frame->Coords;
-  //for (FSceneNode* parentFrame = Frame->Parent; parentFrame != nullptr; parentFrame = parentFrame->Parent)
-  //{
-  //	FrameCoords = parentFrame->Coords * FrameCoords;
-  //}
-  //
   D3DXMatrixIdentity(&viewMatrix);
   FVector translation = FVector(0.0f, 0.0f, 0.0f);
   translation = translation.TransformPointBy(FrameCoords);
@@ -551,6 +573,12 @@ void HighlevelRenderer::OnDrawGeometryBegin(FSceneNode* Frame)
 
 void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet)
 {
+  auto& ctx = *g_ContextManager.GetContext();
+  if (ctx.frameIsSkybox)
+  {
+    int x = 1;
+  }
+
   if (Facet.Polys == nullptr)
   {
     return;
@@ -582,11 +610,12 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
   }
 
   //1. Check if node is in the cached node bin, if it is, skip.
-  if (m_DrawnNodes.find(iNode) != m_DrawnNodes.end() && !surfaceIsDynamic)
+  auto& drawnNodes = m_DrawnNodes[Frame->ZoneNumber];
+  if (drawnNodes.find(iNode) != drawnNodes.end() && !surfaceIsDynamic)
   {
     return;
   }
-  m_DrawnNodes.insert(iNode);
+  drawnNodes.insert(iNode);
 
 
   //2. Build a key that is (textureSetHash + PolyFlags + NodeFlags)
@@ -671,6 +700,7 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
   INT iSurf = -1;
   uint32_t hash = 0;
   sharedMesh->debug = max(sharedMesh->debug, iNode);
+  sharedMesh->zoneIndices.set(Frame->ZoneNumber);
 
   for (auto Poly = Facet.Polys; Poly; Poly = Poly->Next)
   {
@@ -731,7 +761,6 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 
           //note: mesh hashes in Deus Ex are not stable between frames
           MurmurHash3_x86_32(&vtx.Pos, sizeof(vtx.Pos), hash, &hash);
-
           sharedMesh->buffer->push_back(std::move(vtx));
         }
         sharedMesh->primitiveCount++;
@@ -1074,12 +1103,12 @@ void HighlevelRenderer::SetWorldTransformState(const D3DXMATRIX& pMatrix)
 
 void HighlevelRenderer::SetViewState(FSceneNode* Frame, ViewType viewType)
 {
-  check(Frame->Parent == nullptr);
-  //
+  auto& ctx = *g_ContextManager.GetContext();
+
   D3DXMATRIX vm;
   if (viewType == ViewType::game)
   {
-    GetViewMatrix(Frame, vm);
+    GetViewMatrix(Frame->Coords, vm);
   }
   if (viewType == ViewType::engine)
   {

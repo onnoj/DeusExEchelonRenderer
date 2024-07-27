@@ -36,7 +36,10 @@ class FrameContextManager
 public:
   struct Context
   {
-    FSceneNode* frameSceneNode;
+    FSceneNode* frameSceneNode = nullptr;
+
+    std::shared_ptr<FSceneNode> skyframeSceneNode;
+    bool frameIsSkybox = false;
 
     struct DrawCall
     {
@@ -63,6 +66,7 @@ public:
       std::optional<float> maxOccludeBspDistance;
       bool skipDynamicFiltering = false;
       bool bypassSpanBufferRasterization = false;
+      bool levelChanged = false;
       bool bypassSetupDynamics = false;
       bool disableFDynamicSpriteSetup = false;
     } overrides;

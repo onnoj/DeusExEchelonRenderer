@@ -41,7 +41,7 @@ public:
 	void OnDrawUIBegin(FSceneNode* Frame);
 	void OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZDepth, FPlane pColor, FPlane pFog, DWORD pPolyFlags);
 	void OnDrawUIEnd(FSceneNode* Frame);
-	void GetViewMatrix(FSceneNode* Frame, D3DXMATRIX& viewMatrix);
+	void GetViewMatrix(const FCoords& FrameCoords, D3DXMATRIX& viewMatrix);
 	void GetPerspectiveProjectionMatrix(FSceneNode* Frame, D3DXMATRIX& projMatrix);
 
 	TextureManager& GetTextureManager() { return m_TextureManager; }
@@ -60,6 +60,8 @@ private:
 		uint32_t hash = 0;
 		uint32_t primitiveCount = 0;
 		uint32_t debug = 0;
+		//std::optional<int32_t> zoneIndex;
+		std::bitset<FBspNode::MAX_ZONES> zoneIndices;
 		D3DXMATRIX worldMatrix;
 		D3DXMATRIX worldMatrixInverse;
 	};
@@ -97,6 +99,6 @@ private:
 	DebugMeshValue m_DebugMesh;
 	std::unordered_multimap<StaticMeshesKey, StaticMeshesValue> m_staticMeshes;
 	std::unordered_multimap<DynamicMeshesKey, DynamicMeshesValue> m_dynamicMeshes;
-	std::unordered_set<uint32_t> m_DrawnNodes;
+	std::unordered_set<uint32_t> m_DrawnNodes[FBspNode::MAX_ZONES];
 	std::unique_ptr<FrameContextManager::ScopedContext> m_renderingScope;
 };

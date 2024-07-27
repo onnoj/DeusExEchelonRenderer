@@ -131,6 +131,7 @@ namespace Hacks
 
   void URenderOverride::OccludeFrame(FSceneNode* Frame)
   {
+    auto ctx = g_ContextManager.GetContext();
     Frame->Viewport->ExtraPolyFlags |= PF_NoMerge;
 
     bool markTwoSided = false;
@@ -179,7 +180,7 @@ namespace Hacks
     const bool isInCutscene = (player->ConPlay != nullptr && player->bBehindView == 1);
 
     g_DebugMenu.DebugVar("Culling", "Backwards Occlusion Enabled", DebugMenuUniqueID(), g_options.backwardsOcclusionPass);
-    if (g_options.backwardsOcclusionPass && Frame->Parent == nullptr && !isInCutscene)
+    if (g_options.backwardsOcclusionPass && /*Frame->Parent == nullptr &&*/ !isInCutscene)
     {
       const FColor angleColors[] = { FColor(255,0,0), FColor(0,255,0), FColor(0,0,255) };
       //constexpr float angles[] = {0.66f, 0.33f, 0.0f};
@@ -339,13 +340,42 @@ namespace Hacks
 #endif
     }
 
-    if (Frame->Parent == nullptr)
+    bool isSkyBox = false;
+    auto zoneIndex = Frame->ZoneNumber;
+    if (zoneIndex >= 0 && zoneIndex < FBspNode::MAX_ZONES)
+    {
+      auto skyZone = Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
+      isSkyBox = (skyZone != nullptr) && (skyZone->Region.ZoneNumber == zoneIndex);
+    }
+
+    if (Frame->Parent == nullptr || isSkyBox)
     {
       FrameContextManager::ScopedContext ctx;
       ctx->frameSceneNode = Frame;
+      ctx->frameIsSkybox = isSkyBox;
+      if (isSkyBox && Frame->Parent != nullptr)
+      {
+        //rtx requires that the full pass is rendered with the same view matrix.
+        //ie, we cannot change cameras.
+        //since the matrix multiplication is: world * view * proj.
+        //we can turn this into (world * subframeView * invRootView) * rootview * projection
+        ctx->skyframeSceneNode = std::make_shared<FSceneNode>(*Frame);
+
+        //So, there's a weird problem where the skybox camera rotates around up-axis, but not side-axis.
+        //Bit of a hack but it saves some headache...
+        AZoneInfo* SkyZone = (AZoneInfo*)Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
+        FCoords SkyCoords = Frame->Parent->Coords;
+        SkyCoords *= Frame->Parent->Coords.Origin;
+        SkyCoords /= SkyZone->Rotation;
+        SkyCoords /= SkyZone->Location;
+        Frame->Coords = SkyCoords;
+      }
+
+      ::Misc::g_Facade->GetLLRenderer()->PushDeviceState();
       ::Misc::g_Facade->GetHLRenderer()->OnSceneBegin(Frame);
       (GRender->*URenderFuncs::DrawFrame)(Frame);
       ::Misc::g_Facade->GetHLRenderer()->OnSceneEnd(Frame);
+      ::Misc::g_Facade->GetLLRenderer()->PopDeviceState();
     }
   }
 

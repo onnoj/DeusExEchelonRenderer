@@ -121,6 +121,10 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 {
   auto& ctx = *g_ContextManager.GetContext();
   
+  if (ctx.frameIsSkybox && !g_ConfigManager.GetRenderSkybox())
+  {
+    return;
+  }
 
   UModel* Model = Frame->Level->Model;
   auto& GSurfs = Model->Surfs;
@@ -574,10 +578,6 @@ void HighlevelRenderer::OnDrawGeometryBegin(FSceneNode* Frame)
 void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet)
 {
   auto& ctx = *g_ContextManager.GetContext();
-  if (ctx.frameIsSkybox)
-  {
-    int x = 1;
-  }
 
   if (Facet.Polys == nullptr)
   {

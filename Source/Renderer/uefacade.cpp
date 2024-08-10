@@ -95,7 +95,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   InitializeEchelonCore();
 
   g_ConfigManager.LoadConfig();
-  g_ConfigManager.SaveConfig(); //save file again so that we have the defaults
+  //g_ConfigManager.SaveConfig(); //save file again so that we have the defaults
 
   g_CommandManager.Initialize();
   g_DemoManager.Initialize();

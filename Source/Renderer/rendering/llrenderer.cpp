@@ -10,7 +10,9 @@
 #include <xxhash.h>
 
 #include "rendering/llrenderer.h"
+#include "rendering/scenemanager.h"
 #include "utils/debugmenu.h"
+#include "utils/utils.h"
 
 bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen)
 {
@@ -234,19 +236,36 @@ void LowlevelRenderer::Shutdown()
 
 void LowlevelRenderer::BeginScene()
 {
+  check(m_IsInFrame);
+  check(m_IsInScene == 0);
+  m_IsInScene++;
+
   HRESULT res{};
   res = m_Device->BeginScene();
-  check(SUCCEEDED(res));
+   check(SUCCEEDED(res));
+  g_Stats.Writer().BeginScene();
 }
 
 void LowlevelRenderer::EndScene()
 {
   auto res = m_Device->EndScene();
   check(SUCCEEDED(res));
+  g_Stats.Writer().EndScene();
+  m_IsInScene--;
+  check(m_IsInScene == 0);
 }
 
 void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug)
 {
+  auto& ctx = *g_ContextManager.GetContext();
+  //if (!ctx.frameIsSkybox)
+  //{
+  //  return;
+  //}
+
+  g_SceneManager.Validate();
+  g_Stats.Writer().DrawCall();
+
   IDirect3DVertexBuffer9* buffer = nullptr;
   auto bufferedGeoIterator = (pHash != 0 ? m_bufferedGeo.find(pHash) : m_bufferedGeo.end());
   if (bufferedGeoIterator != m_bufferedGeo.end())
@@ -301,11 +320,13 @@ void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertice
     }
   }
 
+  CheckDirtyMatrices();
+
   {
     HRESULT res = S_OK;
     res = m_Device->SetStreamSource(0, buffer, 0, pVertexSize); check(SUCCEEDED(res));
     res = m_Device->SetIndices(nullptr); check(SUCCEEDED(res));
-    m_Device->SetVertexShaderConstantI(pDebug, nullptr, 0);
+    //m_Device->SetVertexShaderConstantI(pDebug, nullptr, 0);
     res = m_Device->SetFVF(pFVF); check(SUCCEEDED(res));
     res = m_Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, primitiveCount);
     check(SUCCEEDED(res));
@@ -370,7 +391,7 @@ void LowlevelRenderer::DisableLight(int32_t index)
   {
     return;
   }
-
+  g_SceneManager.Validate();
   m_Device->LightEnable(index, FALSE);
 }
 
@@ -380,6 +401,8 @@ void LowlevelRenderer::RenderLight(int32_t index, const D3DLIGHT9& pLight)
   {
     return;
   }
+  g_SceneManager.Validate();
+  CheckDirtyMatrices();
 
   static const int maxLightsPerCall = [&]() {
     D3DCAPS9 caps{};
@@ -410,6 +433,9 @@ void LowlevelRenderer::FlushLights()
 
   if (m_CanFlushLights)
   {
+    g_SceneManager.Validate();
+    CheckDirtyMatrices();
+
     HRESULT res = S_OK;
     res = m_Device->SetStreamSource(0, m_fakeLightBuffer, 0, sizeof(float) * 3 * 3); check(SUCCEEDED(res));
     res = m_Device->SetIndices(nullptr); check(SUCCEEDED(res));
@@ -424,6 +450,8 @@ void LowlevelRenderer::FlushLights()
 
 void LowlevelRenderer::BeginFrame()
 {
+  g_SceneManager.Validate();
+  g_Stats.Writer().BeginFrame();
   //validate if the device is still valid
   //DWORD numPasses = 0;
   //if (m_Device->ValidateDevice(&numPasses) != D3D_OK)
@@ -462,6 +490,13 @@ void LowlevelRenderer::BeginFrame()
   //Setup scene
   {
     HRESULT res = S_OK;
+    
+    res = this->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+    res = this->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+    res = this->SetRenderState(D3DRS_COLORWRITEENABLE, TRUE);
+    res = this->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+    
+    res = this->SetRenderState(D3DRS_SPECULARENABLE, TRUE);    
     res = this->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
     res = this->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
     res = this->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
@@ -485,27 +520,22 @@ void LowlevelRenderer::BeginFrame()
     this->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
     this->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
 
+    //TODO: Document why are we doing this?
     if (!m_CurrentState->m_WorldMatrix)
     {
-      m_CurrentState->m_WorldMatrix = D3DXMATRIX();
+      D3DXMATRIX m; D3DXMatrixIdentity(&m);
+      m_CurrentState->m_WorldMatrix = m;
     }
-    m_Device->GetTransform(D3DTS_WORLD, &m_CurrentState->m_WorldMatrix.value());
-
-    ////Set view matrix
-    //D3DMATRIX d3dView = { +1.0f,  0.0f,  0.0f,  0.0f,
-    //	0.0f, -1.0f,  0.0f,  0.0f,
-    //	0.0f,  0.0f, -1.0f,  0.0f,
-    //	0.0f,  0.0f,  0.0f, +1.0f };
-    //res = m_Device->SetTransform(D3DTS_VIEW, &d3dView);  check(SUCCEEDED(res));
   }
 
   //Start rendering
-  auto res = m_Device->BeginScene();	check(SUCCEEDED(res));
+  //auto res = m_Device->BeginScene();	check(SUCCEEDED(res));
   ClearDisplaySurface(Vec4{ 0.0f, 0.0f, 0.0f, 0.0f });
 }
 
 void LowlevelRenderer::EndFrame()
 {
+  g_SceneManager.Validate();
   if (!m_IsInFrame)
   {
     return;
@@ -516,10 +546,11 @@ void LowlevelRenderer::EndFrame()
   int timeSinceLastTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>((now - lastTime)).count();
   lastTime = now;
   if (m_Device == nullptr) return;
-  auto res = m_Device->EndScene(); check(SUCCEEDED(res));
+  //auto res = m_Device->EndScene(); check(SUCCEEDED(res));
 
 #if 1
-  res = m_Device->Present(NULL, NULL, NULL, NULL);
+  CheckDirtyMatrices();
+  auto res = m_Device->Present(NULL, NULL, NULL, NULL);
 #else
   static std::mutex presentMutex;
   static std::condition_variable canPresentCV;
@@ -570,6 +601,7 @@ void LowlevelRenderer::EndFrame()
   }
   check(SUCCEEDED(res));
   m_IsInFrame = false;
+  g_Stats.Writer().EndFrame();
 }
 
 /**
@@ -595,34 +627,88 @@ bool LowlevelRenderer::ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint3
   return false;
 }
 
+void LowlevelRenderer::CheckDirtyMatrices()
+{
+  if (m_CurrentState->m_WorldMatrixPending)
+  {
+    auto& m = *(m_CurrentState->m_WorldMatrixPending);
+    auto result = m_Device->SetTransform(D3DTS_WORLD, &m);
+    check(SUCCEEDED(result));
+    m_CurrentState->m_WorldMatrix = m_CurrentState->m_WorldMatrixPending;
+    m_CurrentState->m_WorldMatrixPending.reset();
+  }
+
+  if (m_CurrentState->m_ViewMatrixPending)
+  {
+    auto& m = *(m_CurrentState->m_ViewMatrixPending);
+
+    D3DXMATRIX oldMInv, mInv;
+    D3DXMATRIX oldM;
+    m_Device->GetTransform(D3DTS_VIEW, &oldM);
+    D3DXMatrixInverse(&oldMInv, nullptr, &oldM);
+    D3DXMatrixInverse(&mInv, nullptr, &(D3DXMATRIX(m)));
+    static D3DXVECTOR3 origin{ 0.0f, 0.0f, 0.0f };
+    D3DXVECTOR3 posA, posB;
+    D3DXVec3TransformCoord(&posA, &origin, &oldMInv);
+    D3DXVec3TransformCoord(&posB, &origin, &mInv);
+    D3DXVECTOR3 diff;
+    D3DXVec3Subtract(&diff, &posA, &posB);
+    float l = D3DXVec3Length(&diff);
+
+    {
+      D3DXMATRIX newM = D3DXMATRIX(m);
+      D3DXVECTOR3 mAxis[] = { {newM(0,0), newM(0,1), newM(0,2)}, {newM(1,0), newM(1,1), newM(1,2)}, {newM(2,0), newM(2,1), newM(2,2)} };
+      float xy = fabsf(D3DXVec3Dot(&mAxis[0], &mAxis[1]));
+      float xz = fabsf(D3DXVec3Dot(&mAxis[0], &mAxis[2]));
+      float yz = fabsf(D3DXVec3Dot(&mAxis[1], &mAxis[2]));
+      check(xy < 0.001f && xz < 0.001f && yz < 0.001f);
+      check(newM(3, 3) == 1.0f);
+    }
+    auto result = m_Device->SetTransform(D3DTS_VIEW, &m);
+    check(SUCCEEDED(result));
+
+    m_CurrentState->m_ViewMatrix = m_CurrentState->m_ViewMatrixPending;
+    m_CurrentState->m_ViewMatrixPending.reset();
+  }
+  else
+  {
+    auto& m = *(m_CurrentState->m_ViewMatrix);
+
+    //debugging:
+    D3DXMATRIX vm;
+    m_Device->GetTransform(D3DTS_VIEW, &vm);
+    auto diff = memcmp(&vm, &m, sizeof(vm));
+    check(diff == 0);
+  }
+
+  if (m_CurrentState->m_ProjectionMatrixPending)
+  {
+    auto& m = *(m_CurrentState->m_ProjectionMatrixPending);
+    auto result = m_Device->SetTransform(D3DTS_PROJECTION, &m);
+    check(SUCCEEDED(result));
+
+    m_CurrentState->m_ProjectionMatrix = m_CurrentState->m_ProjectionMatrixPending;
+    m_CurrentState->m_ProjectionMatrixPending.reset();
+  }
+
+  check(m_CurrentState->m_WorldMatrix);
+  check(m_CurrentState->m_ViewMatrix);
+  check(m_CurrentState->m_ProjectionMatrix);
+}
+
 void LowlevelRenderer::SetWorldMatrix(const D3DMATRIX& pMatrix)
 {
-  if (!m_CurrentState->m_WorldMatrix || ::memcmp(&(m_CurrentState->m_WorldMatrix.value()), &pMatrix, sizeof(pMatrix)) != 0)
-  {
-    auto result = m_Device->SetTransform(D3DTS_WORLD, &pMatrix);
-    m_CurrentState->m_WorldMatrix = pMatrix;
-    check(SUCCEEDED(result));
-  }
+  m_CurrentState->m_WorldMatrixPending = pMatrix;
 }
 
 void LowlevelRenderer::SetViewMatrix(const D3DMATRIX& pMatrix)
 {
-  if (!m_CurrentState->m_ViewMatrix || ::memcmp(&(m_CurrentState->m_ViewMatrix.value()), &pMatrix, sizeof(pMatrix)) != 0)
-  {
-    auto result = m_Device->SetTransform(D3DTS_VIEW, &pMatrix);
-    m_CurrentState->m_ViewMatrix = pMatrix;
-    check(SUCCEEDED(result));
-  }
+  m_CurrentState->m_ViewMatrixPending = pMatrix;
 }
 
 void LowlevelRenderer::SetProjectionMatrix(const D3DMATRIX& pMatrix)
 {
-  if (!m_CurrentState->m_ProjectionMatrix || ::memcmp(&(m_CurrentState->m_ProjectionMatrix.value()), &pMatrix, sizeof(pMatrix)) != 0)
-  {
-    auto result = m_Device->SetTransform(D3DTS_PROJECTION, &pMatrix);
-    m_CurrentState->m_ProjectionMatrix = pMatrix;
-    check(SUCCEEDED(result));
-  }
+  m_CurrentState->m_ProjectionMatrixPending = pMatrix;
 }
 
 bool LowlevelRenderer::SetViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight)
@@ -958,55 +1044,85 @@ void LowlevelRenderer::PushDeviceState()
 
 void LowlevelRenderer::PopDeviceState()
 {
+  const auto device = m_Device;
   const bool canPop = ((m_CurrentState - 1) >= &m_States[0]);
   check(canPop);
   if (canPop)
   {
-    auto newState = (m_CurrentState - 1);
+    auto pendingState = (m_CurrentState - 1);
     //Restore states:
-    for (int i = 0; i < std::size(newState->m_RenderStates); i++)
+    for (int i = 0; i < std::size(m_CurrentState->m_RenderStates); i++)
     {
-      auto& rs = newState->m_RenderStates[i];
-      if (rs)
+      auto& currentRs = m_CurrentState->m_RenderStates[i];
+      auto& pendingRs = pendingState->m_RenderStates[i];
+      check(
+        (!currentRs.has_value() && !pendingRs.has_value()) ||
+        (currentRs.has_value() && pendingRs.has_value())
+      );
+
+      if (pendingRs)
       {
-        m_Device->SetRenderState(D3DRENDERSTATETYPE(i), *rs);
+        m_Device->SetRenderState(D3DRENDERSTATETYPE(i), *pendingRs);
       }
     }
 
-    for (int i = 0; i < std::size(newState->m_TextureSlots); i++)
+    for (int i = 0; i < std::size(pendingState->m_TextureSlots); i++)
     {
 
-      auto& texSlot = (newState->m_TextureSlots[i]);
-      m_Device->SetTexture(i, texSlot ? *texSlot : nullptr);
+      auto& pendingTexSlot = (pendingState->m_TextureSlots[i]);
+      auto& currentTexSlot = (m_CurrentState->m_TextureSlots[i]);
+      if (pendingTexSlot != currentTexSlot)
+      {
+        //TODO: when releasing a texture, crawl up through all states and remove it from any slots.
+        //m_Device->SetTexture(i, pendingTexSlot ? *pendingTexSlot : nullptr);
+      }
     }
 
-    for (int stageId = 0; stageId < newState->MAX_TEXTURESTAGES; stageId++)
+    for (int stageId = 0; stageId < pendingState->MAX_TEXTURESTAGES; stageId++)
     {
-      for (int stateId = 0; stateId < newState->MAX_TEXTURESTAGESTATES; stateId++)
+      for (int stateId = 0; stateId < pendingState->MAX_TEXTURESTAGESTATES; stateId++)
       {
-        auto& slot = newState->m_TextureStageStates[stageId][stateId];
+        auto& slot = pendingState->m_TextureStageStates[stageId][stateId];
         if (slot)
         {
           m_Device->SetTextureStageState(stageId, D3DTEXTURESTAGESTATETYPE(stateId), *slot);
         }
       }
-      for (int samplerStateId = 0; samplerStateId < newState->MAX_SAMPLERSTATES; samplerStateId++)
+      for (int samplerStateId = 0; samplerStateId < pendingState->MAX_SAMPLERSTATES; samplerStateId++)
       {
-        auto& slot = newState->m_SamplerStates[stageId][samplerStateId];
+        auto& slot = pendingState->m_SamplerStates[stageId][samplerStateId];
         if (slot)
         {
           m_Device->SetSamplerState(stageId, D3DSAMPLERSTATETYPE(samplerStateId), *slot);
         }
       }
     }
-    check(newState->m_WorldMatrix);
-    check(newState->m_ViewMatrix);
-    check(newState->m_ProjectionMatrix);
 
-    this->SetWorldMatrix(*(newState->m_WorldMatrix));
-    this->SetViewMatrix(*(newState->m_ViewMatrix));
-    this->SetProjectionMatrix(*(newState->m_ProjectionMatrix));
-    SetViewport(*newState->m_ViewportLeft, *newState->m_ViewportTop, *newState->m_ViewportWidth, *newState->m_ViewportHeight);
+    auto checkMatrix = [device](D3DTRANSFORMSTATETYPE pState, std::optional<D3DMATRIX>& pMatrixSlotNew, std::optional<D3DMATRIX>& pMatrixSlotOld) 
+    {
+      if (pMatrixSlotNew && pMatrixSlotOld)
+      {
+        auto& newM = *(pMatrixSlotNew);
+        auto& oldM = *(pMatrixSlotOld);
+        if (memcmp(&newM, &oldM, sizeof(D3DXMATRIX)) != 0)
+        {
+          device->SetTransform(pState, &newM);
+        }
+      }
+      else
+      {
+        int x = 1;
+      }
+    };
+
+    checkMatrix(D3DTS_WORLD, pendingState->m_WorldMatrix, m_CurrentState->m_WorldMatrix);
+    checkMatrix(D3DTS_VIEW, pendingState->m_ViewMatrix, m_CurrentState->m_ViewMatrix);
+    checkMatrix(D3DTS_PROJECTION, pendingState->m_ProjectionMatrix, m_CurrentState->m_ProjectionMatrix);
+
+    //this->SetWorldMatrix(*(newState->m_WorldMatrix));
+    //this->SetViewMatrix(*(newState->m_ViewMatrix));
+    //this->SetProjectionMatrix(*(newState->m_ProjectionMatrix));
+    SetViewport(*pendingState->m_ViewportLeft, *pendingState->m_ViewportTop, *pendingState->m_ViewportWidth, *pendingState->m_ViewportHeight);
     m_CurrentState--;
   }
 }

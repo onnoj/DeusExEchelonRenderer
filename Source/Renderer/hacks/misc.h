@@ -84,7 +84,7 @@ public:
 protected:
   void PushFrameContext();
   void PopFrameContext();
-} static g_ContextManager;
+} extern g_ContextManager;
 ////////////////////////////////////////////////////////////////////////////////////
 static bool EE_HAS_IMGUI()
 {

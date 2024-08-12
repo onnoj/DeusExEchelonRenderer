@@ -23,6 +23,7 @@ public:
 public:
 	bool Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen);
 	void Shutdown();
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// State management
 	void BeginScene();
@@ -31,6 +32,7 @@ public:
 	void EndFrame();
   void OnLevelChange() {};
 	
+	void CheckDirtyMatrices();
 	void SetWorldMatrix(const D3DMATRIX& pMatrix);
 	void SetViewMatrix(const D3DMATRIX& pMatrix);
 	void SetProjectionMatrix(const D3DMATRIX& pMatrix);
@@ -88,9 +90,12 @@ private:
 		std::optional<float> m_ViewportMinZ;
 		std::optional<float> m_ViewportMaxZ;
 		std::optional<D3DMATRIX> m_WorldMatrix;
+		std::optional<D3DMATRIX> m_WorldMatrixPending;
 		std::optional<D3DMATRIX> m_ViewMatrix;
+		std::optional<D3DMATRIX> m_ViewMatrixPending;
 		std::optional<D3DMATRIX> m_ProjectionMatrix;
-	} m_States[8];
+		std::optional<D3DMATRIX> m_ProjectionMatrixPending;
+	} m_States[16];
 	State* m_CurrentState = &m_States[0];
 
 	std::optional<uint32_t> m_DesiredViewportLeft;
@@ -161,6 +166,7 @@ private:
 	int64_t m_vtxBufferAllocations = 0;
 	IDirect3DVertexBuffer9* m_fakeLightBuffer = nullptr;
 	bool m_IsInFrame = false;
+	int32_t m_IsInScene = 0;
 	struct
 	{
 		uint32_t width = 0;

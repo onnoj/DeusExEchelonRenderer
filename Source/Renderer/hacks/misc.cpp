@@ -25,6 +25,7 @@
 #include "utils/debugmenu.h"
 
 //////////////////////////////////////////////////////////////////////////
+FrameContextManager g_ContextManager;
 
 GlobalRenderOptions g_options;
 namespace Misc

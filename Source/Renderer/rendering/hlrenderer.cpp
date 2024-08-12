@@ -19,6 +19,7 @@
 #include "hacks/misc.h"
 #include "utils/configmanager.h"
 #include "utils/debugmenu.h"
+#include "utils/utils.h"
 #include "MurmurHash3.h"
 
 //////////////////////////////////////////////////////////////////////////
@@ -72,156 +73,12 @@ void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
 
 void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 {
-  //Finally; render the UI:
-  m_LLRenderer->EndScene();
-  m_LLRenderer->BeginScene();
+  check(Frame->Parent == nullptr);
 
-  //Render UI meshes
-#if 1
-  m_LLRenderer->PushDeviceState();
+  //Render real-time lights
+  m_LightManager.Render(Frame);
 
-  SetWorldTransformStateToIdentity();
-
-  m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-  m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
-  m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-  m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
-  m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
-  for (auto& rc : m_UIMeshes)
-  {
-    SetViewState(rc.sceneNode.get(), ViewType::identity);
-    SetProjectionState(rc.sceneNode.get(), ProjectionType::uiorthogonal);
-
-    auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
-    m_TextureManager.BindTexture(rc.flags, textureHandle);
-    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-    m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
-  }
-  m_LLRenderer->PopDeviceState();
-#endif
-  m_UIMeshes.clear();
-  m_renderingScope.reset();
-}
-
-//OnSceneBegin is called when Deus Ex starts rendering a specific scene (as determined by a camera)
-//In modern rasterization engines, games with multiple cameras would render each camera to texture
-//and then in then finally those textures would be used in the final frame.
-//In UE1, multiple cameras is done through portal rendering. When the renderer encounters a
-//portal surface, it switches camera and continues to draw within the shape of the portal surface.
-//Sadly, camera switching is not quite supported with RTX Remix.
-void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
-{
-  SetViewState(Frame, ViewType::game);
-  SetProjectionState(Frame, ProjectionType::perspective);
-}
-
-void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
-{
   auto& ctx = *g_ContextManager.GetContext();
-  
-  if (ctx.frameIsSkybox && !g_ConfigManager.GetRenderSkybox())
-  {
-    return;
-  }
-
-  UModel* Model = Frame->Level->Model;
-  auto& GSurfs = Model->Surfs;
-  auto& GNodes = Model->Nodes;
-  auto& GVerts = Model->Verts;
-  auto& GVertPoints = Model->Points;
-
-  {  //Render all static geometry
-    enum class pass { solid, translucent };
-    constexpr pass passes[] = { pass::solid, pass::translucent };
-    
-    for (auto pass : passes)
-    {
-      for (auto& cachedMeshInfoIt : m_staticMeshes)
-      {
-        Utils::ScopedCall scopedRenderStatePushPop{ [&](){ m_LLRenderer->PushDeviceState();}, [&]() {m_LLRenderer->PopDeviceState(); } };
-
-        auto& info = cachedMeshInfoIt.second;
-        auto& vtxBuffer = *info.buffer.get();
-        if (vtxBuffer.empty())
-        {
-          continue;
-        }
-
-        if (!info.zoneIndices.test(Frame->ZoneNumber))
-        {
-          continue;
-        }
-
-        auto flags = info.flags;
-        const bool isTranslucent = (flags & PF_Translucent) != 0;
-        const bool isUnlitEmissive = ((flags & PF_Unlit) != 0) || ctx.frameIsSkybox;
-        auto wm = info.worldMatrix;
-
-        if (ctx.frameIsSkybox)
-        {
-          flags |= PF_Unlit;
-          flags &= ~PF_Masked;
-
-          m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
-          m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
-        }
-        else
-        {
-          if ((flags & PF_FakeBackdrop) != 0)
-          {
-            continue;
-          }
-        }
-
-        if (pass == pass::solid)
-        {
-          if (isTranslucent)
-          {
-            continue;
-          }
-
-          if (isUnlitEmissive)
-          { //render without unlit flag
-            flags &= ~PF_Unlit;
-          }
-        }
-        else if (pass == pass::translucent)
-        {
-          if (!(isTranslucent || isUnlitEmissive))
-          {
-            continue;
-          }
-
-          if (isUnlitEmissive)
-          {
-            D3DXMATRIX s;
-
-            if (!ctx.frameIsSkybox)
-            {
-              D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
-              D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
-              SetWorldTransformState(wm);
-              m_TextureManager.BindTexture(flags, info.textureHandle);
-              m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
-            }
-
-            D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
-            D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
-            SetWorldTransformState(wm);
-            m_TextureManager.BindTexture(flags, info.textureHandle);
-            m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
-            continue;
-          }
-        }
-
-        SetWorldTransformState(wm);
-        m_TextureManager.BindTexture(flags, info.textureHandle);
-        m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
-      }
-    }
-  }
 
   m_MaterialDebugger.Update(Frame);
   bool clearEachFrame = false;
@@ -231,9 +88,6 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
     m_staticMeshes.clear();
     for(auto& n : m_DrawnNodes) n.clear();
   }
-
-  //Render real-time lights
-  m_LightManager.Render(Frame);
 
 #if 0
   //axis widget
@@ -278,15 +132,15 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 
 
   //Draw player body.
-  if (Frame->Parent == nullptr && g_ConfigManager.GetRenderPlayerBody())
+  if (g_ConfigManager.GetRenderPlayerBody())
   {
     static UBOOL& HasSpecialCoords = []() -> UBOOL& {
-        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
-        return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
+      uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+      return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
       }();
     static FCoords& SpecialCoords = []() -> FCoords& {
-        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
-        return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
+      uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+      return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
       }();
 
     auto player = Frame->Viewport->Actor;
@@ -317,6 +171,218 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
   {
     //DrawFullscreenQuad(Frame, m_TextureManager.GetFakeTexture());
   }
+
+  //Finally; render the UI:
+  check(Frame->Parent == nullptr);
+
+  //Render UI meshes
+#if 1
+  m_LLRenderer->PushDeviceState();
+  SetWorldTransformStateToIdentity();
+
+  m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+  m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
+  m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+  m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+  m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
+  for (auto& rc : m_UIMeshes)
+  {
+    SetViewState(rc.sceneNode.get(), ViewType::identity);
+    SetProjectionState(rc.sceneNode.get(), ProjectionType::uiorthogonal);
+
+    auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
+    m_TextureManager.BindTexture(rc.flags, textureHandle);
+    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+    m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
+  }
+  m_LLRenderer->PopDeviceState();
+  m_UIMeshes.clear();
+#endif
+
+  m_renderingScope.reset();
+}
+
+//OnSceneBegin is called when Deus Ex starts rendering a specific scene (as determined by a camera)
+//In modern rasterization engines, games with multiple cameras would render each camera to texture
+//and then in then finally those textures would be used in the final frame.
+//In UE1, multiple cameras is done through portal rendering. When the renderer encounters a
+//portal surface, it switches camera and continues to draw within the shape of the portal surface.
+//Sadly, camera switching is not quite supported with RTX Remix.
+void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
+{
+  auto& ctx = *g_ContextManager.GetContext();
+  bool isSkyBox = false;
+  auto zoneIndex = Frame->ZoneNumber;
+  if (zoneIndex >= 0 && zoneIndex < FBspNode::MAX_ZONES)
+  {
+    auto skyZone = Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
+    isSkyBox = (skyZone != nullptr) && (skyZone->Region.ZoneNumber == zoneIndex);
+  }
+
+  if (Frame->Parent == nullptr)
+  {
+    g_Stats.Writer().DrawMainFrame();
+  }
+
+  if (Frame->Parent == nullptr || isSkyBox)
+  {
+    ctx.frameSceneNode = Frame;
+    ctx.frameIsSkybox = isSkyBox;
+    if (isSkyBox && Frame->Parent != nullptr)
+    {
+      //rtx requires that the full pass is rendered with the same view matrix.
+      //ie, we cannot change cameras.
+      //since the matrix multiplication is: world * view * proj.
+      //we can turn this into (world * subframeView * invRootView) * rootview * projection
+      ctx.skyframeSceneNode = std::make_shared<FSceneNode>(*Frame);
+
+      //So, there's a weird problem where the skybox camera rotates around up-axis, but not side-axis.
+      //Bit of a hack but it saves some headache...
+      AZoneInfo* SkyZone = (AZoneInfo*)Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
+      FCoords SkyCoords = Frame->Parent->Coords;
+      SkyCoords *= Frame->Parent->Coords.Origin;
+      SkyCoords /= SkyZone->Rotation;
+      SkyCoords /= SkyZone->Location;
+      Frame->Coords = SkyCoords;
+      g_Stats.Writer().DrawSkyBox();
+    }
+  }
+
+  m_LLRenderer->PushDeviceState();
+  m_LLRenderer->BeginScene();
+  SetViewState(Frame, ViewType::game);
+  SetProjectionState(Frame, ProjectionType::perspective);
+
+  if (ctx.frameIsSkybox)
+  {
+    m_LLRenderer->SetViewportDepth(0.9f, 1.0f);
+    m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+    m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+    m_LLRenderer->SetRenderState(D3DRS_LIGHTING, FALSE);
+    
+  }
+  else
+  {
+    m_LLRenderer->ResetViewportDepth();
+  }
+}
+
+void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
+{
+  auto& ctx = *g_ContextManager.GetContext();
+  if (!ctx.frameIsSkybox || (ctx.frameIsSkybox && g_ConfigManager.GetRenderSkybox()))
+  {
+    UModel* Model = Frame->Level->Model;
+    auto& GSurfs = Model->Surfs;
+    auto& GNodes = Model->Nodes;
+    auto& GVerts = Model->Verts;
+    auto& GVertPoints = Model->Points;
+
+    {  //Render all static geometry
+      enum class pass { solid, translucent };
+      constexpr pass passes[] = { pass::solid, pass::translucent };
+
+      for (auto pass : passes)
+      {
+        for (auto& cachedMeshInfoIt : m_staticMeshes)
+        {
+          //Utils::ScopedCall scopedRenderStatePushPop{ [&](){ m_LLRenderer->PushDeviceState();}, [&]() {m_LLRenderer->PopDeviceState(); } };
+
+          auto& info = cachedMeshInfoIt.second;
+          auto& vtxBuffer = *info.buffer.get();
+          if (vtxBuffer.empty())
+          {
+            continue;
+          }
+
+          if (!info.zoneIndices.test(Frame->ZoneNumber))
+          {
+            continue;
+          }
+
+          auto flags = info.flags;
+          const bool isTranslucent = (flags & PF_Translucent) != 0;
+          const bool isUnlitEmissive = ((flags & PF_Unlit) != 0) || ctx.frameIsSkybox;
+          auto wm = info.worldMatrix;
+
+          if (ctx.frameIsSkybox)
+          {
+            flags |= PF_Unlit;
+            flags &= ~PF_Masked;
+          }
+          else
+          {
+            if ((flags & PF_FakeBackdrop) != 0)
+            {
+              continue;
+            }
+          }
+
+          if (pass == pass::solid)
+          {
+            if (isTranslucent)
+            {
+              continue;
+            }
+
+            if (isUnlitEmissive)
+            { //render without unlit flag
+              flags &= ~PF_Unlit;
+            }
+          }
+          else if (pass == pass::translucent)
+          {
+            if (!(isTranslucent || isUnlitEmissive))
+            {
+              continue;
+            }
+
+            if (isUnlitEmissive)
+            {
+              D3DXMATRIX s;
+
+              if (!ctx.frameIsSkybox)
+              {
+                D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
+                D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+                SetWorldTransformState(wm);
+                m_TextureManager.BindTexture(flags, info.textureHandle);
+                m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+              }
+
+              D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
+              D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+              SetWorldTransformState(wm);
+              m_TextureManager.BindTexture(flags, info.textureHandle);
+              m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+              continue;
+            }
+          }
+
+          SetWorldTransformState(wm);
+          if (m_TextureManager.BindTexture(flags, info.textureHandle))
+          {
+#if 0
+            m_LLRenderer->SetViewportDepth(0.0f, 1.0f);
+            m_LLRenderer->getDevice()->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
+            m_LLRenderer->getDevice()->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
+            m_LLRenderer->getDevice()->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
+            m_LLRenderer->getDevice()->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR);
+            m_LLRenderer->getDevice()->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_SRCCOLOR);
+            m_LLRenderer->getDevice()->SetRenderState(D3DRS_COLORWRITEENABLE, 0x0000000F);
+            m_LLRenderer->getDevice()->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+#endif
+            m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+          }
+        }
+      }
+    }
+  }
+  //
+  m_LLRenderer->EndScene();
+  m_LLRenderer->PopDeviceState();
 }
 
 void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, const DeusExD3D9TextureHandle& pTexture, float Size/*=1.0f*/)
@@ -547,6 +613,7 @@ void HighlevelRenderer::GetPerspectiveProjectionMatrix(FSceneNode* Frame, D3DXMA
   * At the time of writing, RTX Remix does not honor the X and Y offsets of the viewport
   * As a hack, I correct the perspective instead.
   */
+  auto& ctx = *g_ContextManager.GetContext();
   bool useFrame = (!g_options.enableViewportXYOffsetWorkaround || (Frame->XB == 0 && Frame->YB == 0));
 
   const float fovangle = Frame->Viewport->Actor->FovAngle;
@@ -560,13 +627,34 @@ void HighlevelRenderer::GetPerspectiveProjectionMatrix(FSceneNode* Frame, D3DXMA
   float offsetR = (1.0f - (float(Frame->XB + Frame->X) / viewportW)) * 0.5f;
   float offsetB = (1.0f - (float(Frame->YB + Frame->Y) / viewportH)) * 0.5f;
 
+#if 1
   D3DXMatrixPerspectiveOffCenterRH(&projMatrix,
     (-1.0f + (useFrame ? 0.0f : offsetL)) * fovHalfAngle,
     (1.0f + (useFrame ? 0.0f : offsetR)) * fovHalfAngle,
     (-1.0f - (useFrame ? 0.0f : offsetB)) * aspect * fovHalfAngle,
     (1.0f - (useFrame ? 0.0f : offsetT)) * aspect * fovHalfAngle,
-    LowlevelRenderer::NearRange, LowlevelRenderer::FarRange
+    LowlevelRenderer::NearRange, LowlevelRenderer::FarRange);
+#else
+  float zScale = 1.0f;
+  float zScale2 = 32768.0f;
+  g_DebugMenu.DebugVar("Rendering", "Zscale 1", DebugMenuUniqueID(), zScale, { DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
+  g_DebugMenu.DebugVar("Rendering", "Zscale 2", DebugMenuUniqueID(), zScale2, { DebugMenuValueOptions::editor::slider, 0.0f, 32768.0f});
+
+  D3DXMATRIX scaledM;
+  D3DXMatrixScaling(&scaledM, 1.0f, 1.0f, 1.0f / 32768.0f);
+
+  D3DXMATRIX tmp;
+  D3DXMatrixPerspectiveOffCenterRH(&tmp,
+    (-1.0f + (useFrame ? 0.0f : offsetL)) * fovHalfAngle,
+    (1.0f + (useFrame ? 0.0f : offsetR)) * fovHalfAngle,
+    (-1.0f - (useFrame ? 0.0f : offsetB)) * aspect * fovHalfAngle,
+    (1.0f - (useFrame ? 0.0f : offsetT)) * aspect * fovHalfAngle,
+    LowlevelRenderer::NearRange, 32768.0f
+    //0.0f, 1.0f
   );
+
+  D3DXMatrixMultiply(&projMatrix, &tmp, &scaledM);
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////

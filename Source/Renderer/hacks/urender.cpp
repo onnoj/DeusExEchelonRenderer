@@ -3,8 +3,10 @@
 
 #include "misc.h"
 #include "hacks.h"
+#include "utils/utils.h"
 #include "utils/configmanager.h"
 #include "utils/debugmenu.h"
+#include "rendering/scenemanager.h"
 #include "uefacade.h"
 
 #include <polyhook2/Detour/NatDetour.hpp>
@@ -330,6 +332,17 @@ namespace Hacks
 
   void URenderOverride::DrawFrame(FSceneNode* Frame)
   {
+    //This function is called recursively, so while it looks like we can do symmetric
+    //enter/exit style functions, we can't. So, instead, we just register with the
+    //scene manager. 
+    FrameContextManager::ScopedContext ctx;
+    ctx->frameSceneNode = Frame;
+
+    g_SceneManager.PushScene(Frame);
+    (GRender->*URenderFuncs::DrawFrame)(Frame);
+    g_SceneManager.PopScene(Frame);
+
+#if 0
     if (g_options.cameraTest)
     {
 #if 0
@@ -339,44 +352,8 @@ namespace Hacks
       FakeComputeRenderSize(Frame);
 #endif
     }
+#endif
 
-    bool isSkyBox = false;
-    auto zoneIndex = Frame->ZoneNumber;
-    if (zoneIndex >= 0 && zoneIndex < FBspNode::MAX_ZONES)
-    {
-      auto skyZone = Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
-      isSkyBox = (skyZone != nullptr) && (skyZone->Region.ZoneNumber == zoneIndex);
-    }
-
-    if (Frame->Parent == nullptr || isSkyBox)
-    {
-      FrameContextManager::ScopedContext ctx;
-      ctx->frameSceneNode = Frame;
-      ctx->frameIsSkybox = isSkyBox;
-      if (isSkyBox && Frame->Parent != nullptr)
-      {
-        //rtx requires that the full pass is rendered with the same view matrix.
-        //ie, we cannot change cameras.
-        //since the matrix multiplication is: world * view * proj.
-        //we can turn this into (world * subframeView * invRootView) * rootview * projection
-        ctx->skyframeSceneNode = std::make_shared<FSceneNode>(*Frame);
-
-        //So, there's a weird problem where the skybox camera rotates around up-axis, but not side-axis.
-        //Bit of a hack but it saves some headache...
-        AZoneInfo* SkyZone = (AZoneInfo*)Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
-        FCoords SkyCoords = Frame->Parent->Coords;
-        SkyCoords *= Frame->Parent->Coords.Origin;
-        SkyCoords /= SkyZone->Rotation;
-        SkyCoords /= SkyZone->Location;
-        Frame->Coords = SkyCoords;
-      }
-
-      ::Misc::g_Facade->GetLLRenderer()->PushDeviceState();
-      ::Misc::g_Facade->GetHLRenderer()->OnSceneBegin(Frame);
-      (GRender->*URenderFuncs::DrawFrame)(Frame);
-      ::Misc::g_Facade->GetHLRenderer()->OnSceneEnd(Frame);
-      ::Misc::g_Facade->GetLLRenderer()->PopDeviceState();
-    }
   }
 
   INT URenderOverride::ClipBspSurf(INT iNode, FTransform**& Result)

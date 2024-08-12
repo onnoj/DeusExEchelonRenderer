@@ -7,39 +7,36 @@
 
 CommandManager g_CommandManager;
 //////////////////////////////////////////////////////////////////////////////
-namespace
+class LocalHook : public FExec
 {
-  class LocalHook : public FExec
-  {
-    public:
-      virtual UBOOL Exec( const TCHAR* Cmd, FOutputDevice& Ar ) 
+  public:
+    virtual UBOOL Exec( const TCHAR* Cmd, FOutputDevice& Ar ) 
+    {
+      if (g_CommandManager.OnExec(Cmd, Ar) != 0)
       {
-        if (g_CommandManager.OnExec(Cmd, Ar) != 0)
-        {
-          return 1;
-        }
+        return 1;
+      }
 
-        if (m_ParentExecHook == nullptr)
-        {
-          return 0;
-        }
-        return m_ParentExecHook->Exec(Cmd, Ar);
-      };
-    public:
-      void Connect()
+      if (m_ParentExecHook == nullptr)
       {
-        m_ParentExecHook = GExec;
-        GExec = &g_LocalHook;
+        return 0;
       }
-      void Disconnect()
-      {
-        GExec = m_ParentExecHook;
-        m_ParentExecHook = nullptr;
-      }
-    private:
-      FExec* m_ParentExecHook = nullptr;
-  } static g_LocalHook;
-}
+      return m_ParentExecHook->Exec(Cmd, Ar);
+    };
+  public:
+    void Connect()
+    {
+      m_ParentExecHook = GExec;
+      GExec = &g_LocalHook;
+    }
+    void Disconnect()
+    {
+      GExec = m_ParentExecHook;
+      m_ParentExecHook = nullptr;
+    }
+  private:
+    FExec* m_ParentExecHook = nullptr;
+} static g_LocalHook;
 //////////////////////////////////////////////////////////////////////////////
 void CommandManager::OnTick(FLOAT DeltaTime)
 {

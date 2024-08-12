@@ -22,6 +22,7 @@
 #include "utils/debugmenu.h"
 #include "hacks/hacks.h"
 #include "hacks/misc.h"
+#include "rendering/scenemanager.h"
 
 IMPLEMENT_PACKAGE(DeusExEchelonRenderer);
 IMPLEMENT_CLASS(UD3D9FPRenderDevice);
@@ -33,15 +34,21 @@ std::mutex UD3D9FPRenderDevice::m_Lock;
 
 class FLogOutImpl : public FOutputDevice
 {
+private:
+  FOutputDevice* Parent = nullptr;
 public:
+  FLogOutImpl(FOutputDevice* pParent) : Parent(pParent) {};
   void Serialize(const TCHAR* V, EName Event)
   {
-    char b[1024]{};
-    WideCharToMultiByte(CP_ACP, 0, V, -1, &b[0], std::size(b), NULL, NULL);
-    printf("[%d] %s\n", int(Event), b);
-    fflush(stdout);
+    //char b[1024]{};
+    //WideCharToMultiByte(CP_ACP, 0, V, -1, &b[0], std::size(b), NULL, NULL);
+    //printf("[%d] %s\n", int(Event), b);
+    //fflush(stdout);
+    OutputDebugStringW(V);
+
+    Parent->Serialize(V, Event);
   }
-} LogOutImpl;
+} LogOutImpl(GLog);
 
 class FErrOutImpl : public FOutputDeviceError
 {
@@ -78,9 +85,9 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
 #if !defined(RELEASE_CONFIG)
   //AllocConsole();
   //freopen("CONOUT$", "w", stdout);
-  //GNull = &LogOutImpl;
-  //GLog = &LogOutImpl;
-  //GError = &ErrOutImpl;
+  GNull = &LogOutImpl;
+  GLog = &LogOutImpl;
+  GError = &ErrOutImpl;
   //if( GLogWindow )
   //{
   //  GLogWindow->Show(1);
@@ -88,7 +95,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   //  GLogWindow->Display.ScrollCaret();
   //}
   pInViewport->Exec(L"showlog");
-  GNull = GLog;
+  //GNull = GLog;
   GError = &ErrOutImpl;
 #endif
 
@@ -96,7 +103,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
 
   g_ConfigManager.LoadConfig();
   //g_ConfigManager.SaveConfig(); //save file again so that we have the defaults
-
+  
   g_CommandManager.Initialize();
   g_DemoManager.Initialize();
 
@@ -173,6 +180,7 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   }
 
   m_HLRenderer.Initialize(&m_LLRenderer);
+  g_SceneManager.Initialize(&m_LLRenderer, &m_HLRenderer);
 
   //force lights off if running with remix disabled
   g_options.hasLights = g_options.hasLights && Misc::IsNvRemixAttached(true);
@@ -195,6 +203,7 @@ void UD3D9FPRenderDevice::Exit()
   g_CommandManager.Shutdown();
   g_DemoManager.Shutdown();
   g_DebugMenu.Shutdown();
+  g_SceneManager.Shutdown();
   m_HLRenderer.Shutdown();
   m_LLRenderer.Shutdown();
 #if !defined(RELEASE_CONFIG)
@@ -346,16 +355,19 @@ void UD3D9FPRenderDevice::Tick(FLOAT DeltaTime)
 
 void UD3D9FPRenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span)
 {
+  g_SceneManager.Validate();
   m_HLRenderer.OnDrawMeshPolygon(Frame, Info, Pts, NumPts, PolyFlags, Span);
 }
 
 void UD3D9FPRenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet)
 {
+  g_SceneManager.Validate();
   m_HLRenderer.OnDrawGeometry(Frame, Surface, Facet);
 }
 
 void UD3D9FPRenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X, FLOAT Y, FLOAT XL, FLOAT YL, FLOAT U, FLOAT V, FLOAT UL, FLOAT VL, class FSpanBuffer* Span, FLOAT Z, FPlane Color, FPlane Fog, DWORD PolyFlags)
 {
+  g_SceneManager.Validate();
   std::wstring textureName = Info.Texture->GetFullName();
   if (textureName.find(L"Corona") != -1)
   {

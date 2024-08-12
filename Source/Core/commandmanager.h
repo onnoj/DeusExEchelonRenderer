@@ -34,7 +34,7 @@ private:
   bool m_WaitForCommandToFinish = false;
   std::unordered_map<uint32_t, std::function<void()>> m_ConsoleCommands;
   std::deque<std::unique_ptr<Command>> m_CommandQueue;
-};
+} extern g_CommandManager;
 
 class WaitTimeCommand : public CommandManager::Command
 {
@@ -73,5 +73,3 @@ class ChangeLevelCommand : public CommandManager::Command
         }
       }{};
 };
-
-extern CommandManager g_CommandManager;

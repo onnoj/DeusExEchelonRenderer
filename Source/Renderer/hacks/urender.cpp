@@ -337,10 +337,19 @@ namespace Hacks
     //scene manager. 
     FrameContextManager::ScopedContext ctx;
     ctx->frameSceneNode = Frame;
+    auto zoneIndex = Frame->ZoneNumber;
+    if (zoneIndex >= 0 && zoneIndex < FBspNode::MAX_ZONES)
+    {
+      auto skyZone = Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
+      ctx->frameIsSkybox = (skyZone != nullptr) && (skyZone->Region.ZoneNumber == zoneIndex);
+    }
 
-    g_SceneManager.PushScene(Frame);
-    (GRender->*URenderFuncs::DrawFrame)(Frame);
-    g_SceneManager.PopScene(Frame);
+    if (Frame->Parent == nullptr || ctx->frameIsSkybox)
+    {
+      g_SceneManager.PushScene(Frame);
+      (GRender->*URenderFuncs::DrawFrame)(Frame);
+      g_SceneManager.PopScene(Frame);
+    }
 
 #if 0
     if (g_options.cameraTest)
@@ -673,7 +682,12 @@ namespace Hacks
       FVector offset{ 0.0f, 0.0f, 0.0f };
       if (g_ConfigManager.GetRenderPlayerBody() && Actor == playerPawn)
       {
-        offset = FVector(-playerPawn->CollisionRadius, 0.0f, 0.0f);
+        float collisionRadiusMultiplier = 2.5f;
+        g_DebugMenu.DebugVar("Rendering", "Player Body Offset factor", DebugMenuUniqueID(), collisionRadiusMultiplier, { DebugMenuValueOptions::editor::slider, -5.0f, 5.0f });
+        offset = FVector(-playerPawn->CollisionRadius * collisionRadiusMultiplier, 0.0f, 0.0f);
+
+        //todo, calculate offset by intersecting the body mesh with the camera frustrum.
+        //currently sometimes the playermesh moves through the camera plane.
       }
 
       //Inform high-level renderer we're about to draw a mesh

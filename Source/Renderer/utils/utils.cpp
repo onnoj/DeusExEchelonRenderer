@@ -1,7 +1,8 @@
 #include "DeusExEchelonRenderer_PCH.h"
 #pragma hdrstop
 
-#include "utils.h"
+#include "utils/utils.h"
+#include "utils/debugmenu.h"
 
 uint32_t frameCount = 0;
 uint32_t sceneCount = 0;
@@ -17,29 +18,44 @@ Stats& Stats::Writer() const
   return *const_cast<Stats*>(self);
 }
 
-void Stats::BeginFrame()
+void Stats::OnTick()
 {
-  frameCount++;
+  
+  static auto lastSceneCount = 0;
+  static auto lastskyBoxCount = 0;
+  static auto lastmainFrameCount = 0;
+  static bool printStatsToLog = false;
+  g_DebugMenu.DebugVar("Rendering", "Print render stats to log", DebugMenuUniqueID(), printStatsToLog);
+  if (printStatsToLog && (lastSceneCount != sceneCount || lastskyBoxCount != skyBoxCount || lastmainFrameCount != mainFrameCount))
+  {
+    lastSceneCount = sceneCount;
+    lastskyBoxCount = skyBoxCount;
+    lastmainFrameCount = mainFrameCount;
+    GLog->Logf(L"sceneCount: %d\tskyboxCount: %d\tmainframeCount: %d, drawCallCount: %d (%d/%d/%d)\n",
+      sceneCount,
+      skyBoxCount,
+      mainFrameCount,
+      drawCallCount,
+      sceneDrawCallCount[0],
+      sceneDrawCallCount[1],
+      sceneDrawCallCount[2]
+    );
+  }
+
   sceneCount = 0;
   drawCallCount = 0;
   skyBoxCount = 0;
   mainFrameCount = 0;
+}
+
+void Stats::BeginFrame()
+{
+  frameCount++;
   ZeroMemory(&sceneDrawCallCount[0], sizeof(sceneDrawCallCount));
 }
 
 void Stats::EndFrame()
 {
-#if 0
-  GLog->Logf(L"sceneCount: %d\tskyboxCount: %d\tmainframeCount: %d, drawCallCount: %d (%d/%d/%d)\n",
-    sceneCount,
-    skyBoxCount,
-    mainFrameCount,
-    drawCallCount,
-    sceneDrawCallCount[0],
-    sceneDrawCallCount[1],
-    sceneDrawCallCount[2]
-  );
-#endif
 }
 
 

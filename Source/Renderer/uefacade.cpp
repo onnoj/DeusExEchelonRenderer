@@ -20,6 +20,7 @@
 #include <Core/commandmanager.h>
 #include "utils/configmanager.h"
 #include "utils/debugmenu.h"
+#include "utils/utils.h"
 #include "hacks/hacks.h"
 #include "hacks/misc.h"
 #include "rendering/scenemanager.h"
@@ -351,6 +352,7 @@ void UD3D9FPRenderDevice::Unlock(UBOOL Blit)
 void UD3D9FPRenderDevice::Tick(FLOAT DeltaTime)
 {
   g_DebugMenu.Render();
+  g_Stats.OnTick();
 }
 
 void UD3D9FPRenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span)

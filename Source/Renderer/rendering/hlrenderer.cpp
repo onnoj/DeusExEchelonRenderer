@@ -132,7 +132,8 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 
 
   //Draw player body.
-  if (g_ConfigManager.GetRenderPlayerBody())
+  auto player = Frame->Viewport->Actor;
+  if (g_ConfigManager.GetRenderPlayerBody() && !player->bBehindView)
   {
     static UBOOL& HasSpecialCoords = []() -> UBOOL& {
       uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
@@ -143,7 +144,6 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
       return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
       }();
 
-    auto player = Frame->Viewport->Actor;
 
     BOOL originalHasSpecialCoords = HasSpecialCoords;
     BITFIELD originalBehindView = player->bBehindView;
@@ -178,26 +178,40 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
   //Render UI meshes
 #if 1
   m_LLRenderer->PushDeviceState();
-  SetWorldTransformStateToIdentity();
-
-  m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-  m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
-  m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-  m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
-  m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
-  for (auto& rc : m_UIMeshes)
   {
-    SetViewState(rc.sceneNode.get(), ViewType::identity);
-    SetProjectionState(rc.sceneNode.get(), ProjectionType::uiorthogonal);
+    m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+    m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
+    m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+    m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+    m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
+    SetViewState(Frame, ViewType::identity);
+    SetProjectionState(Frame, ProjectionType::uiorthogonal);
 
-    auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
-    m_TextureManager.BindTexture(rc.flags, textureHandle);
-    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-    m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
+    //Render any frame clipping (since it seems rtxremix doesn't do that for us).
+    if (true)
+    {
+      UIntRect clipLeft, clipTop, clipRight, clipBottom;
+      m_LLRenderer->GetClipRects(clipLeft, clipTop, clipRight, clipBottom);
+
+      Draw2DScreenQuad(Frame, clipLeft.Left, clipLeft.Top, clipLeft.Width, clipLeft.Height, 0xFF000000ul);
+      Draw2DScreenQuad(Frame, clipTop.Left, clipTop.Top, clipTop.Width, clipTop.Height, 0xFF000000ul);
+      Draw2DScreenQuad(Frame, clipRight.Left, clipRight.Top, clipRight.Width, clipRight.Height, 0xFF000000ul);
+      Draw2DScreenQuad(Frame, clipBottom.Left, clipBottom.Top, clipBottom.Width, clipBottom.Height, 0xFF000000ul);
+    }
+
+    //Render the UI meshes
+    SetWorldTransformStateToIdentity();
+    for (auto& rc : m_UIMeshes)
+    {
+      auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
+      m_TextureManager.BindTexture(rc.flags, textureHandle);
+      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+      m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
+    }
+    m_LLRenderer->PopDeviceState();
   }
-  m_LLRenderer->PopDeviceState();
   m_UIMeshes.clear();
 #endif
 
@@ -213,42 +227,32 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
 {
   auto& ctx = *g_ContextManager.GetContext();
-  bool isSkyBox = false;
-  auto zoneIndex = Frame->ZoneNumber;
-  if (zoneIndex >= 0 && zoneIndex < FBspNode::MAX_ZONES)
-  {
-    auto skyZone = Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
-    isSkyBox = (skyZone != nullptr) && (skyZone->Region.ZoneNumber == zoneIndex);
-  }
+  
 
   if (Frame->Parent == nullptr)
   {
     g_Stats.Writer().DrawMainFrame();
   }
 
-  if (Frame->Parent == nullptr || isSkyBox)
+  if (ctx.frameIsSkybox && Frame->Parent != nullptr)
   {
-    ctx.frameSceneNode = Frame;
-    ctx.frameIsSkybox = isSkyBox;
-    if (isSkyBox && Frame->Parent != nullptr)
-    {
-      //rtx requires that the full pass is rendered with the same view matrix.
-      //ie, we cannot change cameras.
-      //since the matrix multiplication is: world * view * proj.
-      //we can turn this into (world * subframeView * invRootView) * rootview * projection
-      ctx.skyframeSceneNode = std::make_shared<FSceneNode>(*Frame);
+    //rtx requires that the full pass is rendered with the same view matrix.
+    //ie, we cannot change cameras.
+    //since the matrix multiplication is: world * view * proj.
+    //we can turn this into (world * subframeView * invRootView) * rootview * projection
+    ctx.skyframeSceneNode = std::make_shared<FSceneNode>(*Frame);
 
-      //So, there's a weird problem where the skybox camera rotates around up-axis, but not side-axis.
-      //Bit of a hack but it saves some headache...
-      AZoneInfo* SkyZone = (AZoneInfo*)Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
-      FCoords SkyCoords = Frame->Parent->Coords;
-      SkyCoords *= Frame->Parent->Coords.Origin;
-      SkyCoords /= SkyZone->Rotation;
-      SkyCoords /= SkyZone->Location;
-      Frame->Coords = SkyCoords;
-      g_Stats.Writer().DrawSkyBox();
-    }
+    //So, there's a weird problem where the skybox camera rotates around up-axis, but not side-axis.
+    //Bit of a hack but it saves some headache...
+    AZoneInfo* SkyZone = (AZoneInfo*)Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
+    FCoords SkyCoords = Frame->Parent->Coords;
+    SkyCoords *= Frame->Parent->Coords.Origin;
+    SkyCoords /= SkyZone->Rotation;
+    SkyCoords /= SkyZone->Location;
+    Frame->Coords = SkyCoords;
+    g_Stats.Writer().DrawSkyBox();
   }
+  
 
   m_LLRenderer->PushDeviceState();
   m_LLRenderer->BeginScene();
@@ -261,7 +265,6 @@ void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
     m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
     m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
     m_LLRenderer->SetRenderState(D3DRS_LIGHTING, FALSE);
-    
   }
   else
   {
@@ -383,6 +386,24 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
   //
   m_LLRenderer->EndScene();
   m_LLRenderer->PopDeviceState();
+}
+
+void HighlevelRenderer::Draw2DScreenQuad(FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB/* = 0xFF000000ul*/)
+{
+  const LowlevelRenderer::VertexPos3Color0 quad[] = {
+    { { pX+0.0f,    pY+0.0f,    1.0f }, {pARGB} },
+    { { pX+pWidth,	pY+pHeight, 1.0f }, {pARGB} },
+    { { pX+0.0f,    pY+pHeight, 1.0f }, {pARGB} },
+    { { pX+0.0f,    pY+0.0f,    1.0f }, {pARGB} },
+    { { pX+pWidth,	pY+0.0f,    1.0f }, {pARGB} },
+    { { pX+pWidth,	pY+pHeight, 1.0f }, {pARGB} }
+  };
+
+  SetWorldTransformStateToIdentity();
+  m_LLRenderer->ConfigureBlendState(0);
+  m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG0, D3DTA_DIFFUSE);
+  m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+  m_LLRenderer->RenderTriangleList(&quad[0], 2, std::size(quad), 0, 0);
 }
 
 void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, const DeusExD3D9TextureHandle& pTexture, float Size/*=1.0f*/)

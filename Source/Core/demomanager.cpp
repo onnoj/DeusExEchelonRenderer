@@ -80,6 +80,7 @@ void DemoManager::RunBenchmark(bool pMakeScreenshots, bool pLoop, uint32_t pDela
     {L"Pic16", L"01_NYC_UNATCOHQ", {1625.67956543, -534.12329102, 27.80000114}, {0, 6055, 0}, {63062, 6055, 0} },
     {L"Pic17", L"06_HongKong_WanChai_Underworld", {-319.66137695, -716.39184570, -336.10000610}, {0, -6194, 0}, {64442, -6194, 0}},
     {L"Pic18", L"06_HongKong_WanChai_Underworld", {-1110.02636719, -1302.69787598, -96.19999695}, {0, -16953, 0}, {65264, -16953, 0}},
+    {L"Pic19", L"06_HongKong_Helibase", {2087.96118164, -91.19931793, 526.48175049}, {0, 32915, 0}, {63667, 32915, 0}}
   };
 
   for (const auto& location : locations)

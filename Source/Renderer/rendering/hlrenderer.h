@@ -25,6 +25,7 @@ public:
 	void SetViewState(FSceneNode* Frame, ViewType viewType);
 	void SetProjectionState(FSceneNode* Frame, ProjectionType projection);
 
+	void Draw2DScreenQuad(FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB = 0xFF000000ul);
 	void Draw3DCube(FSceneNode* Frame, const FVector& Position, const DeusExD3D9TextureHandle& pTexture, float Size = 1.0f);
 	void Draw3DLine(FSceneNode* Frame, const FVector& PositionFrom, const FVector& PositionTo, FColor Color, float Size = 1.0f);
 	void DrawFullscreenQuad(FSceneNode* Frame, const DeusExD3D9TextureHandle& pTexture);

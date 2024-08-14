@@ -32,6 +32,8 @@ static D3DVECTOR D3DXVec3ToD3DVec(const D3DXVECTOR3& pV)
 
 struct Stats
 {
+  void OnTick();
+
   void BeginFrame();
   void EndFrame();
 

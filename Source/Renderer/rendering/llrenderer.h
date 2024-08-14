@@ -8,6 +8,25 @@
 
 #include "rendering/dxtexturemanager.h"
 
+template <typename T>
+struct Rect
+{
+	T Left{};
+	T Top{};
+	T Width{};
+	T Height{};
+
+	T Right () { return (Width + Left); }
+	T Bottom() { return (Height + Top) ; }
+
+	Rect() = default;
+	Rect(const T& pLeft, const T& pTop, const T& pWidth, const T& pHeight) :
+		Left(pLeft), Top(pTop), Width(pWidth), Height(pHeight) {};
+};
+using FloatRect = Rect<float>;
+using IntRect = Rect<int32_t>;
+using UIntRect = Rect<uint32_t>;
+
 class LowlevelRenderer
 {
 	friend class HighlevelRenderer;
@@ -39,6 +58,9 @@ public:
 
 	bool ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight, bool pFullscreen);
 	bool SetViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight);
+	void GetViewport(uint32_t& pmLeft, uint32_t& pmTop, uint32_t& pmWidth, uint32_t& pmHeight);
+	void GetClipRects(UIntRect& pmLeft, UIntRect& pmTop, UIntRect& pmRight, UIntRect& pmBottom);
+
 	void SetViewportDepth(float pMinZ, float pMaxZ);
 	void ResetViewportDepth();
 	bool ValidateViewport();
@@ -61,6 +83,7 @@ public:
 	void RenderTriangleList(const VertexPos3Norm3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void RenderTriangleList(const VertexPos3Color0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void DisableLight(int32_t index);
 	void RenderLight(int32_t index, const D3DLIGHT9& pLight);
 	void FlushLights();

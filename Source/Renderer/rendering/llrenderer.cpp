@@ -385,6 +385,19 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos4Colo
   );
 }
 
+void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Color0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
+{
+  return RenderTriangleListBuffer(
+    D3DFVF_XYZ | D3DFVF_DIFFUSE /*| D3DFVF_TEX1 | D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
+    pVertices,
+    primitiveCount,
+    pVertexCount,
+    sizeof(LowlevelRenderer::VertexPos3Color0),
+    pHash,
+    pDebug
+  );
+}
+
 void LowlevelRenderer::DisableLight(int32_t index)
 {
   if (!g_options.hasLights)
@@ -519,6 +532,8 @@ void LowlevelRenderer::BeginFrame()
 
     this->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
     this->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+    this->SetTextureStageState(0, D3DTSS_COLORARG0, D3DTA_DIFFUSE);
+    this->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
 
     //TODO: Document why are we doing this?
     if (!m_CurrentState->m_WorldMatrix)
@@ -740,6 +755,25 @@ bool LowlevelRenderer::SetViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidt
   return ValidateViewport();
 }
 
+void LowlevelRenderer::GetViewport(uint32_t& pmLeft, uint32_t& pmTop, uint32_t& pmWidth, uint32_t& pmHeight)
+{
+  pmLeft = (m_CurrentState->m_ViewportLeft ? *m_CurrentState->m_ViewportLeft : 0);
+  pmTop = (m_CurrentState->m_ViewportTop ? *m_CurrentState->m_ViewportTop : 0);
+  pmWidth = (m_CurrentState->m_ViewportLeft ? *m_CurrentState->m_ViewportWidth : 0);
+  pmHeight = (m_CurrentState->m_ViewportLeft ? *m_CurrentState->m_ViewportHeight : 0);
+}
+
+void LowlevelRenderer::GetClipRects(UIntRect& pmLeft, UIntRect& pmTop, UIntRect& pmRight, UIntRect& pmBottom)
+{
+  uint32_t viewportL, viewportT, viewportW, viewportH;
+  GetViewport(viewportL, viewportT, viewportW, viewportH);
+
+  pmLeft = UIntRect(0, 0, viewportL, m_outputSurface.height);
+  pmTop = UIntRect(0, 0, m_outputSurface.width, viewportT);
+  pmRight = UIntRect(viewportL + viewportW, 0, m_outputSurface.width - (viewportL + viewportW), m_outputSurface.height);
+  pmBottom = UIntRect(0, viewportT + viewportH, m_outputSurface.width, m_outputSurface.height - (viewportT + viewportH));
+}
+
 void LowlevelRenderer::SetViewportDepth(float pMinZ, float pMaxZ)
 {
   m_DesiredViewportMinZ = pMinZ;
@@ -756,6 +790,11 @@ void LowlevelRenderer::ResetViewportDepth()
 
 bool LowlevelRenderer::ValidateViewport()
 {
+  if(m_DesiredViewportTop) g_DebugMenu.DebugVar("Rendering", "Viewport.Top", DebugMenuUniqueID(), *m_DesiredViewportTop, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 1080 });
+  if(m_DesiredViewportLeft)  g_DebugMenu.DebugVar("Rendering", "Viewport.Left", DebugMenuUniqueID(), *m_DesiredViewportLeft, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 1080 });
+  if(m_DesiredViewportWidth) g_DebugMenu.DebugVar("Rendering", "Viewport.Width", DebugMenuUniqueID(), *m_DesiredViewportWidth, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 4096 });
+  if(m_DesiredViewportHeight) g_DebugMenu.DebugVar("Rendering", "Viewport.Height", DebugMenuUniqueID(), *m_DesiredViewportHeight, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 4096 });
+
   if ((m_DesiredViewportLeft && (m_CurrentState->m_ViewportLeft != *m_DesiredViewportLeft)) ||
     (m_DesiredViewportWidth && (m_CurrentState->m_ViewportWidth != *m_DesiredViewportWidth)) ||
     (m_DesiredViewportTop && (m_CurrentState->m_ViewportLeft != *m_DesiredViewportTop)) ||

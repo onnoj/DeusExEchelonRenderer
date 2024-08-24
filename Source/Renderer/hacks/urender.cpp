@@ -338,13 +338,15 @@ namespace Hacks
     FrameContextManager::ScopedContext ctx;
     ctx->frameSceneNode = Frame;
     auto zoneIndex = Frame->ZoneNumber;
+    bool frameIsSkybox = false;
     if (zoneIndex >= 0 && zoneIndex < FBspNode::MAX_ZONES)
     {
       auto skyZone = Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
-      ctx->frameIsSkybox = (skyZone != nullptr) && (skyZone->Region.ZoneNumber == zoneIndex);
+      frameIsSkybox = (skyZone != nullptr) && (skyZone->Region.ZoneNumber == zoneIndex);
+      ctx->frameIsSkybox = frameIsSkybox;
     }
 
-    if (Frame->Parent == nullptr || ctx->frameIsSkybox)
+    if (Frame->Parent == nullptr || frameIsSkybox)
     {
       g_SceneManager.PushScene(Frame);
       (GRender->*URenderFuncs::DrawFrame)(Frame);

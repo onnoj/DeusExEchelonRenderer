@@ -12,7 +12,7 @@ public:
 private:
   std::vector<std::wstring> m_HijackedTextureNames;
   UBOOL m_RenderPlayerBody = true;
-  UBOOL m_RenderSkybox = false;
+  UBOOL m_RenderSkybox = true;
 };
 
 extern ConfigManager g_ConfigManager;

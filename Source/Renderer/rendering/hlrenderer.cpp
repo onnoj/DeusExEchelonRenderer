@@ -307,21 +307,8 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 
           auto flags = info.flags;
           const bool isTranslucent = (flags & PF_Translucent) != 0;
-          const bool isUnlitEmissive = ((flags & PF_Unlit) != 0) || ctx.frameIsSkybox;
+          const bool isUnlitEmissive = ((flags & PF_Unlit) != 0);
           auto wm = info.worldMatrix;
-
-          if (ctx.frameIsSkybox)
-          {
-            flags |= PF_Unlit;
-            flags &= ~PF_Masked;
-          }
-          else
-          {
-            if ((flags & PF_FakeBackdrop) != 0)
-            {
-              continue;
-            }
-          }
 
           if (pass == pass::solid)
           {
@@ -344,39 +331,29 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 
             if (isUnlitEmissive)
             {
-              D3DXMATRIX s;
-
+              //Additional 2x renders with a tiny offset, otherwise the effect might not get picked up per-ray.
               if (!ctx.frameIsSkybox)
               {
+                D3DXMATRIX s;
                 D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
                 D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
                 SetWorldTransformState(wm);
                 m_TextureManager.BindTexture(flags, info.textureHandle);
                 m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+              
+                D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
+                D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+                SetWorldTransformState(wm);
+                m_TextureManager.BindTexture(flags, info.textureHandle);
+                m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+                continue;
               }
-
-              D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
-              D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
-              SetWorldTransformState(wm);
-              m_TextureManager.BindTexture(flags, info.textureHandle);
-              m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
-              continue;
             }
           }
 
           SetWorldTransformState(wm);
           if (m_TextureManager.BindTexture(flags, info.textureHandle))
           {
-#if 0
-            m_LLRenderer->SetViewportDepth(0.0f, 1.0f);
-            m_LLRenderer->getDevice()->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
-            m_LLRenderer->getDevice()->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
-            m_LLRenderer->getDevice()->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
-            m_LLRenderer->getDevice()->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR);
-            m_LLRenderer->getDevice()->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_SRCCOLOR);
-            m_LLRenderer->getDevice()->SetRenderState(D3DRS_COLORWRITEENABLE, 0x0000000F);
-            m_LLRenderer->getDevice()->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
-#endif
             m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
           }
         }
@@ -726,7 +703,6 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
   }
   drawnNodes.insert(iNode);
 
-
   //2. Build a key that is (textureSetHash + PolyFlags + NodeFlags)
   DeusExD3D9TextureHandle albedoTextureHandle;
   albedoTextureHandle = m_TextureManager.ProcessTexture(Surface.PolyFlags, Surface.Texture);
@@ -813,12 +789,16 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 
   for (auto Poly = Facet.Polys; Poly; Poly = Poly->Next)
   {
-    INT	  		iNode = Poly->iNode;
+    INT	  		polyINode = Poly->iNode;
     FBspNode* Node = &GNodes(iNode);
     INT       numPts = Node->NumVertices;
     FBspSurf* Surf = &GSurfs(Node->iSurf);
     FCoords   FrameCoords = Frame->Coords;
-    assert(iNode == Facet.Polys[0].iNode);
+    assert(polyINode == iNode);
+    if (numPts < 3)
+    {
+      continue;
+    }
 
     FLOAT UDot = Facet.MapCoords.XAxis | Facet.MapCoords.Origin;
     FLOAT VDot = Facet.MapCoords.YAxis | Facet.MapCoords.Origin;
@@ -834,12 +814,7 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
         return FVector(ucoord, vcoord, 0);
       }
       return FVector(0, 0, 0);
-      };
-
-    if (numPts < 3)
-    {
-      continue;
-    }
+    };
 
     D3DXVECTOR4 point1;
     D3DXVECTOR4 point2;

@@ -22,6 +22,7 @@ if (TRUE)
 endif()
   
 add_compile_definitions($<$<CONFIG:Debug>:_REALLY_WANT_DEBUG>)
+add_compile_definitions($<$<CONFIG:Debug>:EE_DEBUG>)
  
 SET(SDL2_VERSION "SDL2-2.26.5")
 

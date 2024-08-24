@@ -64,8 +64,10 @@ public:
 	void SetViewportDepth(float pMinZ, float pMaxZ);
 	void ResetViewportDepth();
 	bool ValidateViewport();
+	void InitializeDeviceState();
 	void PushDeviceState();
 	void PopDeviceState();
+	DWORD GetRenderState(D3DRENDERSTATETYPE State);
 	HRESULT SetRenderState(D3DRENDERSTATETYPE State,DWORD Value);
 	HRESULT SetTextureStageState(DWORD Stage,D3DTEXTURESTAGESTATETYPE Type,DWORD Value);
 	HRESULT SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value);

@@ -13,6 +13,7 @@
 #include "rendering/scenemanager.h"
 #include "utils/debugmenu.h"
 #include "utils/utils.h"
+#include "utils/materialdebugger.h"
 
 bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen)
 {
@@ -156,8 +157,6 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
   }
   check(SUCCEEDED(hr));
 
-  ///
-
   if (m_fakeLightBuffer == nullptr)
   {
     auto hr = m_Device->CreateVertexBuffer(
@@ -182,6 +181,7 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
   }
 
   ResizeDisplaySurface(0, 0, m_outputSurface.width, m_outputSurface.height, m_outputSurface.fullscreen);
+  InitializeDeviceState();
   return 1;
 }
 
@@ -258,10 +258,6 @@ void LowlevelRenderer::EndScene()
 void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug)
 {
   auto& ctx = *g_ContextManager.GetContext();
-  //if (!ctx.frameIsSkybox)
-  //{
-  //  return;
-  //}
 
   g_SceneManager.Validate();
   g_Stats.Writer().DrawCall();
@@ -322,6 +318,18 @@ void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertice
 
   CheckDirtyMatrices();
 
+#if EE_DEBUG
+  if (pDebug != 0)
+  {
+    wchar_t b[256]{ 0 };
+    swprintf_s(b, L"Dbg: %d", pDebug);
+    D3DPERF_SetMarker(0x00, &b[0]);
+  }
+#endif
+
+  RenderStateDebugger::Process(this, pDebug);
+
+  //Commit primitive
   {
     HRESULT res = S_OK;
     res = m_Device->SetStreamSource(0, buffer, 0, pVertexSize); check(SUCCEEDED(res));
@@ -905,43 +913,12 @@ bool LowlevelRenderer::SetTextureOnDevice(const DeusExD3D9Texture* pTexture)
 
 void LowlevelRenderer::ConfigureBlendState(UnrealBlendFlags pFlags)
 {
-  auto handleflag = [&](UnrealBlendFlags pFlag, std::function<void()> onSet, std::function<void()> onUnset)
-    {
-      if ((pFlags & pFlag) != 0)
+  if ((pFlags & (PF_Translucent | PF_Modulated | PF_Highlighted | PF_Unlit)) != 0)
+  {
+    this->SetRenderState(D3DRS_ALPHABLENDENABLE, ((pFlags & PF_Masked) == 0) ? TRUE : FALSE);
+    if ((pFlags & PF_Translucent) != 0) {
+      if ((pFlags & PF_Portal) == 0)
       {
-        onSet();
-      }
-      else
-      {
-        onUnset();
-      }
-    };
-
-  //Masked is disabled because the renderer (currently) does not support masking.
-  handleflag(PF_Translucent | PF_Modulated | PF_Highlighted | PF_Unlit,
-    [&]() {
-      this->SetRenderState(D3DRS_ALPHABLENDENABLE, ((pFlags & PF_Masked) == 0) ? TRUE : FALSE);
-      if ((pFlags & PF_Translucent) != 0) {
-        if ((pFlags & PF_Portal) == 0)
-        {
-          this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
-          this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCCOLOR);
-        }
-        else
-        {
-          this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
-          this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR);
-        }
-      }
-      else if ((pFlags & PF_Modulated) != 0) {
-        this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
-        this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR);
-      }
-      else if ((pFlags & PF_Highlighted) != 0) {
-        this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
-        this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-      }
-      else if ((pFlags & PF_Unlit) != 0) {
         this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
         this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCCOLOR);
       }
@@ -950,73 +927,88 @@ void LowlevelRenderer::ConfigureBlendState(UnrealBlendFlags pFlags)
         this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
         this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR);
       }
-    },
-    [&]()
-    {
-      this->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
     }
-  );
-
-
-
-
-  handleflag(PF_Masked,
-    [&]() {
-      this->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
-      this->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
+    else if ((pFlags & PF_Modulated) != 0) {
+      this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
+      this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR);
+    }
+    else if ((pFlags & PF_Highlighted) != 0) {
       this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
-      this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO);
-    },
-    [&]()
-    {
-      this->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+      this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
     }
-  );
+    else if ((pFlags & PF_Unlit) != 0) {
+      this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
+      this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCCOLOR);
+    }
+    else
+    {
+      //Are these defaults sane?
+      this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR /*D3D9 default should be D3DBLEND_ONE*/);
+      this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR /*D3D9 default should be D3DBLEND_ZERO*/);
+    }
+  }
+  else
+  {
+    this->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCCOLOR /*D3D9 default should be D3DBLEND_ONE*/);
+    this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE /*D3D9 default should be D3DBLEND_ZERO*/);
+  }
 
-  handleflag(PF_Invisible,
-    [&]() {
-      this->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED);
-    },
-    [&]()
-    {
-      this->SetRenderState(D3DRS_COLORWRITEENABLE, 0x0000000f);
-    }
-  );
 
-  handleflag(PF_Occlude,
-    [&]() {
-      this->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
-    },
-    [&]()
-    {
-      this->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
-    }
-  );
 
-  handleflag(PF_RenderFog,
-    [&]() {
-      this->SetRenderState(D3DRS_SPECULARENABLE, TRUE);
-    },
-    [&]()
-    {
-      this->SetRenderState(D3DRS_SPECULARENABLE, FALSE);
-    }
-  );
+
+  if ((pFlags & PF_Masked) != 0)
+  {
+    this->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+    this->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
+    this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
+    this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO);
+  }
+  else
+  {
+    this->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+  }
+
+  if ((pFlags & PF_Invisible) != 0)
+  {
+    this->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED);
+  }
+  else
+  {
+    this->SetRenderState(D3DRS_COLORWRITEENABLE, 0x0000000f);
+  }
+
+  if ((pFlags & PF_Occlude) != 0)
+  {
+    this->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
+  }
+  else
+  {
+    this->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+  }
+
+  if ((pFlags & PF_RenderFog) != 0)
+  {
+    this->SetRenderState(D3DRS_SPECULARENABLE, TRUE);
+  }
+  else
+  {
+    this->SetRenderState(D3DRS_SPECULARENABLE, FALSE);
+  }
 
   //This acts as an override to the above
   if (g_options.hasLights)
   {
-    handleflag(PF_Unlit,
-      [&]() {
+    if ((pFlags & PF_Unlit) != 0)
+    {
         this->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
         this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCCOLOR);
         this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
-      },
-      [&]()
-      {
-        //this->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
-      }
-    );
+    }
+  }
+  else
+  {
+    this->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD /*default*/);
   }
 
 
@@ -1067,6 +1059,18 @@ void LowlevelRenderer::ConfigureSamplerState(int pStageID, UnrealPolyFlags pFlag
     this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, D3DTEXF_POINT);
     this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
     this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, 1);
+  }
+}
+
+void LowlevelRenderer::InitializeDeviceState()
+{
+  for (int i = 0; i < State::MAX_RENDERSTATES; i++)
+  {
+    DWORD d=0;
+    if (m_Device->GetRenderState(D3DRENDERSTATETYPE(i), &d) == D3D_OK)
+    {
+      m_CurrentState->m_RenderStates[i] = d;
+    }
   }
 }
 
@@ -1165,6 +1169,23 @@ void LowlevelRenderer::PopDeviceState()
     m_CurrentState--;
   }
 }
+
+DWORD LowlevelRenderer::GetRenderState(D3DRENDERSTATETYPE State)
+{
+  check(State < m_CurrentState->MAX_RENDERSTATES);
+
+  if (m_CurrentState->m_RenderStates[State])
+  {
+    return *m_CurrentState->m_RenderStates[State];
+  }
+  else
+  {
+    DWORD v = 0;
+    m_Device->GetRenderState(State, &v);
+    return v;
+  }
+}
+
 
 HRESULT LowlevelRenderer::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value)
 {

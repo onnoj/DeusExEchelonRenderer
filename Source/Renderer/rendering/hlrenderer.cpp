@@ -836,44 +836,41 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
       return FVector(0, 0, 0);
       };
 
-    for (INT polyIndex = 0; polyIndex < /*Poly->*/numPts; polyIndex++)
+    if (numPts < 3)
     {
-      if (numPts < 3)
+      continue;
+    }
+
+    D3DXVECTOR4 point1;
+    D3DXVECTOR4 point2;
+    D3DXVECTOR4 point3;
+
+    FVector localPts[3] = {};
+    FVector projPts[3] = {};
+    localPts[0] = GVertPoints(GVerts(Node->iVertPool + 0).pVertex);
+    projPts[0] = localPts[0].TransformPointBy(FrameCoords);
+    for (INT i = 2; i < numPts; i++)
+    {
+      localPts[1] = GVertPoints(GVerts(Node->iVertPool + i - 1).pVertex);
+      projPts[1] = localPts[1].TransformPointBy(FrameCoords);
+      localPts[2] = GVertPoints(GVerts(Node->iVertPool + i).pVertex);
+      projPts[2] = localPts[2].TransformPointBy(FrameCoords);
+
+      for (int i = 0; i < 3; i++)
       {
-        continue;
-      }
-
-      D3DXVECTOR4 point1;
-      D3DXVECTOR4 point2;
-      D3DXVECTOR4 point3;
-
-      FVector localPts[3] = {};
-      FVector projPts[3] = {};
-      localPts[0] = GVertPoints(GVerts(Node->iVertPool + 0).pVertex);
-      projPts[0] = localPts[0].TransformPointBy(FrameCoords);
-      for (INT i = 2; i < numPts; i++)
-      {
-        localPts[1] = GVertPoints(GVerts(Node->iVertPool + i - 1).pVertex);
-        projPts[1] = localPts[1].TransformPointBy(FrameCoords);
-        localPts[2] = GVertPoints(GVerts(Node->iVertPool + i).pVertex);
-        projPts[2] = localPts[2].TransformPointBy(FrameCoords);
-
-        for (int i = 0; i < 3; i++)
-        {
-          const auto& uvDiffuse = calculateUV(projPts[i], Surface.Texture, albedoTextureHandle->md);
+        const auto& uvDiffuse = calculateUV(projPts[i], Surface.Texture, albedoTextureHandle->md);
 #if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
-          LowlevelRenderer::VertexPos3Tex0 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y } };
+        LowlevelRenderer::VertexPos3Tex0 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y } };
 #else
-          LowlevelRenderer::VertexPos3Tex0 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y } };
+        LowlevelRenderer::VertexPos3Tex0 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y } };
 #endif
-          D3DXVec3TransformCoord(&vtx.Pos, &vtx.Pos, &sharedMesh->worldMatrixInverse);
+        D3DXVec3TransformCoord(&vtx.Pos, &vtx.Pos, &sharedMesh->worldMatrixInverse);
 
-          //note: mesh hashes in Deus Ex are not stable between frames
-          MurmurHash3_x86_32(&vtx.Pos, sizeof(vtx.Pos), hash, &hash);
-          sharedMesh->buffer->push_back(std::move(vtx));
-        }
-        sharedMesh->primitiveCount++;
+        //note: mesh hashes in Deus Ex are not stable between frames
+        MurmurHash3_x86_32(&vtx.Pos, sizeof(vtx.Pos), hash, &hash);
+        sharedMesh->buffer->push_back(std::move(vtx));
       }
+      sharedMesh->primitiveCount++;
     }
   }
   sharedMesh->hash ^= hash;

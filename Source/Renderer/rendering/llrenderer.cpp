@@ -487,6 +487,10 @@ void LowlevelRenderer::BeginFrame()
 {
   g_SceneManager.Validate();
   g_Stats.Writer().BeginFrame();
+
+  g_ContextManager.PushFrameContext();
+  auto& ctx = *g_ContextManager.GetContext();
+  ctx.frameIsRasterized |= !Misc::IsNvRemixAttached(false);
   //validate if the device is still valid
   //DWORD numPasses = 0;
   //if (m_Device->ValidateDevice(&numPasses) != D3D_OK)
@@ -639,6 +643,7 @@ void LowlevelRenderer::EndFrame()
   check(SUCCEEDED(res));
   m_IsInFrame = false;
   g_Stats.Writer().EndFrame();
+  g_ContextManager.PopFrameContext();
 }
 
 /**

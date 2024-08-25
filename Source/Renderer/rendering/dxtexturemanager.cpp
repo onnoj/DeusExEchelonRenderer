@@ -214,6 +214,7 @@ void TextureManager::ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlag
 
 bool TextureManager::BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHandle& pAlbedoTextureHandle, DeusExD3D9TextureHandle pOptionalLightTexture)
 {
+  auto& ctx = *g_ContextManager.GetContext();
   if (m_llrenderer->SetTextureOnDevice(0, pAlbedoTextureHandle.get()))
   {
     if (!(polygonFlags & (PF_Translucent | PF_Modulated | PF_Highlighted))) {
@@ -236,7 +237,7 @@ bool TextureManager::BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHand
     return false;
   }
 
-  if (pOptionalLightTexture && m_llrenderer->SetTextureOnDevice(1, pOptionalLightTexture.get()))
+  if (ctx.frameIsRasterized && pOptionalLightTexture && m_llrenderer->SetTextureOnDevice(1, pOptionalLightTexture.get()))
   {
     m_llrenderer->ConfigureTextureStageState(1, PF_Memorized);
     m_llrenderer->ConfigureSamplerState(1, polygonFlags);

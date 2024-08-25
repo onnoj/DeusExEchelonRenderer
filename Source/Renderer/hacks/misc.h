@@ -39,6 +39,7 @@ public:
     FSceneNode* frameSceneNode = nullptr;
 
     std::shared_ptr<FSceneNode> skyframeSceneNode;
+    bool frameIsRasterized = false;
     bool frameIsSkybox = false;
 
     struct DrawCall
@@ -81,9 +82,9 @@ private:
   static std::deque<Context> m_stack;
 public:
   Context* GetContext();
-protected:
   void PushFrameContext();
   void PopFrameContext();
+protected:
 } extern g_ContextManager;
 ////////////////////////////////////////////////////////////////////////////////////
 static bool EE_HAS_IMGUI()

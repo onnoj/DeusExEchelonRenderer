@@ -344,6 +344,7 @@ namespace Hacks
       auto skyZone = Frame->Level->GetZoneActor(Frame->ZoneNumber)->SkyZone;
       frameIsSkybox = (skyZone != nullptr) && (skyZone->Region.ZoneNumber == zoneIndex);
       ctx->frameIsSkybox = frameIsSkybox;
+      ctx->frameIsRasterized |= frameIsSkybox;
     }
 
     if (Frame->Parent == nullptr || frameIsSkybox)

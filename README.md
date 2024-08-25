@@ -60,8 +60,6 @@ While taking inspiration from those renderers, this renderer is written from scr
 - Level meshes are stable, but object meshes are not, and cannot be replaced efficiently (yet).
 
 ## TODO
-- **Switch from RH to LH coordinates**: When exporting from the game, the lights have their x coordinates inverted. In-game, this is working correctly. Could be a bug in RTX Remix, so changing coordinate systems might be a fast workaround.
-- **Hack out mesh frame clipping**: Currently the meshes are clipped, so characters for example can get clipped a little bit in cutscenes. Additionally, from the perspective of RTX Remix, the clipped mesh becomes unique (and thus cannot be replaced efficiently by the toolkit).
 - **Light effects**: Currently, only the 'disco' light effect is implemented. The other effects (such as flickering), should be implemented as well.
 - **RTX Hash to Name Mapping**: It could be useful for other tools/scripts to have access to human readable names for textures and what not. Currently I re-calculate the remix texture hash but don't do anything with it.
 

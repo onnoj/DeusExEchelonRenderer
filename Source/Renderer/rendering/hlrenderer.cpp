@@ -338,13 +338,13 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
                 D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
                 D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
                 SetWorldTransformState(wm);
-                m_TextureManager.BindTexture(flags, info.textureHandle);
+                m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle);
                 m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
               
                 D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
                 D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
                 SetWorldTransformState(wm);
-                m_TextureManager.BindTexture(flags, info.textureHandle);
+                m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle);
                 m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
                 continue;
               }
@@ -352,7 +352,7 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
           }
 
           SetWorldTransformState(wm);
-          if (m_TextureManager.BindTexture(flags, info.textureHandle))
+          if (m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle))
           {
             m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
           }
@@ -438,7 +438,7 @@ void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, c
   SetWorldTransformState(wm);
 
   uint32_t vtxCount = 0;
-  StaticMeshesVertexBuffer buffer;
+  DebugMeshesVertexBuffer buffer;
   const auto faces = std::size(indices) / 3;
   for (int i = 0; i < faces; ++i) {
     LowlevelRenderer::VertexPos3Tex0 vertex0 = vertices[indices[(i * 3) + 0]];
@@ -705,11 +705,22 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 
   //2. Build a key that is (textureSetHash + PolyFlags + NodeFlags)
   DeusExD3D9TextureHandle albedoTextureHandle;
+  DeusExD3D9TextureHandle lightmapTextureHandle;
+
   albedoTextureHandle = m_TextureManager.ProcessTexture(Surface.PolyFlags, Surface.Texture);
-  m_TextureManager.BindTexture(Surface.PolyFlags, albedoTextureHandle);
+  if (Surface.LightMap && Surface.LightMap)
+  {
+    lightmapTextureHandle = m_TextureManager.ProcessTexture(Surface.PolyFlags, Surface.LightMap);
+  }
+  m_TextureManager.BindTexture(Surface.PolyFlags, albedoTextureHandle, lightmapTextureHandle);
+
   uint32_t key = 0;
   auto nodeFlags = Node.NodeFlags & ~NF_BoxOccluded & ~NF_PolyOccluded;
   MurmurHash3_x86_32(&albedoTextureHandle->md.cacheID, sizeof(albedoTextureHandle->md.cacheID), key, &key);
+  if (lightmapTextureHandle)
+  {
+    MurmurHash3_x86_32(&lightmapTextureHandle->md.cacheID, sizeof(lightmapTextureHandle->md.cacheID), key, &key);
+  }
   MurmurHash3_x86_32(&Surface.PolyFlags, sizeof(Surface.PolyFlags), key, &key);
   MurmurHash3_x86_32(&nodeFlags, sizeof(nodeFlags), key, &key);
 
@@ -755,8 +766,8 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
       mesh.buffer = std::make_unique<StaticMeshesVertexBuffer>();
       mesh.flags = Surface.PolyFlags;
       mesh.primitiveCount = 0;
-      //mesh.textureSet = textureSet;
-      mesh.textureHandle = albedoTextureHandle;
+      mesh.albedoTextureHandle = albedoTextureHandle;
+      mesh.lightmapTextureHandle = lightmapTextureHandle;
       FVector localOrigin = GVertPoints(GVerts(Node.iVertPool + 0).pVertex);
       D3DXMatrixTranslation(&mesh.worldMatrix, localOrigin.X, localOrigin.Y, localOrigin.Z);
       D3DXMatrixInverse(&mesh.worldMatrixInverse, nullptr, &mesh.worldMatrix);
@@ -772,7 +783,8 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
     fakemesh.flags = Surface.PolyFlags;
     fakemesh.primitiveCount = 0;
     //fakemesh.textureSet = textureSet;
-    fakemesh.textureHandle = albedoTextureHandle;
+    fakemesh.albedoTextureHandle = albedoTextureHandle;
+    fakemesh.lightmapTextureHandle = lightmapTextureHandle;
     fakemesh.hash = 0;
     FVector localOrigin = GVertPoints(GVerts(Node.iVertPool + 0).pVertex);
     D3DXMatrixTranslation(&fakemesh.worldMatrix, localOrigin.X, localOrigin.Y, localOrigin.Z);
@@ -833,12 +845,15 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 
       for (int i = 0; i < 3; i++)
       {
-        const auto& uvDiffuse = calculateUV(projPts[i], Surface.Texture, albedoTextureHandle->md);
+        const auto uvDiffuse = calculateUV(projPts[i], Surface.Texture, albedoTextureHandle->md);
+        const auto uvLightmap = calculateUV(projPts[i], Surface.LightMap, lightmapTextureHandle->md);
+
 #if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
-        LowlevelRenderer::VertexPos3Tex0 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y } };
+        LowlevelRenderer::VertexPos3Tex0Tex1 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
 #else
-        LowlevelRenderer::VertexPos3Tex0 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y } };
+        LowlevelRenderer::VertexPos3Tex0Tex1 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
 #endif
+
         D3DXVec3TransformCoord(&vtx.Pos, &vtx.Pos, &sharedMesh->worldMatrixInverse);
 
         //note: mesh hashes in Deus Ex are not stable between frames
@@ -857,11 +872,11 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
     auto flags = sharedMesh->flags;
     if ((flags & PF_Unlit) != 0)
     {
-      m_TextureManager.BindTexture(flags, sharedMesh->textureHandle);
+      m_TextureManager.BindTexture(flags, sharedMesh->albedoTextureHandle, sharedMesh->lightmapTextureHandle);
       m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), sharedMesh->hash, 0);
       flags &= ~PF_Unlit;
     }
-    m_TextureManager.BindTexture(flags, sharedMesh->textureHandle);
+    m_TextureManager.BindTexture(flags, sharedMesh->albedoTextureHandle, sharedMesh->lightmapTextureHandle);
     m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), sharedMesh->hash, 0);
   }
 }

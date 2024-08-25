@@ -75,11 +75,18 @@ DeusExD3D9TextureHandle TextureManager::ProcessTexture(UnrealPolyFlags pFlags, F
   DeusExD3D9TextureHandle& handle = m_InstanceCache.emplace(std::make_pair(key, std::make_unique<DeusExD3D9Texture>())).first->second;
   handle->valid = false;
 
-  std::wstring textureName = pUETextureInfo->Texture->GetPathName();
-  const bool isHijacked = (m_HijackableTextures.find(textureName) != m_HijackableTextures.end());
-  if (isHijacked)
+  if (pUETextureInfo->Texture != nullptr)
   {
-    ProcessHijackedTexture(key, pFlags, pUETextureInfo, handle);
+    std::wstring textureName = pUETextureInfo->Texture->GetPathName();
+    const bool isHijacked = (m_HijackableTextures.find(textureName) != m_HijackableTextures.end());
+    if (isHijacked)
+    {
+      ProcessHijackedTexture(key, pFlags, pUETextureInfo, handle);
+    }
+    else
+    {
+      ProcessUETexture(key, pFlags, pUETextureInfo, handle);
+    }
   }
   else
   {
@@ -126,6 +133,9 @@ void TextureManager::ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlag
   handle->md.multU = 1.0 / (pUETextureInfo->UScale * pUETextureInfo->UClamp);
   handle->md.multV = 1.0 / (pUETextureInfo->VScale * pUETextureInfo->VClamp);
   handle->md.cacheID = pKey;
+  assert(handle->md.width <= pUETextureInfo->USize);
+  assert(handle->md.height <= pUETextureInfo->VSize);
+  assert(handle->md.height != 0);
 
   switch (pUETextureInfo->Format)
   {
@@ -138,9 +148,10 @@ void TextureManager::ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlag
   }; break;
   case TEXF_RGBA7:
   {
-    handle->format = D3DFMT_A8R8G8B8; //Can I assign rgba7 to rgba8?
-    handle->textureDataPtr = textureMip0->DataPtr;
-    handle->textureDataPitch = textureMip0->USize * sizeof(uint8_t) * 4;
+    handle->format = D3DFMT_A8R8G8B8;
+    handle->textureDataPtr = nullptr;
+    handle->textureDataPitch = 0;
+    handle->ConvertFromRGBA7(pUETextureInfo, pFlags);
   }; break;
   case TEXF_DXT1:
   {
@@ -170,6 +181,7 @@ void TextureManager::ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlag
 void TextureManager::ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle)
 {
   ProcessUETexture(pKey, pFlags, pUETextureInfo, handle);
+  assert(pUETextureInfo->Texture != nullptr);
 
 #if 0
   auto textureMip0 = pUETextureInfo->Mips[0];
@@ -188,7 +200,6 @@ void TextureManager::ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlag
   handle->textureDataPtr = handle->buffer->data();
   handle->textureDataPitch = handle->md.width * 4/*D3DFMT_A8R8G8B8 format*/;
 #endif
-
   uint32_t key = 0;
   std::wstring textureName = pUETextureInfo->Texture->GetPathName();
   MurmurHash3_x86_32(textureName.c_str(), textureName.size() * sizeof(wchar_t), key, &key);
@@ -201,9 +212,9 @@ void TextureManager::ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlag
   *reinterpret_cast<uint32_t*>(lastFourBytes) = key;
 }
 
-bool TextureManager::BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHandle& pTextureHandle)
+bool TextureManager::BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHandle& pAlbedoTextureHandle, DeusExD3D9TextureHandle pOptionalLightTexture)
 {
-  if (m_llrenderer->SetTextureOnDevice(pTextureHandle.get()))
+  if (m_llrenderer->SetTextureOnDevice(0, pAlbedoTextureHandle.get()))
   {
     if (!(polygonFlags & (PF_Translucent | PF_Modulated | PF_Highlighted))) {
       polygonFlags |= PF_Occlude;
@@ -217,12 +228,29 @@ bool TextureManager::BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHand
       polygonFlags &= ~PF_Invisible;
     }
 
-    m_llrenderer->ConfigureBlendState(polygonFlags);
     m_llrenderer->ConfigureTextureStageState(0, polygonFlags);
     m_llrenderer->ConfigureSamplerState(0, polygonFlags);
-    return true;
   }
-  return false;
+  else
+  {
+    return false;
+  }
+
+  if (pOptionalLightTexture && m_llrenderer->SetTextureOnDevice(1, pOptionalLightTexture.get()))
+  {
+    m_llrenderer->ConfigureTextureStageState(1, PF_Memorized);
+    m_llrenderer->ConfigureSamplerState(1, polygonFlags);
+
+    //TODO, modify me:
+    m_llrenderer->ConfigureBlendState(polygonFlags);
+  }
+  else
+  {
+    m_llrenderer->ConfigureTextureStageState(1, 0);
+    m_llrenderer->ConfigureBlendState(polygonFlags);
+  }
+
+  return true;
 }
 
 std::vector<DeusExD3D9TextureHandle> TextureManager::FindTextures(uint32_t pUETextureCacheID)
@@ -242,7 +270,7 @@ std::vector<DeusExD3D9TextureHandle> TextureManager::FindTextures(uint32_t pUETe
 
 TextureHash TextureHash::FromTextureInfo(FTextureInfo* pTextureInfo, UnrealPolyFlags pFlags)
 {
-  pFlags |= pTextureInfo->Texture->PolyFlags;
+  pFlags |= (pTextureInfo->Texture != nullptr) ? pTextureInfo->Texture->PolyFlags : 0;
 
   TextureHash hash{};
   MurmurHash3_x86_32(&pTextureInfo->CacheID, sizeof(pTextureInfo->CacheID), hash.m_Hash, &hash.m_Hash);

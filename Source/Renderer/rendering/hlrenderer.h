@@ -51,11 +51,13 @@ private:
 	using StaticMeshesKey = uint32_t;
 	using UIMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos4Color0Tex0>;
 	using DynamicMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Norm3Tex0>;
-	using StaticMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Tex0>;
+	using DebugMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Tex0>;
+	using StaticMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Tex0Tex1>;
 
 	struct StaticMeshesValue {
 		TextureSet textureSet{};
-		DeusExD3D9TextureHandle textureHandle;
+		DeusExD3D9TextureHandle albedoTextureHandle;
+		DeusExD3D9TextureHandle lightmapTextureHandle;
 		UnrealPolyFlags flags = 0;
 		std::unique_ptr<StaticMeshesVertexBuffer> buffer;
 		uint32_t hash = 0;

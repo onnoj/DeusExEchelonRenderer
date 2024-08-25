@@ -45,7 +45,7 @@ public:
   DeusExD3D9TextureHandle ProcessTexture(UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo);
   void ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);
   void ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);
-  bool BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHandle& pTextureHandle);
+  bool BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHandle& pTextureHandle, DeusExD3D9TextureHandle pOptionalLightTexture = {});
   std::vector<DeusExD3D9TextureHandle> FindTextures(uint32_t pUETextureCacheID);
 
   DeusExD3D9TextureHandle GetFakeTexture() { return m_FakeTexture; };

@@ -21,5 +21,6 @@ struct DeusExD3D9Texture
   bool valid = false;
 
   void ConvertFrom8bpp(FTextureInfo* pUETextureInfo, UnrealPolyFlags pFlags);
+  void ConvertFromRGBA7(FTextureInfo* pUETextureInfo, UnrealPolyFlags pFlags);
 };
 using DeusExD3D9TextureHandle = std::shared_ptr<DeusExD3D9Texture>;

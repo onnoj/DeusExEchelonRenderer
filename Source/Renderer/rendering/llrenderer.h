@@ -33,6 +33,7 @@ class LowlevelRenderer
 	friend class MaterialDebugger;
 public:
 	struct VertexPos3Tex0;
+	struct VertexPos3Tex0Tex1;
 	struct VertexPos3Norm3Tex0;
 	struct VertexPos3Tex0to4;
 	struct VertexPos4Color0Tex0;
@@ -84,6 +85,7 @@ public:
 	void RenderTriangleList(const VertexPos3Tex0to4* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Norm3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void RenderTriangleList(const VertexPos3Tex0Tex1* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Color0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void DisableLight(int32_t index);
@@ -91,7 +93,7 @@ public:
 	void FlushLights();
 
 	bool AllocateTexture(DeusExD3D9TextureHandle& pmTexture);
-	bool SetTextureOnDevice(const DeusExD3D9Texture* pTexture);
+	bool SetTextureOnDevice(const uint32_t pSlot, const DeusExD3D9Texture* pTexture);
 
 protected:
 
@@ -139,6 +141,13 @@ private:
 	{
 		D3DXVECTOR3 Pos;
 		D3DXVECTOR2 Tex0;
+	};
+
+	struct VertexPos3Tex0Tex1
+	{
+		D3DXVECTOR3 Pos;
+		D3DXVECTOR2 Tex0;
+		D3DXVECTOR2 Tex1;
 	};
 
 	struct VertexPos3Norm3Tex0

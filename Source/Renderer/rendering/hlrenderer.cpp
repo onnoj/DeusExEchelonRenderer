@@ -48,6 +48,7 @@ void HighlevelRenderer::Shutdown()
 //OnRenderingBegin is called before Deus Ex starts rendering the scene graph.
 void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
 {
+  m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnRenderingBegin");
   m_renderingScope = std::make_unique<FrameContextManager::ScopedContext>();
 
   auto& ctx = *g_ContextManager.GetContext();
@@ -131,40 +132,6 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
   };
 
 
-  //Draw player body.
-  auto player = Frame->Viewport->Actor;
-  if (g_ConfigManager.GetRenderPlayerBody() && !player->bBehindView)
-  {
-    static UBOOL& HasSpecialCoords = []() -> UBOOL& {
-      uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
-      return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
-      }();
-    static FCoords& SpecialCoords = []() -> FCoords& {
-      uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
-      return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
-      }();
-
-
-    BOOL originalHasSpecialCoords = HasSpecialCoords;
-    BITFIELD originalBehindView = player->bBehindView;
-    {
-      HasSpecialCoords = 0;
-      player->bBehindView = 1;
-      GRender->DrawMesh(
-        Frame,
-        player,
-        player,
-        nullptr,
-        nullptr,
-        Frame->Coords,
-        nullptr,
-        nullptr,
-        PF_TwoSided|PF_NoMerge
-      );
-    }
-    player->bBehindView = originalBehindView;
-    HasSpecialCoords = originalHasSpecialCoords;
-  }
 
   //Render Remix warning screen
   if (!IsDebuggerPresent())
@@ -172,49 +139,7 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
     //DrawFullscreenQuad(Frame, m_TextureManager.GetFakeTexture());
   }
 
-  //Finally; render the UI:
-  check(Frame->Parent == nullptr);
-
-  //Render UI meshes
-#if 1
-  m_LLRenderer->PushDeviceState();
-  {
-    m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-    m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
-    m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-    m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
-    m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
-    SetViewState(Frame, ViewType::identity);
-    SetProjectionState(Frame, ProjectionType::uiorthogonal);
-
-    //Render any frame clipping (since it seems rtxremix doesn't do that for us).
-    if (true)
-    {
-      UIntRect clipLeft, clipTop, clipRight, clipBottom;
-      m_LLRenderer->GetClipRects(clipLeft, clipTop, clipRight, clipBottom);
-
-      Draw2DScreenQuad(Frame, clipLeft.Left, clipLeft.Top, clipLeft.Width, clipLeft.Height, 0xFF000000ul);
-      Draw2DScreenQuad(Frame, clipTop.Left, clipTop.Top, clipTop.Width, clipTop.Height, 0xFF000000ul);
-      Draw2DScreenQuad(Frame, clipRight.Left, clipRight.Top, clipRight.Width, clipRight.Height, 0xFF000000ul);
-      Draw2DScreenQuad(Frame, clipBottom.Left, clipBottom.Top, clipBottom.Width, clipBottom.Height, 0xFF000000ul);
-    }
-
-    //Render the UI meshes
-    SetWorldTransformStateToIdentity();
-    for (auto& rc : m_UIMeshes)
-    {
-      auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
-      m_TextureManager.BindTexture(rc.flags, textureHandle);
-      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-      m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
-    }
-    m_LLRenderer->PopDeviceState();
-  }
-  m_UIMeshes.clear();
-#endif
-
+  m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnRenderingEnd");
   m_renderingScope.reset();
 }
 
@@ -227,7 +152,7 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
 {
   auto& ctx = *g_ContextManager.GetContext();
-  
+  m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnSceneBegin");
 
   if (Frame->Parent == nullptr)
   {
@@ -252,8 +177,7 @@ void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
     Frame->Coords = SkyCoords;
     g_Stats.Writer().DrawSkyBox();
   }
-  
-
+  //  
   m_LLRenderer->PushDeviceState();
   m_LLRenderer->BeginScene();
   SetViewState(Frame, ViewType::game);
@@ -361,8 +285,47 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
     }
   }
   //
+  if (!ctx.frameIsSkybox && !ctx.renderingUI && Frame->Parent == nullptr)
+  {
+    //Draw player body.
+    auto player = Frame->Viewport->Actor;
+    if (g_ConfigManager.GetRenderPlayerBody() && !player->bBehindView)
+    {
+      static UBOOL& HasSpecialCoords = []() -> UBOOL& {
+        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+        return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
+        }();
+      static FCoords& SpecialCoords = []() -> FCoords& {
+        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+        return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
+        }();
+
+
+      BOOL originalHasSpecialCoords = HasSpecialCoords;
+      BITFIELD originalBehindView = player->bBehindView;
+      {
+        HasSpecialCoords = 0;
+        player->bBehindView = 1;
+        GRender->DrawMesh(
+          Frame,
+          player,
+          player,
+          nullptr,
+          nullptr,
+          Frame->Coords,
+          nullptr,
+          nullptr,
+          PF_TwoSided|PF_NoMerge
+        );
+      }
+      player->bBehindView = originalBehindView;
+      HasSpecialCoords = originalHasSpecialCoords;
+    }
+  }
+  //
   m_LLRenderer->EndScene();
   m_LLRenderer->PopDeviceState();
+  m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnSceneEnd");
 }
 
 void HighlevelRenderer::Draw2DScreenQuad(FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB/* = 0xFF000000ul*/)
@@ -687,6 +650,12 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
   const auto& Node = GNodes(iNode);
 
   bool surfaceIsDynamic = false;
+
+  //if (ctx.renderingUI)
+  //{
+  //  surfaceIsDynamic = true;
+  //}
+
   if (Frame->Level->BrushTracker != nullptr)
   {
     if (Frame->Level->BrushTracker->SurfIsDynamic(Node.iSurf))
@@ -1095,8 +1064,72 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Actor)
 
 void HighlevelRenderer::OnDrawUIBegin(FSceneNode* Frame)
 {
-  assert(g_ContextManager.GetContext()->frameSceneNode == Frame);
+  m_LLRenderer->ClearDepth();
+  g_ContextManager.PushFrameContext();
+  auto ctx = g_ContextManager.GetContext();
+  ctx->renderingUI = true;
+  ctx->frameIsRasterized = true;
+  m_LLRenderer->EmitDebugText(L"[EchelonRenderer] BeginUI");
+
+#if 1
+  m_LLRenderer->PushDeviceState();
+  {
+    m_LLRenderer->EmitDebugText(L"[EchelonRenderer] Begin 2D UI");
+    m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+    m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
+    m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+    m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+    m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
+    SetViewState(Frame, ViewType::identity);
+    SetProjectionState(Frame, ProjectionType::uiorthogonal);
+
+    //Render any frame clipping (since it seems rtxremix doesn't do that for us).
+    if (true)
+    {
+      UIntRect clipLeft, clipTop, clipRight, clipBottom;
+      m_LLRenderer->GetClipRects(clipLeft, clipTop, clipRight, clipBottom);
+
+      Draw2DScreenQuad(Frame, clipLeft.Left, clipLeft.Top, clipLeft.Width, clipLeft.Height, 0xFF000000ul);
+      Draw2DScreenQuad(Frame, clipTop.Left, clipTop.Top, clipTop.Width, clipTop.Height, 0xFF000000ul);
+      Draw2DScreenQuad(Frame, clipRight.Left, clipRight.Top, clipRight.Width, clipRight.Height, 0xFF000000ul);
+      Draw2DScreenQuad(Frame, clipBottom.Left, clipBottom.Top, clipBottom.Width, clipBottom.Height, 0xFF000000ul);
+    }
+
+    //Render the UI meshes
+    SetWorldTransformStateToIdentity();
+    for (auto& rc : m_UIMeshes)
+    {
+      auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
+      m_TextureManager.BindTexture(rc.flags, textureHandle);
+      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+      m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
+    }
+    m_LLRenderer->PopDeviceState();
+  }
+  m_UIMeshes.clear();
+#endif
+  m_LLRenderer->ClearDepth();
 }
+
+void HighlevelRenderer::OnDrawUIEnd(FSceneNode* Frame)
+{
+
+  auto ctx = g_ContextManager.GetContext();
+  {
+    //Finally; render the UI:
+    check(Frame->Parent == nullptr);
+
+    //Render UI meshes
+
+  }
+  ctx->renderingUI = false;
+  g_ContextManager.PopFrameContext();
+
+  m_LLRenderer->EmitDebugText(L"[EchelonRenderer] EndUI");
+}
+
 
 void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZDepth, FPlane pColor, FPlane pFog, DWORD pPolyFlags)
 {
@@ -1179,9 +1212,6 @@ void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, f
   latestUIMesh->primitiveCount++;
 }
 
-void HighlevelRenderer::OnDrawUIEnd(FSceneNode* Frame)
-{
-}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1226,7 +1256,16 @@ void HighlevelRenderer::SetViewState(FSceneNode* Frame, ViewType viewType)
     D3DXMatrixIdentity(&vm);
   }
   m_LLRenderer->SetViewMatrix(vm);
-  m_LLRenderer->SetViewport(Frame->XB, Frame->YB, Frame->X, Frame->Y);
+
+  if (g_options.enableViewportXYOffsetWorkaround && !ctx.frameIsRasterized)
+  {
+    auto sz = m_LLRenderer->GetDisplaySurfaceSize();
+    m_LLRenderer->SetViewport(0, 0, sz.first, sz.second);
+  }
+  else
+  {
+    m_LLRenderer->SetViewport(Frame->XB, Frame->YB, Frame->X, Frame->Y);
+  }
 }
 
 void HighlevelRenderer::SetProjectionState(FSceneNode* Frame, ProjectionType projection) {

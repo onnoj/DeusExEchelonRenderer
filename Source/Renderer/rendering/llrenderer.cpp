@@ -430,6 +430,13 @@ void LowlevelRenderer::DisableLight(int32_t index)
   m_Device->LightEnable(index, FALSE);
 }
 
+void LowlevelRenderer::EmitDebugText(const wchar_t* pTxt)
+{
+#if EE_DEBUG
+  D3DPERF_SetMarker(0x00, pTxt);
+#endif
+}
+
 void LowlevelRenderer::RenderLight(int32_t index, const D3DLIGHT9& pLight)
 {
   if (!g_options.hasLights)
@@ -543,7 +550,7 @@ void LowlevelRenderer::BeginFrame()
     res = this->SetRenderState(D3DRS_ALPHAREF, 127);
     res = this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
     res = this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO);
-    res = this->SetRenderState(D3DRS_LIGHTING, g_options.hasLights ? TRUE : FALSE); check(SUCCEEDED(res));
+    res = this->SetRenderState(D3DRS_LIGHTING, FALSE); check(SUCCEEDED(res));
     res = this->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE); check(SUCCEEDED(res));
     res = this->SetRenderState(D3DRS_DITHERENABLE, TRUE);
     res = this->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD);
@@ -588,11 +595,12 @@ void LowlevelRenderer::EndFrame()
   lastTime = now;
   if (m_Device == nullptr) return;
   //auto res = m_Device->EndScene(); check(SUCCEEDED(res));
+  CheckDirtyMatrices();
 
 #if 1
-  CheckDirtyMatrices();
   auto res = m_Device->Present(NULL, NULL, NULL, NULL);
 #else
+  HRESULT res = D3D_OK;
   static std::mutex presentMutex;
   static std::condition_variable canPresentCV;
   static bool canPresent = false;
@@ -601,7 +609,10 @@ void LowlevelRenderer::EndFrame()
     while (true)
     {
       std::unique_lock lk(presentMutex);
-      canPresentCV.wait(lk, [] { return canPresent; });
+      canPresentCV.wait(lk, [] 
+        { 
+          return canPresent; 
+        });
 
       while (m_Device->Present(NULL, NULL, NULL, NULL) == D3DERR_WASSTILLDRAWING)
       {
@@ -617,7 +628,10 @@ void LowlevelRenderer::EndFrame()
   //Wait for the present thread to be done if it was still running
   {
     std::unique_lock lk(presentMutex);
-    canPresentCV.wait(lk, [] { return hasPresented; });
+    canPresentCV.wait(lk, [] 
+      { 
+        return hasPresented; 
+      });
   }
 
   //Trigger a present
@@ -755,20 +769,10 @@ void LowlevelRenderer::SetProjectionMatrix(const D3DMATRIX& pMatrix)
 
 bool LowlevelRenderer::SetViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight)
 {
-  if (g_options.enableViewportXYOffsetWorkaround)
-  {
-    m_DesiredViewportLeft = 0;
-    m_DesiredViewportTop = 0;
-    m_DesiredViewportWidth = m_outputSurface.width;
-    m_DesiredViewportHeight = m_outputSurface.height;
-  }
-  else
-  {
-    m_DesiredViewportLeft = pLeft;
-    m_DesiredViewportTop = pTop;
-    m_DesiredViewportWidth = pWidth;
-    m_DesiredViewportHeight = pHeight;
-  }
+  m_DesiredViewportLeft = pLeft;
+  m_DesiredViewportTop = pTop;
+  m_DesiredViewportWidth = pWidth;
+  m_DesiredViewportHeight = pHeight;
 
   if (!m_DesiredViewportMinZ)
   {
@@ -862,6 +866,20 @@ bool LowlevelRenderer::ValidateViewport()
     m_Device->SetScissorRect(&r);
   }
   return true;
+}
+
+void LowlevelRenderer::ClearDepth()
+{
+  if (m_Device == nullptr) return;
+
+  auto hr = m_Device->Clear(
+    0,
+    NULL,
+    D3DCLEAR_ZBUFFER,
+    0,
+    1.0f,
+    0);
+  check(SUCCEEDED(hr));
 }
 
 void LowlevelRenderer::ClearDisplaySurface(const Vec4& clearColor)

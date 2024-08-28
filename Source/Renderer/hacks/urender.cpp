@@ -61,6 +61,18 @@ namespace Hacks
     };
     /*virtual*/ void DrawWorld(FSceneNode* Frame)
     {
+      static UObject* uo = nullptr;
+      if (uo != nullptr)
+      {
+        GLog->Log(uo->GetFullName());
+        if (uo->GetClass())
+        {
+          GLog->Log(uo->GetClass()->GetFullName());
+          GLog->Log(uo->GetClass()->GetNameCPP());
+        }
+        uo = nullptr;
+      }
+
       for (auto iActor = 0; iActor < Frame->Level->Actors.Num(); iActor++)
       {
         auto actor = Frame->Level->Actors(iActor);
@@ -182,7 +194,7 @@ namespace Hacks
     const bool isInCutscene = (player->ConPlay != nullptr && player->bBehindView == 1);
 
     g_DebugMenu.DebugVar("Culling", "Backwards Occlusion Enabled", DebugMenuUniqueID(), g_options.backwardsOcclusionPass);
-    if (g_options.backwardsOcclusionPass && /*Frame->Parent == nullptr &&*/ !isInCutscene)
+    if (g_options.backwardsOcclusionPass && /*Frame->Parent == nullptr &&*/ !isInCutscene  && !ctx->frameIsRasterized)
     {
       const FColor angleColors[] = { FColor(255,0,0), FColor(0,255,0), FColor(0,0,255) };
       //constexpr float angles[] = {0.66f, 0.33f, 0.0f};
@@ -381,7 +393,7 @@ namespace Hacks
 
     bool overrideClipBsp = false;
     g_DebugMenu.DebugVar("Culling", "Override ClipBSP", DebugMenuUniqueID(), overrideClipBsp, {});
-    if (!overrideClipBsp)
+    if (!overrideClipBsp || ctx->frameIsRasterized)
     {
       return (GRender->*URenderFuncs::ClipBspSurf)(iNode, Result);
     }
@@ -564,7 +576,7 @@ namespace Hacks
     bool hasMaxDistance = true;
     g_DebugMenu.DebugVar("Culling", "SetupRaster Use Max Distance", DebugMenuUniqueID(), hasMaxDistance);
     auto ctx = g_ContextManager.GetContext();
-    if (ctx->overrides.maxOccludeBspDistance)
+    if (ctx->overrides.maxOccludeBspDistance && !ctx->frameIsRasterized)
     {
       FVector center = FVector(0.0f, 0.0f, 0.0f);
       for (int i = 0; i < NumPts; i++)

@@ -57,6 +57,7 @@ public:
 	void SetViewMatrix(const D3DMATRIX& pMatrix);
 	void SetProjectionMatrix(const D3DMATRIX& pMatrix);
 
+	std::pair<uint32_t,uint32_t> GetDisplaySurfaceSize() const { return {m_outputSurface.width, m_outputSurface.height}; }
 	bool ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight, bool pFullscreen);
 	bool SetViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight);
 	void GetViewport(uint32_t& pmLeft, uint32_t& pmTop, uint32_t& pmWidth, uint32_t& pmHeight);
@@ -79,7 +80,7 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	std::vector<D3DDISPLAYMODE> GetDisplayModes() const;
   std::optional<D3DDISPLAYMODE> FindClosestResolution(uint32_t pWidth, uint32_t pHeight) const;
-	void ClearDepth() {/*TODO?*/ };
+	void ClearDepth();
 	void ClearDisplaySurface(const Vec4& clearColor);
 	void RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Tex0to4* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
@@ -88,6 +89,7 @@ public:
 	void RenderTriangleList(const VertexPos3Tex0Tex1* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Color0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void EmitDebugText(const wchar_t* pTxt);
 	void DisableLight(int32_t index);
 	void RenderLight(int32_t index, const D3DLIGHT9& pLight);
 	void FlushLights();

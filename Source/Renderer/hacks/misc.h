@@ -22,7 +22,7 @@ struct GlobalRenderOptions
   bool cameraTest = false;
   bool fixThreadAffinity = true;
   bool galaxyMallocFix = true;
-  bool hasDebugMenu = true;
+  bool hasDebugMenu = false;
   bool clusterNodes = true;
   bool clusterNodesWithSameParent = true;
   bool hasDebugDraw = true;
@@ -41,6 +41,7 @@ public:
     std::shared_ptr<FSceneNode> skyframeSceneNode;
     bool frameIsRasterized = false;
     bool frameIsSkybox = false;
+    bool renderingUI = false;
 
     struct DrawCall
     {

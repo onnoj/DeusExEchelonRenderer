@@ -45,7 +45,7 @@ namespace Hacks
   INT FSpanBufferOverride::CopyFromRaster(FSpanBuffer& Screen, INT RasterStartY, INT RasterEndY, FRasterSpan* Raster)
   {
     auto ctx = g_ContextManager.GetContext();
-    if (ctx->overrides.bypassSpanBufferRasterization)
+    if (ctx->overrides.bypassSpanBufferRasterization && !ctx->frameIsRasterized)
     {
       auto pThis = reinterpret_cast<FSpanBuffer*>(this);
       if (pThis->ValidLines == 0)
@@ -114,7 +114,7 @@ namespace Hacks
 #if 1
     auto ctx = g_ContextManager.GetContext();
 
-    if (ctx->overrides.bypassSpanBufferRasterization)
+    if (ctx->overrides.bypassSpanBufferRasterization && !ctx->frameIsRasterized)
     {
       auto pThis = reinterpret_cast<FSpanBuffer*>(this);
 
@@ -264,7 +264,7 @@ namespace Hacks
   INT FSpanBufferOverride::BoxIsVisible(INT X1, INT Y1, INT X2, INT Y2)
   {
     auto ctx = g_ContextManager.GetContext();
-    if (ctx->overrides.bypassSpanBufferRasterization)
+    if (ctx->overrides.bypassSpanBufferRasterization && !ctx->frameIsRasterized)
     {
       return 1;
     }

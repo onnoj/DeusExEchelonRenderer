@@ -120,6 +120,8 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   InstallFDynamicItemFilterHacks();
   InstallULightManagerHacks();
   InstallUConsoleHacks();
+  InstallXViewportWindowHacks();
+  InstallAPlayerPawnHacks();
 
   Hooks::UGameEngineCallbacks::OnTick.insert({this, [&](FLOAT deltaTime){ Tick(deltaTime);}});
   Hooks::UGameEngineCallbacks::OnNotifyLevelChange.insert({this, [&](){ OnLevelChange();}});
@@ -225,6 +227,8 @@ void UD3D9FPRenderDevice::Exit()
   UninstallUGameEngineHooks();
   UninstallBytePatches();
   UninstallUConsoleHacks();
+  UninstallXViewportWindowHacks();
+  UninstallAPlayerPawnHacks();
 
   ShutdownEchelonCore();
 }

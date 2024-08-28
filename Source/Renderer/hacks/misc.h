@@ -22,7 +22,7 @@ struct GlobalRenderOptions
   bool cameraTest = false;
   bool fixThreadAffinity = true;
   bool galaxyMallocFix = true;
-  bool hasDebugMenu = false;
+  bool hasDebugMenu = true;
   bool clusterNodes = true;
   bool clusterNodesWithSameParent = true;
   bool hasDebugDraw = true;

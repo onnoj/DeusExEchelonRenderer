@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <optional>
 #include <bitset>
+#include "utils/utils.h"
 #include "hacks/misc.h"
 
 #include "rendering/dxtexturemanager.h"
@@ -27,6 +28,47 @@ using FloatRect = Rect<float>;
 using IntRect = Rect<int32_t>;
 using UIntRect = Rect<uint32_t>;
 
+struct RangeDefinition
+{
+	float NearRange;
+	float FarRange;
+	float DepthMin;
+	float DepthMax;
+};
+
+namespace RenderRanges
+{
+	static const RangeDefinition Engine{
+		/*NearRange = */0.0f,
+		/*FarRange =  */32768.0f,
+		/*DepthMin =  */0.001f,
+		/*DepthMax =  */1.0f,
+	};
+
+	static const RangeDefinition Game{
+		/*NearRange = */0.500f,
+		/*FarRange =  */Engine.FarRange - 100.0f,
+		/*DepthMin =  */0.05f,
+		/*DepthMax =  */Engine.DepthMax - 0.01f,
+	};
+
+	static const RangeDefinition UI{
+		/*NearRange = */0.0f,
+		/*FarRange =  */0.500f,
+		/*DepthMin =  */Engine.DepthMin,
+		/*DepthMax =  */Game.DepthMin,
+	};
+
+	static const RangeDefinition Skybox{
+		/*NearRange = */Game.FarRange,
+		/*FarRange =  */Engine.FarRange,
+		/*DepthMin =  */Game.DepthMax,
+		/*DepthMax =  */Engine.DepthMax,
+	};
+
+	extern const RangeDefinition& FromContext(FrameContextManager::Context* pCtx);
+}
+
 class LowlevelRenderer
 {
 	friend class HighlevelRenderer;
@@ -38,8 +80,6 @@ public:
 	struct VertexPos3Tex0to4;
 	struct VertexPos4Color0Tex0;
 	struct VertexPos3Color0;
-	static constexpr float NearRange = 0.501f;
-	static constexpr float FarRange = 32768.0f;
 public:
 	bool Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen);
 	void Shutdown();
@@ -63,6 +103,7 @@ public:
 	void GetViewport(uint32_t& pmLeft, uint32_t& pmTop, uint32_t& pmWidth, uint32_t& pmHeight);
 	void GetClipRects(UIntRect& pmLeft, UIntRect& pmTop, UIntRect& pmRight, UIntRect& pmBottom);
 
+	void SetViewportDepth(const RangeDefinition& pType);
 	void SetViewportDepth(float pMinZ, float pMaxZ);
 	void ResetViewportDepth();
 	bool ValidateViewport();

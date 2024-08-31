@@ -65,11 +65,44 @@ void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
 
   ctx.overrides.bypassSpanBufferRasterization = levelChanged;
   ctx.overrides.levelChanged = levelChanged;
+  ctx.overrides.enableViewportXYOffsetWorkaround = g_options.enableViewportXYOffsetWorkaround;
   g_DebugMenu.DebugVar("Rendering", "Bypass SpanBuffer Rasterization", DebugMenuUniqueID(), ctx.overrides.bypassSpanBufferRasterization);
 
   //m_LLRenderer->beginScene();
   SetViewState(Frame, ViewType::game);
   SetProjectionState(Frame, ProjectionType::perspective);
+
+  //HACK, render fake UI to force early RTX injection:
+  if (false)
+  {
+    m_LLRenderer->BeginScene();
+    m_LLRenderer->PushDeviceState();
+    {
+      m_LLRenderer->EmitDebugText(L"[EchelonRenderer] Begin 2D UI");
+      m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+      m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
+      m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+      m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+      m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
+      SetViewState(Frame, ViewType::identity);
+      SetProjectionState(Frame, ProjectionType::uiorthogonal);
+
+      //Render any frame clipping (since it seems rtxremix doesn't do that for us).
+      if (true)
+      {
+        UIntRect clipLeft, clipTop, clipRight, clipBottom;
+        m_LLRenderer->GetClipRects(clipLeft, clipTop, clipRight, clipBottom);
+
+        Draw2DScreenQuad(Frame, clipLeft.Left, clipLeft.Top, clipLeft.Width, clipLeft.Height, 0xFF000000ul);
+        Draw2DScreenQuad(Frame, clipTop.Left, clipTop.Top, clipTop.Width, clipTop.Height, 0xFF000000ul);
+        Draw2DScreenQuad(Frame, clipRight.Left, clipRight.Top, clipRight.Width, clipRight.Height, 0xFF000000ul);
+        Draw2DScreenQuad(Frame, clipBottom.Left, clipBottom.Top, clipBottom.Width, clipBottom.Height, 0xFF000000ul);
+      }
+      m_LLRenderer->PopDeviceState();
+      m_LLRenderer->EndScene();
+    }
+    m_UIMeshes.clear();
+  }
 }
 
 void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
@@ -159,8 +192,15 @@ void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
     g_Stats.Writer().DrawMainFrame();
   }
 
+  if (ctx.frameIsRasterized)
+  {
+    ctx.overrides.enableViewportXYOffsetWorkaround = false;
+  }
+
   if (ctx.frameIsSkybox && Frame->Parent != nullptr)
   {
+    m_LLRenderer->EmitDebugText(L"[EchelonRenderer] Skybox begin");
+
     //rtx requires that the full pass is rendered with the same view matrix.
     //ie, we cannot change cameras.
     //since the matrix multiplication is: world * view * proj.
@@ -185,14 +225,14 @@ void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
 
   if (ctx.frameIsSkybox)
   {
-    m_LLRenderer->SetViewportDepth(0.9f, 1.0f);
+    m_LLRenderer->SetViewportDepth(RenderRanges::Skybox);
     m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
     m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
     m_LLRenderer->SetRenderState(D3DRS_LIGHTING, FALSE);
   }
   else
   {
-    m_LLRenderer->ResetViewportDepth();
+    m_LLRenderer->SetViewportDepth(RenderRanges::Game);
   }
 }
 
@@ -525,7 +565,7 @@ void HighlevelRenderer::GetViewMatrix(const FCoords& FrameCoords, D3DXMATRIX& vi
 
     initialMatrix(2, 0) = 0.0f;
     initialMatrix(2, 1) = 0.0f;
-    initialMatrix(2, 2) = -1.0f;
+    initialMatrix(2, 2) = 1.0f;
   }
 
   D3DXMATRIX cameraMatrix;
@@ -574,47 +614,55 @@ void HighlevelRenderer::GetPerspectiveProjectionMatrix(FSceneNode* Frame, D3DXMA
   * At the time of writing, RTX Remix does not honor the X and Y offsets of the viewport
   * As a hack, I correct the perspective instead.
   */
-  auto& ctx = *g_ContextManager.GetContext();
-  bool useFrame = (!g_options.enableViewportXYOffsetWorkaround || (Frame->XB == 0 && Frame->YB == 0));
+  auto ctx = g_ContextManager.GetContext();
+  bool useFrame = (!ctx->overrides.enableViewportXYOffsetWorkaround || (Frame->XB == 0 && Frame->YB == 0));
+
+  const RangeDefinition& renderRanges = RenderRanges::FromContext(ctx);
 
   const float fovangle = Frame->Viewport->Actor->FovAngle;
   const float aspect = (useFrame ? Frame->FY / Frame->FX : float(Frame->Viewport->SizeY) / float(Frame->Viewport->SizeX));
-  const float fovHalfAngle = appTan(fovangle * (PI / 360.0f)) * LowlevelRenderer::NearRange;
+  const float fovHalfAngle = appTan(fovangle * (PI / 360.0f)) * renderRanges.NearRange;
 
-  float viewportW = float(Frame->Viewport->SizeX);
-  float viewportH = float(Frame->Viewport->SizeY);
+  float viewportW = useFrame ? float(Frame->FX) : float(Frame->Viewport->SizeX);
+  float viewportH = useFrame ? float(Frame->FY) : float(Frame->Viewport->SizeY);
   float offsetL = (float(Frame->XB) / viewportW) * 0.5f;
   float offsetT = (float(Frame->YB) / viewportH) * 0.5f;
   float offsetR = (1.0f - (float(Frame->XB + Frame->X) / viewportW)) * 0.5f;
   float offsetB = (1.0f - (float(Frame->YB + Frame->Y) / viewportH)) * 0.5f;
 
 #if 1
-  D3DXMatrixPerspectiveOffCenterRH(&projMatrix,
+  D3DXMatrixPerspectiveOffCenterLH(&projMatrix,
     (-1.0f + (useFrame ? 0.0f : offsetL)) * fovHalfAngle,
     (1.0f + (useFrame ? 0.0f : offsetR)) * fovHalfAngle,
     (-1.0f - (useFrame ? 0.0f : offsetB)) * aspect * fovHalfAngle,
     (1.0f - (useFrame ? 0.0f : offsetT)) * aspect * fovHalfAngle,
-    LowlevelRenderer::NearRange, LowlevelRenderer::FarRange);
+    renderRanges.NearRange, renderRanges.FarRange);
 #else
-  float zScale = 1.0f;
-  float zScale2 = 32768.0f;
-  g_DebugMenu.DebugVar("Rendering", "Zscale 1", DebugMenuUniqueID(), zScale, { DebugMenuValueOptions::editor::slider, 0.0f, 1.0f});
-  g_DebugMenu.DebugVar("Rendering", "Zscale 2", DebugMenuUniqueID(), zScale2, { DebugMenuValueOptions::editor::slider, 0.0f, 32768.0f});
+  float zScale = 0.1f;
+
+  D3DXMATRIX translation1, translation2;
+  D3DXMatrixTranslation(&translation1, 0, 0, -renderRanges.NearRange);
+  D3DXMatrixTranslation(&translation2, 0, 0, +renderRanges.NearRange);
 
   D3DXMATRIX scaledM;
-  D3DXMatrixScaling(&scaledM, 1.0f, 1.0f, 1.0f / 32768.0f);
+  D3DXMatrixScaling(&scaledM, 1.0f, 1.0f, zScale);
 
-  D3DXMATRIX tmp;
-  D3DXMatrixPerspectiveOffCenterRH(&tmp,
-    (-1.0f + (useFrame ? 0.0f : offsetL)) * fovHalfAngle,
-    (1.0f + (useFrame ? 0.0f : offsetR)) * fovHalfAngle,
-    (-1.0f - (useFrame ? 0.0f : offsetB)) * aspect * fovHalfAngle,
-    (1.0f - (useFrame ? 0.0f : offsetT)) * aspect * fovHalfAngle,
-    LowlevelRenderer::NearRange, 32768.0f
+  D3DXMATRIX persp;
+  D3DXMatrixPerspectiveOffCenterLH(&persp,
+    (-1.0f + (useFrame ? 0.0f : offsetL)) * fovHalfAngle / zScale,
+    (1.0f + (useFrame ? 0.0f : offsetR)) * fovHalfAngle / zScale,
+    (-1.0f - (useFrame ? 0.0f : offsetB)) * aspect * fovHalfAngle / zScale,
+    (1.0f - (useFrame ? 0.0f : offsetT)) * aspect * fovHalfAngle / zScale,
+    renderRanges.NearRange, renderRanges.FarRange
     //0.0f, 1.0f
   );
 
-  D3DXMatrixMultiply(&projMatrix, &tmp, &scaledM);
+  //proj = translation1 * scale * translation2 * persp;
+  D3DXMatrixIdentity(&projMatrix);
+  D3DXMatrixMultiply(&projMatrix, &projMatrix, &translation1);
+  D3DXMatrixMultiply(&projMatrix, &projMatrix, &scaledM);
+  D3DXMatrixMultiply(&projMatrix, &projMatrix, &translation2);
+  D3DXMatrixMultiply(&projMatrix, &projMatrix, &persp);
 #endif
 }
 
@@ -970,7 +1018,7 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Actor)
   APawn* thisPawn = (isPawn ? Cast<APawn>(actor) : nullptr);
   APawn* parentPawn = (parentIsPawn ? Cast<APawn>(parent) : nullptr);
   const bool isWeapon = Cast<AWeapon>(actor);//(parentPawn ? parentPawn->Weapon == actor : false);
-  const bool isPlayerWeapon = (parent == Frame->Viewport->Actor);
+  const bool isPlayerWeapon = isWeapon && (parent == Frame->Viewport->Actor);
 
   auto wmCoords = GMath.UnitCoords;
   wmCoords = wmCoords * actor->Location * actor->Rotation;
@@ -997,8 +1045,8 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Actor)
   //Override viewport depth to signal rtxremix that we're rendering a viewmodel (weapon).
   //Otherwise, it will show up in reflections and shadow.
   Utils::ScopedCall scopedViewmodelDepth {
-    [&]() { if (isPlayerWeapon || actor->bOnlyOwnerSee) { m_LLRenderer->SetViewportDepth(0.0f, 0.5f); } },
-    [&]() { if (isPlayerWeapon || actor->bOnlyOwnerSee) { m_LLRenderer->ResetViewportDepth(); }  }
+    [&]() { if (isPlayerWeapon || actor->bOnlyOwnerSee) { m_LLRenderer->SetViewportDepth(RenderRanges::UI /*viewmodel?*/); } },
+    [&]() { if (isPlayerWeapon || actor->bOnlyOwnerSee) { m_LLRenderer->SetViewportDepth(RenderRanges::FromContext(renderContext)); } }
   };
 
   //The mesh was split up per texture+flag permutation. We have to render them all.
@@ -1170,10 +1218,7 @@ void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, f
     int x = 1;
   }
 
-  D3DXMATRIX ProjectionMatrix{};
-  GetPerspectiveProjectionMatrix(Frame, ProjectionMatrix);
   const float RZ = 1.0f / pZDepth;
-  const float SZ = ProjectionMatrix._33 + ProjectionMatrix._43 * RZ;
   const float X1 = (pX + Frame->XB - 0.5);
   const float Y1 = (pY + Frame->YB - 0.5);
   const float	X2 = (X1 + pWidth);
@@ -1257,7 +1302,7 @@ void HighlevelRenderer::SetViewState(FSceneNode* Frame, ViewType viewType)
   }
   m_LLRenderer->SetViewMatrix(vm);
 
-  if (g_options.enableViewportXYOffsetWorkaround && !ctx.frameIsRasterized)
+  if (ctx.overrides.enableViewportXYOffsetWorkaround)
   {
     auto sz = m_LLRenderer->GetDisplaySurfaceSize();
     m_LLRenderer->SetViewport(0, 0, sz.first, sz.second);
@@ -1287,14 +1332,15 @@ void HighlevelRenderer::SetProjectionState(FSceneNode* Frame, ProjectionType pro
   }
   else if (projection == ProjectionType::orthogonal)
   {
-    //D3DXMatrixOrthoLH(&d3dProj, Frame->FX, Frame->FY, 0.0001f, 2.0f);
+    assert(false); //iimplementation probably needs to be fixed due to the render range changes.
+
     const float fovangle = Frame->Viewport->Actor->FovAngle;
     const float aspect = (Frame->FY / Frame->FX);
-    const float fovHalfAngle = appTan(fovangle * (PI / 360.0f)) * LowlevelRenderer::NearRange;
+    const float fovHalfAngle = appTan(fovangle * (PI / 360.0f)) * RenderRanges::Engine.NearRange;
 
     float viewportW = float(Frame->Viewport->SizeX);
     float viewportH = float(Frame->Viewport->SizeY);
-    D3DXMatrixOrthoOffCenterRH(&d3dProj, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, LowlevelRenderer::NearRange);
+    D3DXMatrixOrthoOffCenterRH(&d3dProj, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, RenderRanges::Engine.FarRange);
 
     m_LLRenderer->SetProjectionMatrix(d3dProj);
   }

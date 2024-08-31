@@ -4,6 +4,34 @@
 #include "utils/utils.h"
 #include "utils/debugmenu.h"
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+FrameContextManager g_ContextManager;
+std::deque<FrameContextManager::Context> FrameContextManager::m_stack;
+
+void FrameContextManager::PushFrameContext()
+{
+  auto currentContext = GetContext();
+  assert(m_stack.size() < 50);
+  m_stack.push_back(currentContext ? FrameContextManager::Context(*currentContext) : FrameContextManager::Context{});
+}
+
+void FrameContextManager::PopFrameContext()
+{
+  m_stack.pop_back();
+}
+
+FrameContextManager::Context* FrameContextManager::GetContext()
+{
+  if (!m_stack.empty())
+  {
+    return &(m_stack.back());
+  }
+  return nullptr;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 uint32_t frameCount = 0;
 uint32_t sceneCount = 0;
 uint32_t sceneCountTotal = 0;

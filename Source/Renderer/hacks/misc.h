@@ -31,63 +31,6 @@ struct GlobalRenderOptions
 
 extern GlobalRenderOptions g_options;
 ////////////////////////////////////////////////////////////////////////////////////
-class FrameContextManager
-{
-public:
-  struct Context
-  {
-    FSceneNode* frameSceneNode = nullptr;
-
-    std::shared_ptr<FSceneNode> skyframeSceneNode;
-    bool frameIsRasterized = false;
-    bool frameIsSkybox = false;
-    bool renderingUI = false;
-
-    struct DrawCall
-    {
-      AActor* Owner = nullptr;
-      AActor* LightSink = nullptr;
-      FSpanBuffer* SpanBuffer = nullptr;
-      AZoneInfo* Zone = nullptr;
-      FCoords Coords;
-      std::optional<FCoords> SpecialCoords;
-      FVolActorLink* LeafLights = nullptr;
-      FActorLink* Volumetrics = nullptr;
-      DWORD PolyFlags = 0;
-      UTexture* LastTextureInfo = nullptr;
-      bool InViewSpace = false;
-      std::optional<TextureMetaData> LastTextureMetadata;
-      std::optional<D3DXMATRIX> worldMatrix;
-      std::optional<D3DXMATRIX> worldMatrixInv;
-      DrawCall() = default;
-    };
-    std::optional<DrawCall> drawcallInfo;
-
-    struct
-    {
-      std::optional<float> maxOccludeBspDistance;
-      bool skipDynamicFiltering = false;
-      bool bypassSpanBufferRasterization = false;
-      bool levelChanged = false;
-      bool bypassSetupDynamics = false;
-      bool disableFDynamicSpriteSetup = false;
-    } overrides;
-  };
-  struct ScopedContext
-  {
-    ScopedContext() { g_ContextManager.PushFrameContext(); }
-    ~ScopedContext() { g_ContextManager.PopFrameContext(); }
-    Context* operator->() { return g_ContextManager.GetContext(); }
-  };
-private:
-  static std::deque<Context> m_stack;
-public:
-  Context* GetContext();
-  void PushFrameContext();
-  void PopFrameContext();
-protected:
-} extern g_ContextManager;
-////////////////////////////////////////////////////////////////////////////////////
 static bool EE_HAS_IMGUI()
 {
   static bool hasImgui = []() {

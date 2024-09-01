@@ -11,6 +11,8 @@ extern void InstallThreadAffinityHacks();
 extern void InstallBytePatches();
 extern void InstallRTXConfigPatches();
 extern void InstallUConsoleHacks();
+extern void InstallXViewportWindowHacks();
+extern void InstallAPlayerPawnHacks();
 
 extern void UninstallFSceneNodeHacks();
 extern void UninstallFSpanBufferHacks();
@@ -23,6 +25,8 @@ extern void UninstallThreadAffinityHacks();
 extern void UninstallBytePatches();
 extern void UninstallRTXConfigPatches();
 extern void UninstallUConsoleHacks();
+extern void UninstallXViewportWindowHacks();
+extern void UninstallAPlayerPawnHacks();
 
 template<typename TFuncPtr>
 struct HookableFunction

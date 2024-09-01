@@ -212,9 +212,10 @@ void TextureManager::ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlag
   *reinterpret_cast<uint32_t*>(lastFourBytes) = key;
 }
 
-bool TextureManager::BindTexture(DWORD polygonFlags, const DeusExD3D9TextureHandle& pAlbedoTextureHandle, DeusExD3D9TextureHandle pOptionalLightTexture)
+bool TextureManager::BindTexture(DWORD polygonFlags, DeusExD3D9TextureHandle pAlbedoTextureHandle, DeusExD3D9TextureHandle pOptionalLightTexture)
 {
   auto& ctx = *g_ContextManager.GetContext();
+
   if (m_llrenderer->SetTextureOnDevice(0, pAlbedoTextureHandle.get()))
   {
     if (!(polygonFlags & (PF_Translucent | PF_Modulated | PF_Highlighted))) {
@@ -267,6 +268,19 @@ std::vector<DeusExD3D9TextureHandle> TextureManager::FindTextures(uint32_t pUETe
     break;
   }
   return handles;
+}
+
+DeusExD3D9TextureHandle TextureManager::FindRTXTexture(uint64_t pRTXTextureHash)
+{
+  std::vector<DeusExD3D9TextureHandle> handles;
+  for (const auto& it : m_TextureCache)
+  {
+    if (it.second->remixHash == pRTXTextureHash)
+    {
+      return it.second;
+    }
+  }
+  return {};
 }
 
 TextureHash TextureHash::FromTextureInfo(FTextureInfo* pTextureInfo, UnrealPolyFlags pFlags)

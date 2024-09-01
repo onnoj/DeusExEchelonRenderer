@@ -55,6 +55,36 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 
   ResizeDisplaySurface(0, 0, pWidth, pHeight, pFullscreen);
 
+  D3DFORMAT depthFormat = [&]() {
+    constexpr D3DFORMAT depthFormats[] = {
+      D3DFMT_D32,
+      D3DFMT_D32F_LOCKABLE,
+      D3DFMT_D32_LOCKABLE,
+      D3DFMT_D24X8,
+      D3DFMT_D24S8,
+      D3DFMT_D24X4S4,
+      D3DFMT_D24FS8,
+      D3DFMT_D16,
+      D3DFMT_D16_LOCKABLE,
+      D3DFMT_D15S1,
+      D3DFMT_S8_LOCKABLE,
+    };
+
+    D3DDISPLAYMODE currentMode{0};
+    auto hResult = m_API->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &currentMode);
+    if (SUCCEEDED(hResult))
+    {
+      for (auto fmt : depthFormats)
+      {
+        if (SUCCEEDED(m_API->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, currentMode.Format, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_SURFACE, fmt)))
+        {
+          return fmt;
+        }
+      }
+    }
+    return D3DFMT_D16;
+    }();
+
   D3DPRESENT_PARAMETERS d3dpp{0};
   d3dpp.Windowed = !pFullscreen;
   d3dpp.hDeviceWindow = hWnd;
@@ -64,10 +94,11 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
   d3dpp.BackBufferHeight = m_outputSurface.height;
   d3dpp.BackBufferCount = 1;
   d3dpp.EnableAutoDepthStencil = TRUE;
-  d3dpp.AutoDepthStencilFormat = D3DFMT_D16;
+  d3dpp.AutoDepthStencilFormat = depthFormat;
   d3dpp.Flags = 0;// D3DPRESENT_DONOTWAIT;//D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
   d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT; // D3DPRESENT_INTERVAL_IMMEDIATE;
   d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+
   GLog->Logf(L"D3DPRESENT_PARAMETERS: fullscreen:%d w:%d h:%d", pFullscreen ? 1 : 0, d3dpp.BackBufferWidth, d3dpp.BackBufferHeight);
   if (m_Device == nullptr)
   {
@@ -133,10 +164,10 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
   hr = m_Device->CreateDepthStencilSurface(
     m_outputSurface.width, // Width of the depth buffer surface
     m_outputSurface.height, // Height of the depth buffer surface
-    D3DFMT_D16, // Depth buffer format (should match the one specified in d3dpp)
+    depthFormat, // Depth buffer format (should match the one specified in d3dpp)
     D3DMULTISAMPLE_NONE, // Multisample type
     0, // Multisample quality
-    TRUE, // Discard stencil data (if any)
+    FALSE, // Discard stencil data (if any)
     &m_DepthStencilSurface,
     nullptr
   );
@@ -430,6 +461,13 @@ void LowlevelRenderer::DisableLight(int32_t index)
   m_Device->LightEnable(index, FALSE);
 }
 
+void LowlevelRenderer::EmitDebugText(const wchar_t* pTxt)
+{
+#if EE_DEBUG
+  D3DPERF_SetMarker(0x00, pTxt);
+#endif
+}
+
 void LowlevelRenderer::RenderLight(int32_t index, const D3DLIGHT9& pLight)
 {
   if (!g_options.hasLights)
@@ -543,7 +581,7 @@ void LowlevelRenderer::BeginFrame()
     res = this->SetRenderState(D3DRS_ALPHAREF, 127);
     res = this->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
     res = this->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO);
-    res = this->SetRenderState(D3DRS_LIGHTING, g_options.hasLights ? TRUE : FALSE); check(SUCCEEDED(res));
+    res = this->SetRenderState(D3DRS_LIGHTING, FALSE); check(SUCCEEDED(res));
     res = this->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE); check(SUCCEEDED(res));
     res = this->SetRenderState(D3DRS_DITHERENABLE, TRUE);
     res = this->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD);
@@ -588,11 +626,12 @@ void LowlevelRenderer::EndFrame()
   lastTime = now;
   if (m_Device == nullptr) return;
   //auto res = m_Device->EndScene(); check(SUCCEEDED(res));
+  CheckDirtyMatrices();
 
 #if 1
-  CheckDirtyMatrices();
   auto res = m_Device->Present(NULL, NULL, NULL, NULL);
 #else
+  HRESULT res = D3D_OK;
   static std::mutex presentMutex;
   static std::condition_variable canPresentCV;
   static bool canPresent = false;
@@ -601,7 +640,10 @@ void LowlevelRenderer::EndFrame()
     while (true)
     {
       std::unique_lock lk(presentMutex);
-      canPresentCV.wait(lk, [] { return canPresent; });
+      canPresentCV.wait(lk, [] 
+        { 
+          return canPresent; 
+        });
 
       while (m_Device->Present(NULL, NULL, NULL, NULL) == D3DERR_WASSTILLDRAWING)
       {
@@ -617,7 +659,10 @@ void LowlevelRenderer::EndFrame()
   //Wait for the present thread to be done if it was still running
   {
     std::unique_lock lk(presentMutex);
-    canPresentCV.wait(lk, [] { return hasPresented; });
+    canPresentCV.wait(lk, [] 
+      { 
+        return hasPresented; 
+      });
   }
 
   //Trigger a present
@@ -755,29 +800,19 @@ void LowlevelRenderer::SetProjectionMatrix(const D3DMATRIX& pMatrix)
 
 bool LowlevelRenderer::SetViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight)
 {
-  if (g_options.enableViewportXYOffsetWorkaround)
-  {
-    m_DesiredViewportLeft = 0;
-    m_DesiredViewportTop = 0;
-    m_DesiredViewportWidth = m_outputSurface.width;
-    m_DesiredViewportHeight = m_outputSurface.height;
-  }
-  else
-  {
-    m_DesiredViewportLeft = pLeft;
-    m_DesiredViewportTop = pTop;
-    m_DesiredViewportWidth = pWidth;
-    m_DesiredViewportHeight = pHeight;
-  }
+  m_DesiredViewportLeft = pLeft;
+  m_DesiredViewportTop = pTop;
+  m_DesiredViewportWidth = pWidth;
+  m_DesiredViewportHeight = pHeight;
 
   if (!m_DesiredViewportMinZ)
   {
-    m_DesiredViewportMinZ = LowlevelRenderer::NearRange;
+    m_DesiredViewportMinZ = RenderRanges::Engine.DepthMin;
   }
 
   if (!m_DesiredViewportMaxZ)
   {
-    m_DesiredViewportMaxZ = LowlevelRenderer::FarRange;
+    m_DesiredViewportMaxZ = RenderRanges::Engine.DepthMax;
   }
   return ValidateViewport();
 }
@@ -801,6 +836,11 @@ void LowlevelRenderer::GetClipRects(UIntRect& pmLeft, UIntRect& pmTop, UIntRect&
   pmBottom = UIntRect(0, viewportT + viewportH, m_outputSurface.width, m_outputSurface.height - (viewportT + viewportH));
 }
 
+void LowlevelRenderer::SetViewportDepth(const RangeDefinition& pType)
+{
+  SetViewportDepth(pType.DepthMin, pType.DepthMax);
+}
+
 void LowlevelRenderer::SetViewportDepth(float pMinZ, float pMaxZ)
 {
   m_DesiredViewportMinZ = pMinZ;
@@ -810,8 +850,7 @@ void LowlevelRenderer::SetViewportDepth(float pMinZ, float pMaxZ)
 
 void LowlevelRenderer::ResetViewportDepth()
 {
-  m_DesiredViewportMinZ = LowlevelRenderer::NearRange;
-  m_DesiredViewportMaxZ = LowlevelRenderer::FarRange;
+  SetViewportDepth(RenderRanges::Engine);
   ValidateViewport();
 }
 
@@ -862,6 +901,20 @@ bool LowlevelRenderer::ValidateViewport()
     m_Device->SetScissorRect(&r);
   }
   return true;
+}
+
+void LowlevelRenderer::ClearDepth()
+{
+  if (m_Device == nullptr) return;
+
+  auto hr = m_Device->Clear(
+    0,
+    NULL,
+    D3DCLEAR_ZBUFFER,
+    0,
+    1.0f,
+    0);
+  check(SUCCEEDED(hr));
 }
 
 void LowlevelRenderer::ClearDisplaySurface(const Vec4& clearColor)
@@ -1406,4 +1459,26 @@ std::optional<D3DDISPLAYMODE> LowlevelRenderer::FindClosestResolution(uint32_t p
   }
 
   return {};
+}
+
+const RangeDefinition& RenderRanges::FromContext(FrameContextManager::Context* pCtx)
+{
+  //We play with the ranges to help tweak RTX Remix, but when we're running fully
+  //rasterized, we shouldn't care about that.
+  if (pCtx->frameIsRasterized)
+  {
+    return Game;
+  }
+
+  if (pCtx->renderingUI)
+  {
+    return UI;
+  }
+
+  if (pCtx->frameIsSkybox)
+  {
+    return Skybox;
+  }
+
+  return Game;
 }

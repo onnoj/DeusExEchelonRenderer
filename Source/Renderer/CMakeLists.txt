@@ -74,6 +74,8 @@ set(SRC_BASE
 	"hacks/fdynamicsprite.cpp"
 	"hacks/fscenenode.cpp"
 	"hacks/fspanbuffer.cpp"
+	"hacks/aplayerpawn.cpp"
+	"hacks/xviewportwindow.cpp"
 	"hacks/threadaffinity.cpp"
 	"hacks/bytepatches.cpp"
 	"hacks/rtxconf.cpp"
@@ -111,12 +113,13 @@ find_library(LIB_DEUSEX "deusex.lib")
 find_library(LIB_CORE "core.lib")
 find_library(LIB_ENGINE "engine.lib")
 find_library(LIB_RENDER "render.lib")
+find_library(LIB_EXTENSION "extension.lib")
 find_library(LIB_D3D9 "d3d9.lib")
 find_library(LIB_D3DX9 "d3dx9.lib")
 find_library(LIB_SDL2 "sdl2.lib")
 
 set(DEUSEX_LIBS 
-	"${LIB_DEUSEX}" "${LIB_CORE}" "${LIB_ENGINE}" "${LIB_RENDER}"
+	"${LIB_DEUSEX}" "${LIB_CORE}" "${LIB_ENGINE}" "${LIB_RENDER}" "${LIB_EXTENSION}"
 	"winmm.lib" "comctl32.lib"
 	"${LIB_D3D9}" "${LIB_D3DX9}" "${LIB_SDL2}"
 	)

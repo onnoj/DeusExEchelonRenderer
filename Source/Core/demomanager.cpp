@@ -13,8 +13,8 @@ void DemoManager::Initialize()
   Hooks::UGameEngineCallbacks::OnTick.insert(std::make_pair(this, [&](FLOAT pTime){ OnTick(pTime); }));
   Hooks::UGameEngineCallbacks::OnNotifyLevelChange.insert(std::make_pair(this, [&](){ OnNotifyLevelChange(); }));
 
-  g_CommandManager.RegisterConsoleCommand(L"bml" /*benchmark lighting*/, [&]() {
-    RunBenchmark(true, false, 1000);
+  g_CommandManager.RegisterConsoleCommand(L"bm" /*single benchmark run*/, [&]() {
+    RunBenchmark(true, false, 4000);
   });
   g_CommandManager.RegisterConsoleCommand(L"demoloop" /*loop the scenes*/, [&]() {
     RunBenchmark(false, true, 4000);

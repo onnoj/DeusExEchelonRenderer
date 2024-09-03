@@ -110,8 +110,9 @@ public:
 	void InitializeDeviceState();
 	void PushDeviceState();
 	void PopDeviceState();
-	DWORD GetRenderState(D3DRENDERSTATETYPE State);
+	DWORD GetRenderState(D3DRENDERSTATETYPE State) const;
 	HRESULT SetRenderState(D3DRENDERSTATETYPE State,DWORD Value);
+	DWORD GetTextureStageState(DWORD Stage,D3DTEXTURESTAGESTATETYPE Type) const;
 	HRESULT SetTextureStageState(DWORD Stage,D3DTEXTURESTAGESTATETYPE Type,DWORD Value);
 	HRESULT SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value);
 	void ConfigureBlendState(UnrealBlendFlags pFlags);
@@ -147,7 +148,7 @@ private:
 		static constexpr uint32_t MAX_RENDERSTATES = 512;
 		static constexpr uint32_t MAX_TEXTURESLOTS = 8;
 		static constexpr uint32_t MAX_TEXTURESTAGES = 8;
-		static constexpr uint32_t MAX_TEXTURESTAGESTATES = 32;
+		static constexpr uint32_t MAX_TEXTURESTAGESTATES = 33;
 		static constexpr uint32_t MAX_SAMPLERSTATES = 16;
 		std::optional<IDirect3DTexture9*> m_TextureSlots[MAX_TEXTURESLOTS];
 		std::optional<DWORD> m_RenderStates[MAX_RENDERSTATES];

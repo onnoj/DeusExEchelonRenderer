@@ -30,7 +30,7 @@ std::wstring Utils::GetProcessFolder()
 uint32_t Utils::HashWc(const wchar_t* pString)
 {
   uint32_t ret = 0;
-  ::MurmurHash3_x86_32(pString, lstrlenW(pString), 0, &ret);
+  ::MurmurHash3_x86_32(pString, lstrlenW(pString) * sizeof(wchar_t), 0, &ret);
   return ret;
 }
 

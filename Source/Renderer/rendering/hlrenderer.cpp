@@ -1147,12 +1147,15 @@ void HighlevelRenderer::OnDrawUIBegin(FSceneNode* Frame)
     SetWorldTransformStateToIdentity();
     for (auto& rc : m_UIMeshes)
     {
-      auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
-      m_TextureManager.BindTexture(rc.flags, textureHandle);
-      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-      m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-      m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
+      if (rc.primitiveCount > 0)
+      {
+        auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
+        m_TextureManager.BindTexture(rc.flags, textureHandle);
+        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
+      }
     }
     m_LLRenderer->PopDeviceState();
   }
@@ -1184,10 +1187,10 @@ void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, f
   auto& ctx = *g_ContextManager.GetContext();
   UIMeshesValue* latestUIMesh = (!m_UIMeshes.empty() ? &m_UIMeshes.back() : nullptr);
 
-  auto flags = pPolyFlags;
-  flags &= ~PF_Memorized;
-  flags |= TextureInfo.Texture->PolyFlags;
-  flags |= (TextureInfo.Palette && TextureInfo.Palette[128].A != 255 && !(pPolyFlags & PF_Translucent)) ? PF_Highlighted : 0;
+  DWORD flags = (pPolyFlags & ~PF_Memorized) | TextureInfo.Texture->PolyFlags;
+  if (TextureInfo.Palette && TextureInfo.Palette[128].A != 255 && !(pPolyFlags & PF_Translucent)) {
+    flags |= PF_Highlighted;
+  }
 
   bool allocateNewUIMesh = false;
   allocateNewUIMesh |= (latestUIMesh == nullptr);
@@ -1204,19 +1207,6 @@ void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, f
     latestUIMesh->sceneNode = std::make_unique<FSceneNode>(*Frame);
   }
 
-  //if ((pZDepth >= 0.5f) && (pZDepth < 8.0f)) {
-  //	pZDepth = (((pZDepth - 0.5f) / 7.5f) * 4.0f) + 4.0f;
-  //}
-
-  auto hack = GUglyHackFlags;
-  if (TextureInfo.Texture->GetIndex() == 36711)
-  {
-    int x = 1;
-  }
-  else
-  {
-    int x = 1;
-  }
 
   const float RZ = 1.0f / pZDepth;
   const float X1 = (pX + Frame->XB - 0.5);
@@ -1225,35 +1215,38 @@ void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, f
   const float	Y2 = (Y1 + pHeight);
 
   const auto& md = m_TextureManager.ProcessTexture(latestUIMesh->flags, &TextureInfo)->md;
-  FLOAT	RZUS = RZ * md.multU;
-  FLOAT	U1 = (pTexCoordU)*RZUS;
-  FLOAT	U2 = (pTexCoordU + pTexCoordUL) * RZUS;
-  FLOAT	RZVS = RZ * md.multV;
-  FLOAT	V1 = (pTexCoordV)*RZVS;
-  FLOAT	V2 = (pTexCoordV + pTexCoordVL) * RZVS;
+  const float RZUS = RZ * md.multU;
+  const float U1 = (pTexCoordU)*RZUS;
+  const float U2 = (pTexCoordU + pTexCoordUL) * RZUS;
+  const float RZVS = RZ * md.multV;
+  const float V1 = (pTexCoordV)*RZVS;
+  const float V2 = (pTexCoordV + pTexCoordVL) * RZVS;
 
-  //if (PolyFlags & PF_NoSmooth)
-  //{
-  //	FLOAT HalfOffset=RZ*0.5f/(float)Info.USize;
-  //	U1-=HalfOffset;
-  //	U2-=HalfOffset;
-  //	V1-=HalfOffset;
-  //	V2-=HalfOffset;
-  //}
+  // Handle color processing
+  FColor clampedColor = FColor(pColor);
+  check(TextureInfo.MaxColor != nullptr);
+  FColor maxColor = *TextureInfo.MaxColor;
 
-  //auto maxColor = *Info.MaxColor;
-  //if ((PolyFlags & PF_Modulated)!=0)
-  //{
-  //	maxColor = FColor(maxColor.Plane() * Color);
-  //}
-  D3DCOLOR Clr = FColor(FPlane(pColor)).TrueColor() | 0xFF000000;
+  if (flags & (PF_Modulated | PF_Masked)) {
+    maxColor = FColor(0xFF, 0xFF, 0xFF, 0xFF);
+  }
+
+      D3DCOLOR Clr = (flags & (PF_Modulated)) ?
+                   (maxColor.TrueColor() | 0xFF000000) :
+                   (FColor{
+                       Min(clampedColor.R, maxColor.R),
+                       Min(clampedColor.G, maxColor.G),
+                       Min(clampedColor.B, maxColor.B),
+                       Min(clampedColor.A, maxColor.A)
+                   }.TrueColor() | 0xFF000000);
+
   latestUIMesh->buffer->push_back({ {X1, Y1, pZDepth, 1.0f}, Clr, {U1, V1} });
   latestUIMesh->buffer->push_back({ {X2, Y1, pZDepth, 1.0f}, Clr, {U2, V1} });
   latestUIMesh->buffer->push_back({ {X2, Y2, pZDepth, 1.0f}, Clr, {U2, V2} });
+  latestUIMesh->primitiveCount++;
   latestUIMesh->buffer->push_back({ {X1, Y1, pZDepth, 1.0f}, Clr, {U1, V1} });
   latestUIMesh->buffer->push_back({ {X2, Y2, pZDepth, 1.0f}, Clr, {U2, V2} });
   latestUIMesh->buffer->push_back({ {X1, Y2, pZDepth, 1.0f}, Clr, {U1, V2	} });
-  latestUIMesh->primitiveCount++;
   latestUIMesh->primitiveCount++;
 }
 

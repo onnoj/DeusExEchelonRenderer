@@ -509,7 +509,7 @@ continue;
 void RenderStateDebugger::Process(LowlevelRenderer* pLLRenderer, uint32_t pDebugID)
 {
   static uint32_t expectedDebugId = 0;
-  g_DebugMenu.DebugVar("Rendering Debug", "Debug ID", DebugMenuUniqueID(), expectedDebugId);
+  g_DebugMenu.DebugVar("Rendering Debug", "RS Debug ID", DebugMenuUniqueID(), expectedDebugId);
 
   if (pDebugID != expectedDebugId || expectedDebugId == 0)
   {
@@ -522,109 +522,109 @@ void RenderStateDebugger::Process(LowlevelRenderer* pLLRenderer, uint32_t pDebug
   constexpr auto getRenderStateKey = [](const RenderStateInfo& rsi) { return std::get<1>(rsi); };
   constexpr auto getRenderStateName = [](const RenderStateInfo& rsi) { return std::get<2>(rsi); };
   static const RenderStateInfo renderstates[] = {
-    {DebugMenuUniqueID(), D3DRS_ADAPTIVETESS_W, "D3DRS_ADAPTIVETESS_W"},
-    {DebugMenuUniqueID(), D3DRS_ADAPTIVETESS_X, "D3DRS_ADAPTIVETESS_X"},
-    {DebugMenuUniqueID(), D3DRS_ADAPTIVETESS_Y, "D3DRS_ADAPTIVETESS_Y"},
-    {DebugMenuUniqueID(), D3DRS_ADAPTIVETESS_Z, "D3DRS_ADAPTIVETESS_Z"},
-    {DebugMenuUniqueID(), D3DRS_ALPHABLENDENABLE, "D3DRS_ALPHABLENDENABLE"},
-    {DebugMenuUniqueID(), D3DRS_ALPHAFUNC, "D3DRS_ALPHAFUNC"},
-    {DebugMenuUniqueID(), D3DRS_ALPHAREF, "D3DRS_ALPHAREF"},
-    {DebugMenuUniqueID(), D3DRS_ALPHATESTENABLE, "D3DRS_ALPHATESTENABLE"},
-    {DebugMenuUniqueID(), D3DRS_AMBIENT, "D3DRS_AMBIENT"},
-    {DebugMenuUniqueID(), D3DRS_AMBIENTMATERIALSOURCE, "D3DRS_AMBIENTMATERIALSOURCE"},
-    {DebugMenuUniqueID(), D3DRS_ANTIALIASEDLINEENABLE, "D3DRS_ANTIALIASEDLINEENABLE"},
-    {DebugMenuUniqueID(), D3DRS_BLENDFACTOR, "D3DRS_BLENDFACTOR"},
-    {DebugMenuUniqueID(), D3DRS_BLENDOP, "D3DRS_BLENDOP"},
-    {DebugMenuUniqueID(), D3DRS_BLENDOPALPHA, "D3DRS_BLENDOPALPHA"},
-    {DebugMenuUniqueID(), D3DRS_CCW_STENCILFAIL, "D3DRS_CCW_STENCILFAIL"},
-    {DebugMenuUniqueID(), D3DRS_CCW_STENCILFUNC, "D3DRS_CCW_STENCILFUNC"},
-    {DebugMenuUniqueID(), D3DRS_CCW_STENCILPASS, "D3DRS_CCW_STENCILPASS"},
-    {DebugMenuUniqueID(), D3DRS_CCW_STENCILZFAIL, "D3DRS_CCW_STENCILZFAIL"},
-    {DebugMenuUniqueID(), D3DRS_CLIPPING, "D3DRS_CLIPPING"},
-    {DebugMenuUniqueID(), D3DRS_CLIPPLANEENABLE, "D3DRS_CLIPPLANEENABLE"},
-    {DebugMenuUniqueID(), D3DRS_COLORVERTEX, "D3DRS_COLORVERTEX"},
-    {DebugMenuUniqueID(), D3DRS_COLORWRITEENABLE, "D3DRS_COLORWRITEENABLE"},
-    {DebugMenuUniqueID(), D3DRS_COLORWRITEENABLE1, "D3DRS_COLORWRITEENABLE1"},
-    {DebugMenuUniqueID(), D3DRS_COLORWRITEENABLE2, "D3DRS_COLORWRITEENABLE2"},
-    {DebugMenuUniqueID(), D3DRS_COLORWRITEENABLE3, "D3DRS_COLORWRITEENABLE3"},
-    {DebugMenuUniqueID(), D3DRS_CULLMODE, "D3DRS_CULLMODE"},
-    {DebugMenuUniqueID(), D3DRS_DEBUGMONITORTOKEN, "D3DRS_DEBUGMONITORTOKEN"},
-    {DebugMenuUniqueID(), D3DRS_DEPTHBIAS, "D3DRS_DEPTHBIAS"},
-    {DebugMenuUniqueID(), D3DRS_DESTBLEND, "D3DRS_DESTBLEND"},
-    {DebugMenuUniqueID(), D3DRS_DESTBLENDALPHA, "D3DRS_DESTBLENDALPHA"},
-    {DebugMenuUniqueID(), D3DRS_DIFFUSEMATERIALSOURCE, "D3DRS_DIFFUSEMATERIALSOURCE"},
-    {DebugMenuUniqueID(), D3DRS_DITHERENABLE, "D3DRS_DITHERENABLE"},
-    {DebugMenuUniqueID(), D3DRS_EMISSIVEMATERIALSOURCE, "D3DRS_EMISSIVEMATERIALSOURCE"},
-    {DebugMenuUniqueID(), D3DRS_ENABLEADAPTIVETESSELLATION, "D3DRS_ENABLEADAPTIVETESSELLATION"},
+    {DebugMenuUniqueID(), D3DRS_ZENABLE, "D3DRS_ZENABLE"},
     {DebugMenuUniqueID(), D3DRS_FILLMODE, "D3DRS_FILLMODE"},
-    {DebugMenuUniqueID(), D3DRS_FOGCOLOR, "D3DRS_FOGCOLOR"},
-    {DebugMenuUniqueID(), D3DRS_FOGDENSITY, "D3DRS_FOGDENSITY"},
-    {DebugMenuUniqueID(), D3DRS_FOGENABLE, "D3DRS_FOGENABLE"},
-    {DebugMenuUniqueID(), D3DRS_FOGEND, "D3DRS_FOGEND"},
-    {DebugMenuUniqueID(), D3DRS_FOGSTART, "D3DRS_FOGSTART"},
-    {DebugMenuUniqueID(), D3DRS_FOGTABLEMODE, "D3DRS_FOGTABLEMODE"},
-    {DebugMenuUniqueID(), D3DRS_FOGVERTEXMODE, "D3DRS_FOGVERTEXMODE"},
-    {DebugMenuUniqueID(), D3DRS_INDEXEDVERTEXBLENDENABLE, "D3DRS_INDEXEDVERTEXBLENDENABLE"},
-    {DebugMenuUniqueID(), D3DRS_LASTPIXEL, "D3DRS_LASTPIXEL"},
-    {DebugMenuUniqueID(), D3DRS_LIGHTING, "D3DRS_LIGHTING"},
-    {DebugMenuUniqueID(), D3DRS_LOCALVIEWER, "D3DRS_LOCALVIEWER"},
-    {DebugMenuUniqueID(), D3DRS_MAXTESSELLATIONLEVEL, "D3DRS_MAXTESSELLATIONLEVEL"},
-    {DebugMenuUniqueID(), D3DRS_MINTESSELLATIONLEVEL, "D3DRS_MINTESSELLATIONLEVEL"},
-    {DebugMenuUniqueID(), D3DRS_MULTISAMPLEANTIALIAS, "D3DRS_MULTISAMPLEANTIALIAS"},
-    {DebugMenuUniqueID(), D3DRS_MULTISAMPLEMASK, "D3DRS_MULTISAMPLEMASK"},
-    {DebugMenuUniqueID(), D3DRS_NORMALDEGREE, "D3DRS_NORMALDEGREE"},
-    {DebugMenuUniqueID(), D3DRS_NORMALIZENORMALS, "D3DRS_NORMALIZENORMALS"},
-    {DebugMenuUniqueID(), D3DRS_PATCHEDGESTYLE, "D3DRS_PATCHEDGESTYLE"},
-    {DebugMenuUniqueID(), D3DRS_POINTSCALE_A, "D3DRS_POINTSCALE_A"},
-    {DebugMenuUniqueID(), D3DRS_POINTSCALE_B, "D3DRS_POINTSCALE_B"},
-    {DebugMenuUniqueID(), D3DRS_POINTSCALE_C, "D3DRS_POINTSCALE_C"},
-    {DebugMenuUniqueID(), D3DRS_POINTSCALEENABLE, "D3DRS_POINTSCALEENABLE"},
-    {DebugMenuUniqueID(), D3DRS_POINTSIZE, "D3DRS_POINTSIZE"},
-    {DebugMenuUniqueID(), D3DRS_POINTSIZE_MAX, "D3DRS_POINTSIZE_MAX"},
-    {DebugMenuUniqueID(), D3DRS_POINTSIZE_MIN, "D3DRS_POINTSIZE_MIN"},
-    {DebugMenuUniqueID(), D3DRS_POINTSPRITEENABLE, "D3DRS_POINTSPRITEENABLE"},
-    {DebugMenuUniqueID(), D3DRS_POSITIONDEGREE, "D3DRS_POSITIONDEGREE"},
-    {DebugMenuUniqueID(), D3DRS_RANGEFOGENABLE, "D3DRS_RANGEFOGENABLE"},
-    {DebugMenuUniqueID(), D3DRS_SCISSORTESTENABLE, "D3DRS_SCISSORTESTENABLE"},
-    {DebugMenuUniqueID(), D3DRS_SEPARATEALPHABLENDENABLE, "D3DRS_SEPARATEALPHABLENDENABLE"},
     {DebugMenuUniqueID(), D3DRS_SHADEMODE, "D3DRS_SHADEMODE"},
-    {DebugMenuUniqueID(), D3DRS_SLOPESCALEDEPTHBIAS, "D3DRS_SLOPESCALEDEPTHBIAS"},
-    {DebugMenuUniqueID(), D3DRS_SPECULARENABLE, "D3DRS_SPECULARENABLE"},
-    {DebugMenuUniqueID(), D3DRS_SPECULARMATERIALSOURCE, "D3DRS_SPECULARMATERIALSOURCE"},
+    {DebugMenuUniqueID(), D3DRS_ZWRITEENABLE, "D3DRS_ZWRITEENABLE"},
+    {DebugMenuUniqueID(), D3DRS_ALPHATESTENABLE, "D3DRS_ALPHATESTENABLE"},
+    {DebugMenuUniqueID(), D3DRS_LASTPIXEL, "D3DRS_LASTPIXEL"},
     {DebugMenuUniqueID(), D3DRS_SRCBLEND, "D3DRS_SRCBLEND"},
+    {DebugMenuUniqueID(), D3DRS_DESTBLEND, "D3DRS_DESTBLEND"},
+    {DebugMenuUniqueID(), D3DRS_BLENDOP, "D3DRS_BLENDOP"},
+    {DebugMenuUniqueID(), D3DRS_BLENDFACTOR, "D3DRS_BLENDFACTOR"},
+    {DebugMenuUniqueID(), D3DRS_ALPHABLENDENABLE, "D3DRS_ALPHABLENDENABLE"},
+    {DebugMenuUniqueID(), D3DRS_SEPARATEALPHABLENDENABLE, "D3DRS_SEPARATEALPHABLENDENABLE"},
     {DebugMenuUniqueID(), D3DRS_SRCBLENDALPHA, "D3DRS_SRCBLENDALPHA"},
-    {DebugMenuUniqueID(), D3DRS_SRGBWRITEENABLE, "D3DRS_SRGBWRITEENABLE"},
+    {DebugMenuUniqueID(), D3DRS_DESTBLENDALPHA, "D3DRS_DESTBLENDALPHA"},
+    {DebugMenuUniqueID(), D3DRS_BLENDOPALPHA, "D3DRS_BLENDOPALPHA"},
+    {DebugMenuUniqueID(), D3DRS_VERTEXBLEND, "D3DRS_VERTEXBLEND"},
+    {DebugMenuUniqueID(), D3DRS_INDEXEDVERTEXBLENDENABLE, "D3DRS_INDEXEDVERTEXBLENDENABLE"},
+    {DebugMenuUniqueID(), D3DRS_CULLMODE, "D3DRS_CULLMODE"},
+    {DebugMenuUniqueID(), D3DRS_ZFUNC, "D3DRS_ZFUNC"},
+    {DebugMenuUniqueID(), D3DRS_ALPHAREF, "D3DRS_ALPHAREF"},
+    {DebugMenuUniqueID(), D3DRS_ALPHAFUNC, "D3DRS_ALPHAFUNC"},
+    {DebugMenuUniqueID(), D3DRS_DITHERENABLE, "D3DRS_DITHERENABLE"},
+    {DebugMenuUniqueID(), D3DRS_FOGENABLE, "D3DRS_FOGENABLE"},
+    {DebugMenuUniqueID(), D3DRS_SPECULARENABLE, "D3DRS_SPECULARENABLE"},
+    {DebugMenuUniqueID(), D3DRS_FOGCOLOR, "D3DRS_FOGCOLOR"},
+    {DebugMenuUniqueID(), D3DRS_FOGTABLEMODE, "D3DRS_FOGTABLEMODE"},
+    {DebugMenuUniqueID(), D3DRS_FOGSTART, "D3DRS_FOGSTART"},
+    {DebugMenuUniqueID(), D3DRS_FOGEND, "D3DRS_FOGEND"},
+    {DebugMenuUniqueID(), D3DRS_FOGDENSITY, "D3DRS_FOGDENSITY"},
+    {DebugMenuUniqueID(), D3DRS_RANGEFOGENABLE, "D3DRS_RANGEFOGENABLE"},
     {DebugMenuUniqueID(), D3DRS_STENCILENABLE, "D3DRS_STENCILENABLE"},
     {DebugMenuUniqueID(), D3DRS_STENCILFAIL, "D3DRS_STENCILFAIL"},
-    {DebugMenuUniqueID(), D3DRS_STENCILFUNC, "D3DRS_STENCILFUNC"},
-    {DebugMenuUniqueID(), D3DRS_STENCILMASK, "D3DRS_STENCILMASK"},
-    {DebugMenuUniqueID(), D3DRS_STENCILPASS, "D3DRS_STENCILPASS"},
-    {DebugMenuUniqueID(), D3DRS_STENCILREF, "D3DRS_STENCILREF"},
-    {DebugMenuUniqueID(), D3DRS_STENCILWRITEMASK, "D3DRS_STENCILWRITEMASK"},
     {DebugMenuUniqueID(), D3DRS_STENCILZFAIL, "D3DRS_STENCILZFAIL"},
+    {DebugMenuUniqueID(), D3DRS_STENCILPASS, "D3DRS_STENCILPASS"},
+    {DebugMenuUniqueID(), D3DRS_STENCILFUNC, "D3DRS_STENCILFUNC"},
+    {DebugMenuUniqueID(), D3DRS_STENCILREF, "D3DRS_STENCILREF"},
+    {DebugMenuUniqueID(), D3DRS_STENCILMASK, "D3DRS_STENCILMASK"},
+    {DebugMenuUniqueID(), D3DRS_STENCILWRITEMASK, "D3DRS_STENCILWRITEMASK"},
     {DebugMenuUniqueID(), D3DRS_TEXTUREFACTOR, "D3DRS_TEXTUREFACTOR"},
-    {DebugMenuUniqueID(), D3DRS_TWEENFACTOR, "D3DRS_TWEENFACTOR"},
-    {DebugMenuUniqueID(), D3DRS_TWOSIDEDSTENCILMODE, "D3DRS_TWOSIDEDSTENCILMODE"},
-    {DebugMenuUniqueID(), D3DRS_VERTEXBLEND, "D3DRS_VERTEXBLEND"},
     {DebugMenuUniqueID(), D3DRS_WRAP0, "D3DRS_WRAP0"},
     {DebugMenuUniqueID(), D3DRS_WRAP1, "D3DRS_WRAP1"},
-    {DebugMenuUniqueID(), D3DRS_WRAP10, "D3DRS_WRAP10"},
-    {DebugMenuUniqueID(), D3DRS_WRAP11, "D3DRS_WRAP11"},
-    {DebugMenuUniqueID(), D3DRS_WRAP12, "D3DRS_WRAP12"},
-    {DebugMenuUniqueID(), D3DRS_WRAP13, "D3DRS_WRAP13"},
-    {DebugMenuUniqueID(), D3DRS_WRAP14, "D3DRS_WRAP14"},
-    {DebugMenuUniqueID(), D3DRS_WRAP15, "D3DRS_WRAP15"},
     {DebugMenuUniqueID(), D3DRS_WRAP2, "D3DRS_WRAP2"},
     {DebugMenuUniqueID(), D3DRS_WRAP3, "D3DRS_WRAP3"},
     {DebugMenuUniqueID(), D3DRS_WRAP4, "D3DRS_WRAP4"},
     {DebugMenuUniqueID(), D3DRS_WRAP5, "D3DRS_WRAP5"},
     {DebugMenuUniqueID(), D3DRS_WRAP6, "D3DRS_WRAP6"},
     {DebugMenuUniqueID(), D3DRS_WRAP7, "D3DRS_WRAP7"},
+    {DebugMenuUniqueID(), D3DRS_CLIPPING, "D3DRS_CLIPPING"},
+    {DebugMenuUniqueID(), D3DRS_LIGHTING, "D3DRS_LIGHTING"},
+    {DebugMenuUniqueID(), D3DRS_AMBIENT, "D3DRS_AMBIENT"},
+    {DebugMenuUniqueID(), D3DRS_FOGVERTEXMODE, "D3DRS_FOGVERTEXMODE"},
+    {DebugMenuUniqueID(), D3DRS_COLORVERTEX, "D3DRS_COLORVERTEX"},
+    {DebugMenuUniqueID(), D3DRS_LOCALVIEWER, "D3DRS_LOCALVIEWER"},
+    {DebugMenuUniqueID(), D3DRS_NORMALIZENORMALS, "D3DRS_NORMALIZENORMALS"},
+    {DebugMenuUniqueID(), D3DRS_DIFFUSEMATERIALSOURCE, "D3DRS_DIFFUSEMATERIALSOURCE"},
+    {DebugMenuUniqueID(), D3DRS_SPECULARMATERIALSOURCE, "D3DRS_SPECULARMATERIALSOURCE"},
+    {DebugMenuUniqueID(), D3DRS_AMBIENTMATERIALSOURCE, "D3DRS_AMBIENTMATERIALSOURCE"},
+    {DebugMenuUniqueID(), D3DRS_EMISSIVEMATERIALSOURCE, "D3DRS_EMISSIVEMATERIALSOURCE"},
+    {DebugMenuUniqueID(), D3DRS_CLIPPLANEENABLE, "D3DRS_CLIPPLANEENABLE"},
+    {DebugMenuUniqueID(), D3DRS_POINTSIZE, "D3DRS_POINTSIZE"},
+    {DebugMenuUniqueID(), D3DRS_POINTSIZE_MIN, "D3DRS_POINTSIZE_MIN"},
+    {DebugMenuUniqueID(), D3DRS_POINTSPRITEENABLE, "D3DRS_POINTSPRITEENABLE"},
+    {DebugMenuUniqueID(), D3DRS_POINTSCALEENABLE, "D3DRS_POINTSCALEENABLE"},
+    {DebugMenuUniqueID(), D3DRS_POINTSCALE_A, "D3DRS_POINTSCALE_A"},
+    {DebugMenuUniqueID(), D3DRS_POINTSCALE_B, "D3DRS_POINTSCALE_B"},
+    {DebugMenuUniqueID(), D3DRS_POINTSCALE_C, "D3DRS_POINTSCALE_C"},
+    {DebugMenuUniqueID(), D3DRS_MULTISAMPLEANTIALIAS, "D3DRS_MULTISAMPLEANTIALIAS"},
+    {DebugMenuUniqueID(), D3DRS_MULTISAMPLEMASK, "D3DRS_MULTISAMPLEMASK"},
+    {DebugMenuUniqueID(), D3DRS_PATCHEDGESTYLE, "D3DRS_PATCHEDGESTYLE"},
+    {DebugMenuUniqueID(), D3DRS_DEBUGMONITORTOKEN, "D3DRS_DEBUGMONITORTOKEN"},
+    {DebugMenuUniqueID(), D3DRS_POINTSIZE_MAX, "D3DRS_POINTSIZE_MAX"},
+    {DebugMenuUniqueID(), D3DRS_COLORWRITEENABLE, "D3DRS_COLORWRITEENABLE"},
+    {DebugMenuUniqueID(), D3DRS_TWEENFACTOR, "D3DRS_TWEENFACTOR"},
+    {DebugMenuUniqueID(), D3DRS_POSITIONDEGREE, "D3DRS_POSITIONDEGREE"},
+    {DebugMenuUniqueID(), D3DRS_NORMALDEGREE, "D3DRS_NORMALDEGREE"},
+    {DebugMenuUniqueID(), D3DRS_SCISSORTESTENABLE, "D3DRS_SCISSORTESTENABLE"},
+    {DebugMenuUniqueID(), D3DRS_SLOPESCALEDEPTHBIAS, "D3DRS_SLOPESCALEDEPTHBIAS"},
+    {DebugMenuUniqueID(), D3DRS_ANTIALIASEDLINEENABLE, "D3DRS_ANTIALIASEDLINEENABLE"},
+    {DebugMenuUniqueID(), D3DRS_MINTESSELLATIONLEVEL, "D3DRS_MINTESSELLATIONLEVEL"},
+    {DebugMenuUniqueID(), D3DRS_MAXTESSELLATIONLEVEL, "D3DRS_MAXTESSELLATIONLEVEL"},
+    {DebugMenuUniqueID(), D3DRS_ADAPTIVETESS_X, "D3DRS_ADAPTIVETESS_X"},
+    {DebugMenuUniqueID(), D3DRS_ADAPTIVETESS_Y, "D3DRS_ADAPTIVETESS_Y"},
+    {DebugMenuUniqueID(), D3DRS_ADAPTIVETESS_Z, "D3DRS_ADAPTIVETESS_Z"},
+    {DebugMenuUniqueID(), D3DRS_ADAPTIVETESS_W, "D3DRS_ADAPTIVETESS_W"},
+    {DebugMenuUniqueID(), D3DRS_ENABLEADAPTIVETESSELLATION, "D3DRS_ENABLEADAPTIVETESSELLATION"},
+    {DebugMenuUniqueID(), D3DRS_TWOSIDEDSTENCILMODE, "D3DRS_TWOSIDEDSTENCILMODE"},
+    {DebugMenuUniqueID(), D3DRS_CCW_STENCILFAIL, "D3DRS_CCW_STENCILFAIL"},
+    {DebugMenuUniqueID(), D3DRS_CCW_STENCILZFAIL, "D3DRS_CCW_STENCILZFAIL"},
+    {DebugMenuUniqueID(), D3DRS_CCW_STENCILPASS, "D3DRS_CCW_STENCILPASS"},
+    {DebugMenuUniqueID(), D3DRS_CCW_STENCILFUNC, "D3DRS_CCW_STENCILFUNC"},
+    {DebugMenuUniqueID(), D3DRS_COLORWRITEENABLE1, "D3DRS_COLORWRITEENABLE1"},
+    {DebugMenuUniqueID(), D3DRS_COLORWRITEENABLE2, "D3DRS_COLORWRITEENABLE2"},
+    {DebugMenuUniqueID(), D3DRS_COLORWRITEENABLE3, "D3DRS_COLORWRITEENABLE3"},
+    {DebugMenuUniqueID(), D3DRS_SRGBWRITEENABLE, "D3DRS_SRGBWRITEENABLE"},
+    {DebugMenuUniqueID(), D3DRS_DEPTHBIAS, "D3DRS_DEPTHBIAS"},
     {DebugMenuUniqueID(), D3DRS_WRAP8, "D3DRS_WRAP8"},
     {DebugMenuUniqueID(), D3DRS_WRAP9, "D3DRS_WRAP9"},
-    {DebugMenuUniqueID(), D3DRS_ZENABLE, "D3DRS_ZENABLE"},
-    {DebugMenuUniqueID(), D3DRS_ZFUNC, "D3DRS_ZFUNC"},
-    {DebugMenuUniqueID(), D3DRS_ZWRITEENABLE, "D3DRS_ZWRITEENABLE"},
+    {DebugMenuUniqueID(), D3DRS_WRAP10, "D3DRS_WRAP10"},
+    {DebugMenuUniqueID(), D3DRS_WRAP11, "D3DRS_WRAP11"},
+    {DebugMenuUniqueID(), D3DRS_WRAP12, "D3DRS_WRAP12"},
+    {DebugMenuUniqueID(), D3DRS_WRAP13, "D3DRS_WRAP13"},
+    {DebugMenuUniqueID(), D3DRS_WRAP14, "D3DRS_WRAP14"},
+    {DebugMenuUniqueID(), D3DRS_WRAP15, "D3DRS_WRAP15"},
   };
 
   constexpr auto numRenderStates = std::size(renderstates);
@@ -638,5 +638,56 @@ void RenderStateDebugger::Process(LowlevelRenderer* pLLRenderer, uint32_t pDebug
     g_DebugMenu.DebugVar("Rendering Debug", getRenderStateName(rs), getRenderStateDebugID(rs), renderStateValues[i]);
 
     pLLRenderer->SetRenderState(renderStateKey, renderStateValues[i]);
+  }
+}
+
+
+void TextureStageStateDebugger::Process(LowlevelRenderer* pLLRenderer, uint32_t pDebugID)
+{
+  static uint32_t expectedDebugId = 0;
+  g_DebugMenu.DebugVar("Rendering Debug", "TSS Debug ID", DebugMenuUniqueID(), expectedDebugId);
+
+  if (pDebugID != expectedDebugId || expectedDebugId == 0)
+  {
+    return;
+  }
+
+  using TextureStageStateInfo = std::tuple<uint64_t, D3DTEXTURESTAGESTATETYPE, const char*>;
+  
+  constexpr auto getTextureStateDebugID = [](const TextureStageStateInfo& tss) { return std::get<0>(tss); };
+  constexpr auto getTextureStateKey = [](const TextureStageStateInfo& tss) { return std::get<1>(tss); };
+  constexpr auto getTextureStateName = [](const TextureStageStateInfo& tss) { return std::get<2>(tss); };
+  static const TextureStageStateInfo textureStates[] = {
+    {DebugMenuUniqueID(),D3DTSS_COLOROP, "D3DTSS_COLOROP"},
+    {DebugMenuUniqueID(),D3DTSS_COLORARG1, "D3DTSS_COLORARG1"},
+    {DebugMenuUniqueID(),D3DTSS_COLORARG2, "D3DTSS_COLORARG2"},
+    {DebugMenuUniqueID(),D3DTSS_ALPHAOP, "D3DTSS_ALPHAOP"},
+    {DebugMenuUniqueID(),D3DTSS_ALPHAARG1, "D3DTSS_ALPHAARG1"},
+    {DebugMenuUniqueID(),D3DTSS_ALPHAARG2, "D3DTSS_ALPHAARG2"},
+    {DebugMenuUniqueID(),D3DTSS_BUMPENVMAT00, "D3DTSS_BUMPENVMAT00"},
+    {DebugMenuUniqueID(),D3DTSS_BUMPENVMAT01, "D3DTSS_BUMPENVMAT01"},
+    {DebugMenuUniqueID(),D3DTSS_BUMPENVMAT10, "D3DTSS_BUMPENVMAT10"},
+    {DebugMenuUniqueID(),D3DTSS_BUMPENVMAT11, "D3DTSS_BUMPENVMAT11"},
+    {DebugMenuUniqueID(),D3DTSS_TEXCOORDINDEX, "D3DTSS_TEXCOORDINDEX"},
+    {DebugMenuUniqueID(),D3DTSS_BUMPENVLSCALE, "D3DTSS_BUMPENVLSCALE"},
+    {DebugMenuUniqueID(),D3DTSS_BUMPENVLOFFSET, "D3DTSS_BUMPENVLOFFSET"},
+    {DebugMenuUniqueID(),D3DTSS_TEXTURETRANSFORMFLAGS, "D3DTSS_TEXTURETRANSFORMFLAGS"},
+    {DebugMenuUniqueID(),D3DTSS_COLORARG0, "D3DTSS_COLORARG0"},
+    {DebugMenuUniqueID(),D3DTSS_ALPHAARG0, "D3DTSS_ALPHAARG0"},
+    {DebugMenuUniqueID(),D3DTSS_RESULTARG, "D3DTSS_RESULTARG"},
+    {DebugMenuUniqueID(),D3DTSS_CONSTANT, "D3DTSS_CONSTANT"},
+  };
+
+  constexpr auto numTextureStates = std::size(textureStates);
+  DWORD renderStateValues[numTextureStates]{ 0 };
+  for (int i = 0; i < numTextureStates; i++)
+  {
+    const auto& rs = textureStates[i];
+    const auto& renderStateKey = getTextureStateKey(rs);
+    renderStateValues[i] = pLLRenderer->GetTextureStageState(0, renderStateKey);
+
+    g_DebugMenu.DebugVar("Rendering Debug", getTextureStateName(rs), getTextureStateDebugID(rs), renderStateValues[i]);
+
+    pLLRenderer->SetTextureStageState(0, renderStateKey, renderStateValues[i]);
   }
 }

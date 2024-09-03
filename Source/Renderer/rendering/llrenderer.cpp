@@ -353,12 +353,13 @@ void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertice
   if (pDebug != 0)
   {
     wchar_t b[256]{ 0 };
-    swprintf_s(b, L"Dbg: %d", pDebug);
+    swprintf_s(b, L"Dbg: %08u", pDebug);
     D3DPERF_SetMarker(0x00, &b[0]);
   }
 #endif
 
   RenderStateDebugger::Process(this, pDebug);
+  TextureStageStateDebugger::Process(this, pDebug);
 
   //Commit primitive
   {
@@ -1087,41 +1088,50 @@ void LowlevelRenderer::ConfigureBlendState(UnrealBlendFlags pFlags)
 
 void LowlevelRenderer::ConfigureTextureStageState(int pStageID, UnrealBlendFlags pFlags)
 {
-  if (pStageID == 0)
-  {
-    this->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-    this->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
-    return;
-  }
-
   if ((pFlags & PF_Modulated) != 0)
   {
     this->SetTextureStageState(pStageID, D3DTSS_COLOROP, D3DTOP_MODULATE);
     this->SetTextureStageState(pStageID, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
-    this->SetTextureStageState(pStageID, D3DTSS_COLORARG2, D3DTA_CURRENT);
+    this->SetTextureStageState(pStageID, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    this->SetTextureStageState(pStageID, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+    this->SetTextureStageState(pStageID, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    this->SetTextureStageState(pStageID, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
   }
-  //else if ((pFlags & PF_Memorized) != 0)
-  //{
-  //  this->SetTextureStageState(pStageID, D3DTSS_COLOROP, D3DTOP_BLENDCURRENTALPHA);
-  //  this->SetTextureStageState(pStageID, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
-  //  this->SetTextureStageState(pStageID, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-  //}
   else if ((pFlags & PF_Highlighted) != 0)
   {
     this->SetTextureStageState(pStageID, D3DTSS_COLOROP, D3DTOP_MODULATEINVALPHA_ADDCOLOR);
     this->SetTextureStageState(pStageID, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
-    this->SetTextureStageState(pStageID, D3DTSS_COLORARG2, D3DTA_CURRENT);
+    this->SetTextureStageState(pStageID, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    this->SetTextureStageState(pStageID, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
   }
   else
   {
-    this->SetTextureStageState( pStageID, D3DTSS_COLOROP, (pFlags&PF_Memorized) ? D3DTOP_MODULATE/*D3DTOP_MODULATE2X*/ : D3DTOP_DISABLE );
-    this->SetTextureStageState( pStageID, D3DTSS_ALPHAOP, (pFlags&PF_Memorized) ? D3DTOP_SELECTARG2 : D3DTOP_DISABLE );
+    if (pStageID > 0)
+    {
+      this->SetTextureStageState( pStageID, D3DTSS_COLOROP, (pFlags&PF_Memorized) ? D3DTOP_MODULATE2X : D3DTOP_DISABLE );
+      this->SetTextureStageState( pStageID, D3DTSS_ALPHAOP, (pFlags&PF_Memorized) ? D3DTOP_SELECTARG2 : D3DTOP_DISABLE );
+      this->SetTextureStageState(pStageID, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+      this->SetTextureStageState(pStageID, D3DTSS_COLORARG2, D3DTA_CURRENT);
+    }
+    else
+    {
+      this->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+      this->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+      this->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+      this->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+    }
   }
 }
 
 void LowlevelRenderer::ConfigureSamplerState(int pStageID, UnrealPolyFlags pFlags)
 {
-  if ((pFlags & PF_NoSmooth) == 0)
+  if ((pFlags & PF_NoSmooth) != 0)
+  {
+    this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+    this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+    this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, 1);
+  }
+  else
   {
     auto filter = D3DTEXF_ANISOTROPIC;
     auto anisotropyLevel = m_caps.MaxAnisotropy;
@@ -1130,12 +1140,6 @@ void LowlevelRenderer::ConfigureSamplerState(int pStageID, UnrealPolyFlags pFlag
     this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, filter);
     this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, filter);
     this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, anisotropyLevel);
-  }
-  else
-  {
-    this->SetSamplerState(pStageID, D3DSAMP_MINFILTER, D3DTEXF_POINT);
-    this->SetSamplerState(pStageID, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
-    this->SetSamplerState(pStageID, D3DSAMP_MAXANISOTROPY, 1);
   }
 }
 
@@ -1353,9 +1357,9 @@ void LowlevelRenderer::PopDeviceState()
   }
 }
 
-DWORD LowlevelRenderer::GetRenderState(D3DRENDERSTATETYPE State)
+DWORD LowlevelRenderer::GetRenderState(D3DRENDERSTATETYPE State) const
 {
-  check(State < m_CurrentState->MAX_RENDERSTATES);
+  check(State >= 0 && State < m_CurrentState->MAX_RENDERSTATES);
 
   if (m_CurrentState->m_RenderStates[State])
   {
@@ -1369,6 +1373,21 @@ DWORD LowlevelRenderer::GetRenderState(D3DRENDERSTATETYPE State)
   }
 }
 
+DWORD LowlevelRenderer::GetTextureStageState(DWORD Stage, D3DTEXTURESTAGESTATETYPE State) const
+{
+  check(State < m_CurrentState->MAX_TEXTURESTAGESTATES);
+
+  if (m_CurrentState->m_TextureStageStates[Stage][State])
+  {
+    return *m_CurrentState->m_TextureStageStates[Stage][State];
+  }
+  else
+  {
+    DWORD v = 0;
+    m_Device->GetTextureStageState(Stage, State, &v);
+    return v;
+  }
+}
 
 HRESULT LowlevelRenderer::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value)
 {

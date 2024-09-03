@@ -66,8 +66,8 @@ void CommandManager::OnTick(FLOAT DeltaTime)
 
 UBOOL CommandManager::OnExec(const TCHAR* Cmd, FOutputDevice& Ar)
 {
-  const auto commandKey = Utils::HashWc(Cmd);
-  if (auto it = m_ConsoleCommands.find(commandKey); it != m_ConsoleCommands.end())
+  const auto commandKeyHash = Utils::HashWc(Cmd);
+  if (auto it = m_ConsoleCommands.find(commandKeyHash); it != m_ConsoleCommands.end() && it->first == commandKeyHash)
   {
     (*it).second();
     return 1;

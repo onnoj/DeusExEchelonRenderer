@@ -17,4 +17,11 @@ public:
   static void Process(LowlevelRenderer* pLLRenderer, uint32_t pDebugID);
 };
 
+class TextureStageStateDebugger
+{
+public:
+  static void Process(LowlevelRenderer* pLLRenderer, uint32_t pDebugID);
+};
+
+
 extern MaterialDebugger g_MaterialDebugger;

@@ -699,10 +699,12 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 
   bool surfaceIsDynamic = false;
 
-  //if (ctx.renderingUI)
-  //{
-  //  surfaceIsDynamic = true;
-  //}
+  if (ctx.frameIsSkybox)
+  {
+    //Consider the skybox dynamic; depth buffering is
+    //turned off, so we can't cache the render calls.
+    surfaceIsDynamic = true;
+  }
 
   if (Frame->Level->BrushTracker != nullptr)
   {
@@ -712,20 +714,33 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
     }
   }
 
-  //1. Check if node is in the cached node bin, if it is, skip.
-  auto& drawnNodes = m_DrawnNodes[Frame->ZoneNumber];
-  if (drawnNodes.find(iNode) != drawnNodes.end() && !surfaceIsDynamic)
+  if (Surface.Texture->bRealtimeChanged || Surface.Texture->bRealtime)
   {
-    return;
+    surfaceIsDynamic = true;
   }
-  drawnNodes.insert(iNode);
+
+  if ((Surface.PolyFlags & (PF_AutoUPan | PF_AutoVPan)) != 0)
+  {
+    surfaceIsDynamic = true;
+  }
+
+  //1. Check if node is in the cached node bin, if it is, skip.
+  if (!surfaceIsDynamic)
+  {
+    auto& drawnNodes = m_DrawnNodes[Frame->ZoneNumber];
+    if (drawnNodes.find(iNode) != drawnNodes.end())
+    {
+      return;
+    }
+    drawnNodes.insert(iNode);
+  }
 
   //2. Build a key that is (textureSetHash + PolyFlags + NodeFlags)
   DeusExD3D9TextureHandle albedoTextureHandle;
   DeusExD3D9TextureHandle lightmapTextureHandle;
 
   albedoTextureHandle = m_TextureManager.ProcessTexture(Surface.PolyFlags, Surface.Texture);
-  if (Surface.LightMap && Surface.LightMap)
+  if (Surface.LightMap && ctx.frameIsRasterized)
   {
     lightmapTextureHandle = m_TextureManager.ProcessTexture(Surface.PolyFlags, Surface.LightMap);
   }
@@ -833,13 +848,13 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
     FLOAT VDot = Facet.MapCoords.YAxis | Facet.MapCoords.Origin;
 
     //TODO: can this be cached? Or delayed until we actually need to calculate it?
-    auto calculateUV = [&Facet, UDot, VDot](const FVector& pts, const FTextureInfo* pTextureInfo, const TextureMetaData& pTextureMD) -> FVector {
-      if (pTextureInfo != nullptr)
+    auto calculateUV = [&Facet, UDot, VDot, iNode](const FVector& pts, const FTextureInfo* pTextureInfo, const DeusExD3D9TextureHandle& pTextureHandle) -> FVector {
+      if (pTextureInfo != nullptr && pTextureHandle != nullptr)
       {
         FLOAT U = Facet.MapCoords.XAxis | pts;
         FLOAT V = Facet.MapCoords.YAxis | pts;
-        FLOAT ucoord = ((U - UDot) - pTextureInfo->Pan.X) * pTextureMD.multU;
-        FLOAT vcoord = ((V - VDot) - pTextureInfo->Pan.Y) * pTextureMD.multV;
+        FLOAT ucoord = ((U - UDot) - pTextureInfo->Pan.X) * pTextureHandle->md.multU;
+        FLOAT vcoord = ((V - VDot) - pTextureInfo->Pan.Y) * pTextureHandle->md.multV;
         return FVector(ucoord, vcoord, 0);
       }
       return FVector(0, 0, 0);
@@ -862,8 +877,8 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 
       for (int i = 0; i < 3; i++)
       {
-        const auto uvDiffuse = calculateUV(projPts[i], Surface.Texture, albedoTextureHandle->md);
-        const auto uvLightmap = calculateUV(projPts[i], Surface.LightMap, lightmapTextureHandle->md);
+        const auto uvDiffuse = calculateUV(projPts[i], Surface.Texture, albedoTextureHandle);
+        const auto uvLightmap = calculateUV(projPts[i], Surface.LightMap, lightmapTextureHandle);
 
 #if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
         LowlevelRenderer::VertexPos3Tex0Tex1 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
@@ -875,6 +890,8 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
 
         //note: mesh hashes in Deus Ex are not stable between frames
         MurmurHash3_x86_32(&vtx.Pos, sizeof(vtx.Pos), hash, &hash);
+        MurmurHash3_x86_32(&vtx.Tex0, sizeof(vtx.Tex0), hash, &hash);
+        MurmurHash3_x86_32(&vtx.Tex1, sizeof(vtx.Tex1), hash, &hash);
         sharedMesh->buffer->push_back(std::move(vtx));
       }
       sharedMesh->primitiveCount++;
@@ -890,12 +907,13 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
     if ((flags & PF_Unlit) != 0)
     {
       m_TextureManager.BindTexture(flags, sharedMesh->albedoTextureHandle, sharedMesh->lightmapTextureHandle);
-      m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), sharedMesh->hash, 0);
+      m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), 0, sharedMesh->debug);
       flags &= ~PF_Unlit;
     }
     m_TextureManager.BindTexture(flags, sharedMesh->albedoTextureHandle, sharedMesh->lightmapTextureHandle);
-    m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), sharedMesh->hash, 0);
+    m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), 0, sharedMesh->debug);
   }
+
 }
 
 void HighlevelRenderer::OnDrawGeometryEnd(FSceneNode* Frame)

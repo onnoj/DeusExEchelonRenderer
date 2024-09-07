@@ -360,6 +360,8 @@ void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertice
 
   RenderStateDebugger::Process(this, pDebug);
   TextureStageStateDebugger::Process(this, pDebug);
+  TextureSamplerDebugger::Process(this, pDebug);
+  
 
   //Commit primitive
   {
@@ -389,7 +391,7 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0
 void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0Tex1* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
   return RenderTriangleListBuffer(
-    D3DFVF_XYZ | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 | D3DFVF_TEX2 /*| D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5 */,
+    D3DFVF_XYZ | /*D3DFVF_DIFFUSE | D3DFVF_TEX1 | */ D3DFVF_TEX2 /*| D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5 */,
     pVertices,
     primitiveCount,
     pVertexCount,
@@ -468,6 +470,23 @@ void LowlevelRenderer::EmitDebugText(const wchar_t* pTxt)
   D3DPERF_SetMarker(0x00, pTxt);
 #endif
 }
+
+void LowlevelRenderer::EmitDebugTextF(const wchar_t* pFmt, ...)
+{
+#if EE_DEBUG
+  std::va_list vargs;
+  va_start(vargs, pFmt);
+
+  static thread_local wchar_t buffer[1024]{ 0 };
+  if (vswprintf(&buffer[0], std::size(buffer), pFmt, vargs) > 0)
+  {
+    D3DPERF_SetMarker(0x00, buffer);
+  }
+
+  va_end(vargs);
+#endif
+}
+
 
 void LowlevelRenderer::RenderLight(int32_t index, const D3DLIGHT9& pLight)
 {
@@ -1385,6 +1404,23 @@ DWORD LowlevelRenderer::GetTextureStageState(DWORD Stage, D3DTEXTURESTAGESTATETY
   {
     DWORD v = 0;
     m_Device->GetTextureStageState(Stage, State, &v);
+    return v;
+  }
+}
+
+DWORD LowlevelRenderer::GetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type) const
+{
+  check(Sampler < m_CurrentState->MAX_TEXTURESTAGES);
+  check(Type < m_CurrentState->MAX_SAMPLERSTATES);
+
+  if (m_CurrentState->m_SamplerStates[Sampler][Type])
+  {
+    return *m_CurrentState->m_SamplerStates[Sampler][Type];
+  }
+  else
+  {
+    DWORD v = 0;
+    m_Device->GetSamplerState(Sampler, Type, &v);
     return v;
   }
 }

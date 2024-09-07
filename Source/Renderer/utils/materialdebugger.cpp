@@ -509,7 +509,7 @@ continue;
 void RenderStateDebugger::Process(LowlevelRenderer* pLLRenderer, uint32_t pDebugID)
 {
   static uint32_t expectedDebugId = 0;
-  g_DebugMenu.DebugVar("Rendering Debug", "RS Debug ID", DebugMenuUniqueID(), expectedDebugId);
+  g_DebugMenu.DebugVar("Rendering Debug", "\n\nRS Debug ID", DebugMenuUniqueID(), expectedDebugId);
 
   if (pDebugID != expectedDebugId || expectedDebugId == 0)
   {
@@ -645,7 +645,7 @@ void RenderStateDebugger::Process(LowlevelRenderer* pLLRenderer, uint32_t pDebug
 void TextureStageStateDebugger::Process(LowlevelRenderer* pLLRenderer, uint32_t pDebugID)
 {
   static uint32_t expectedDebugId = 0;
-  g_DebugMenu.DebugVar("Rendering Debug", "TSS Debug ID", DebugMenuUniqueID(), expectedDebugId);
+  g_DebugMenu.DebugVar("Rendering Debug", "\n\nTSS Debug ID", DebugMenuUniqueID(), expectedDebugId);
 
   if (pDebugID != expectedDebugId || expectedDebugId == 0)
   {
@@ -689,5 +689,51 @@ void TextureStageStateDebugger::Process(LowlevelRenderer* pLLRenderer, uint32_t 
     g_DebugMenu.DebugVar("Rendering Debug", getTextureStateName(rs), getTextureStateDebugID(rs), renderStateValues[i]);
 
     pLLRenderer->SetTextureStageState(0, renderStateKey, renderStateValues[i]);
+  }
+}
+
+
+void TextureSamplerDebugger::Process(LowlevelRenderer* pLLRenderer, uint32_t pDebugID)
+{
+  static uint32_t expectedDebugId = 0;
+  g_DebugMenu.DebugVar("Rendering Debug", "\n\nTSAMP Debug ID", DebugMenuUniqueID(), expectedDebugId);
+
+  if (pDebugID != expectedDebugId || expectedDebugId == 0)
+  {
+    return;
+  }
+
+  using SamplerStageStateInfo = std::tuple<uint64_t, D3DSAMPLERSTATETYPE, const char*>;
+
+  constexpr auto getSamplerStateDebugID = [](const SamplerStageStateInfo& info) { return std::get<0>(info); };
+  constexpr auto getSamplerStateKey = [](const SamplerStageStateInfo& info) { return std::get<1>(info); };
+  constexpr auto getSamplerStateName = [](const SamplerStageStateInfo& info) { return std::get<2>(info); };
+  static const SamplerStageStateInfo samplerStates[] = {
+    {DebugMenuUniqueID(),D3DSAMP_ADDRESSU, "D3DSAMP_ADDRESSU"},
+    {DebugMenuUniqueID(),D3DSAMP_ADDRESSV, "D3DSAMP_ADDRESSV"},
+    {DebugMenuUniqueID(),D3DSAMP_ADDRESSW, "D3DSAMP_ADDRESSW"},
+    {DebugMenuUniqueID(),D3DSAMP_BORDERCOLOR, "D3DSAMP_BORDERCOLOR"},
+    {DebugMenuUniqueID(),D3DSAMP_MAGFILTER, "D3DSAMP_MAGFILTER"},
+    {DebugMenuUniqueID(),D3DSAMP_MINFILTER, "D3DSAMP_MINFILTER"},
+    {DebugMenuUniqueID(),D3DSAMP_MIPFILTER, "D3DSAMP_MIPFILTER"},
+    {DebugMenuUniqueID(),D3DSAMP_MIPMAPLODBIAS, "D3DSAMP_MIPMAPLODBIAS"},
+    {DebugMenuUniqueID(),D3DSAMP_MAXMIPLEVEL, "D3DSAMP_MAXMIPLEVEL"},
+    {DebugMenuUniqueID(),D3DSAMP_MAXANISOTROPY, "D3DSAMP_MAXANISOTROPY"},
+    {DebugMenuUniqueID(),D3DSAMP_SRGBTEXTURE, "D3DSAMP_SRGBTEXTURE"},
+    {DebugMenuUniqueID(),D3DSAMP_ELEMENTINDEX, "D3DSAMP_ELEMENTINDEX"},
+    {DebugMenuUniqueID(),D3DSAMP_DMAPOFFSET, "D3DSAMP_DMAPOFFSET"},
+  };
+
+  constexpr auto numSamplerStates = std::size(samplerStates);
+  DWORD samplerStateValues[numSamplerStates]{ 0 };
+  for (int i = 0; i < numSamplerStates; i++)
+  {
+    const auto& rs = samplerStates[i];
+    const auto& samplerStateKey = getSamplerStateKey(rs);
+    samplerStateValues[i] = pLLRenderer->GetSamplerState(0, samplerStateKey);
+
+    g_DebugMenu.DebugVar("Rendering Debug", getSamplerStateName(rs), getSamplerStateDebugID(rs), samplerStateValues[i]);
+
+    pLLRenderer->SetSamplerState(0, samplerStateKey, samplerStateValues[i]);
   }
 }

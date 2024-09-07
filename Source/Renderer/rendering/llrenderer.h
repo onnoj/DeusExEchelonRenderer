@@ -114,6 +114,7 @@ public:
 	HRESULT SetRenderState(D3DRENDERSTATETYPE State,DWORD Value);
 	DWORD GetTextureStageState(DWORD Stage,D3DTEXTURESTAGESTATETYPE Type) const;
 	HRESULT SetTextureStageState(DWORD Stage,D3DTEXTURESTAGESTATETYPE Type,DWORD Value);
+	DWORD GetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type) const;
 	HRESULT SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value);
 	void ConfigureBlendState(UnrealBlendFlags pFlags);
 	void ConfigureTextureStageState(int pStageID, UnrealPolyFlags pFlags);
@@ -132,6 +133,7 @@ public:
 	void RenderTriangleList(const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Color0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void EmitDebugText(const wchar_t* pTxt);
+	void EmitDebugTextF(const wchar_t* pFmt, ...);
 	void DisableLight(int32_t index);
 	void RenderLight(int32_t index, const D3DLIGHT9& pLight);
 	void FlushLights();

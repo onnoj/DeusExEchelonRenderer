@@ -23,5 +23,12 @@ public:
   static void Process(LowlevelRenderer* pLLRenderer, uint32_t pDebugID);
 };
 
+class TextureSamplerDebugger
+{
+public:
+  static void Process(LowlevelRenderer* pLLRenderer, uint32_t pDebugID);
+};
+
+
 
 extern MaterialDebugger g_MaterialDebugger;

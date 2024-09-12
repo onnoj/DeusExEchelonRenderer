@@ -16,6 +16,8 @@ var (
 
 		PackageFilters        []string
 		PackageFiltersRegexes []*regexp.Regexp
+
+		OverwriteOverrides bool
 	}
 )
 
@@ -34,6 +36,8 @@ func init() {
 	rootCmd.Flags().BoolVarP(&Options.InputFolderRecursive, "recursive", "R", false, "--recursive")
 	rootCmd.Flags().StringVarP(&Options.TextureDumpJSON, "jsondump", "j", "", "--jsondump=<path/to/.json>")
 	rootCmd.Flags().StringArrayVar(&Options.PackageFilters, "package-filter", []string{}, "--package-filter=<regex>, can be specified multiple times.")
+	rootCmd.Flags().BoolVar(&Options.OverwriteOverrides, "overwrite-overrides", false, "--overwrite-overrides, can be specified to always set a material override even if one already exists.")
+
 }
 
 func main() {

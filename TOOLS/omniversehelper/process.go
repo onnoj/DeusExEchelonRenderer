@@ -10,7 +10,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onnoj/DeusExEchelonRenderer/OmniverseHelper/data"
@@ -19,14 +21,15 @@ import (
 )
 
 // constants:
-const TEXTURES_PER_BATCH = 1
+const TEXTURES_PER_BATCH = 16
 
 // Global variables
 var (
-	PackageNames   []string                            = make([]string, 0)
-	TextureMapping map[uint64]*data.TextureData        = make(map[uint64]*data.TextureData)
-	PackageMapping map[string]data.TextureDataPtrSlice = make(map[string]data.TextureDataPtrSlice)
-	LayerMapping   map[string]Layer                    = make(map[string]Layer)
+	PackageNames       []string                            = make([]string, 0)
+	TextureMapping     map[uint64]*data.TextureData        = make(map[uint64]*data.TextureData)
+	TextureFileMapping map[string]*data.TextureData        = make(map[string]*data.TextureData)
+	PackageMapping     map[string]data.TextureDataPtrSlice = make(map[string]data.TextureDataPtrSlice)
+	LayerMapping       map[string]Layer                    = make(map[string]Layer)
 
 	ProjectLayer Layer
 	RootLayer    Layer
@@ -111,27 +114,6 @@ func Execute() {
 	httpClient := NewClient("http://127.0.0.1:8011", time.Minute*15)
 	loadLayers(httpClient)
 
-	/*
-		ass, err := httpClient.GetAssets(GetAssetsQueryParams{})
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		log.Println(ass)
-		os.WriteFile("d:\\temp\\mongoose.txt", []byte(strings.Join(ass, "\r\n")), 0777)
-	*/
-
-	resp, err := httpClient.GetTextures(GetTexturesRequestParams{})
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	log.Println(resp.Textures)
-
-	f, _ := os.OpenFile("d:\\temp\\mongoose.txt", os.O_CREATE|os.O_WRONLY, 0777)
-	for _, t := range resp.Textures {
-		f.WriteString(fmt.Sprintf("%s\t\t%s\r\n", t[0], t[1]))
-	}
-	f.Close()
-
 	//Prepare the texturemapping
 	jsonFile, err := os.Open(Options.TextureDumpJSON)
 	if err != nil {
@@ -144,6 +126,7 @@ func Execute() {
 	}
 	for _, texInfo := range dump.Textures {
 		wrappedTexInfo := data.FromJSONTextureInfo(texInfo)
+		wrappedTexInfo.RemixHashText = strings.ToUpper(wrappedTexInfo.RemixHashText)
 		TextureMapping[texInfo.RemixHash] = &wrappedTexInfo
 		PackageMapping[texInfo.PackageName] = append(PackageMapping[texInfo.PackageName], &wrappedTexInfo)
 		PackageNames = utils.AppendUnique(PackageNames, texInfo.PackageName)
@@ -153,6 +136,7 @@ func Execute() {
 	type ProcessFolderFunc = func(path string, d fs.DirEntry, err error) error
 	var processFolder ProcessFolderFunc
 	processFolder = func(path string, d fs.DirEntry, err error) error {
+		path, _ = filepath.Abs(path)
 		if d.IsDir() {
 			rel, _ := filepath.Rel(Options.InputFolder, d.Name())
 			if Options.InputFolderRecursive && rel != "" {
@@ -178,7 +162,7 @@ func Execute() {
 			} else {
 				log.Fatal("option not implemented, please fix me")
 			}
-
+			TextureFileMapping[path] = mappedTextureData
 			mappedTextureData.ImportTexturePath[uint(textureType)] = path
 		}
 		return nil
@@ -191,107 +175,296 @@ func Execute() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+	defaultAssetDirectory, _ = filepath.Abs(defaultAssetDirectory)
 
 	//Start processing each package.
 	for _, packageName := range PackageNames {
 		if !utils.MatchAnyOfRegex(Options.PackageFiltersRegexes, packageName) {
 			continue
 		}
+		fmt.Println("Processing " + packageName)
 
+		totalProcessedTextureCount := 0
 		layerName := fmt.Sprintf("Overrides_%s.usda", packageName)
-		activeLayer := findLayer(layerName, true)
-		if activeLayer == nil {
-			layerPath := path.Join(RootDir, layerName)
-			if _, err := os.Stat(layerPath); err == nil {
-				os.Remove(layerPath)
-			}
-			l, err := createLayer(httpClient, PostCreateLayerRequestParams{
-				LayerPath:       layerPath,
-				LayerType:       LayerType_AutoUpscale,
-				SetEditTarget:   utils.NewPtrValue(true),
-				ParentLayerID:   utils.NewPtrValue(RootLayer.LayerFilePath),
-				CreateOrInsert:  utils.NewPtrValue(true),
-				ReplaceExisting: utils.NewPtrValue(false),
-			})
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			activeLayer = &l
+		activeLayer := prepareLayer(layerName, httpClient)
+		workloads, totaltextureCount := generateIngestionWorkload(packageName, defaultAssetDirectory, httpClient)
+		for _, workload := range workloads {
+			ingestResults, processedTextureCount := executeTexturesIngestion(*workload, activeLayer, httpClient, totaltextureCount)
+
+			progressf := float64(totalProcessedTextureCount) / float64(totaltextureCount)
+			log.Printf("Processed %d textures of %d remaining; %d%%.\n", len(workload.InputFiles), (totaltextureCount - totalProcessedTextureCount), uint(progressf*100.0))
+
+			totalProcessedTextureCount += processedTextureCount
+			inputOutputMapping := processIngestResults(*workload, ingestResults)
+			processTextureOverrides(inputOutputMapping, httpClient)
+		}
+	}
+}
+
+func prepareLayer(layerName string, httpClient *RestClient) *Layer {
+	activeLayer := findLayer(layerName, true)
+	if activeLayer == nil {
+		layerPath := path.Join(RootDir, layerName)
+		if _, err := os.Stat(layerPath); err == nil {
+			os.Remove(layerPath)
+		}
+		l, err := createLayer(httpClient, PostCreateLayerRequestParams{
+			LayerPath:       layerPath,
+			LayerType:       LayerType_AutoUpscale,
+			SetEditTarget:   utils.NewPtrValue(true),
+			ParentLayerID:   utils.NewPtrValue(RootLayer.LayerFilePath),
+			CreateOrInsert:  utils.NewPtrValue(true),
+			ReplaceExisting: utils.NewPtrValue(false),
+		})
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		activeLayer = &l
+	}
+
+	if _, err := httpClient.SetEditLayer(activeLayer.LayerFilePath); err != nil {
+		log.Fatalf("Failed to switch to layer %s", activeLayer.LayerFilePath)
+	}
+	return activeLayer
+}
+
+func generateIngestionWorkload(packageName string, defaultAssetDirectory string, httpClient *RestClient) ([]*IngestTexturesRequestParams, int) {
+	totalTextureCount := 0
+	params := make([]*IngestTexturesRequestParams, 0)
+	var currentParams *IngestTexturesRequestParams
+	allocateNewParams := func() {
+		currentParams = new(IngestTexturesRequestParams)
+		currentParams.OutputDirectory = path.Join(defaultAssetDirectory, "overrides", packageName)
+		params = append(params, currentParams)
+	}
+	allocateNewParams()
+
+	// Iterate over textures in the package
+	for _, v := range PackageMapping[packageName] {
+		remixTextures, err := httpClient.GetTextures(GetTexturesRequestParams{
+			AssetHashes: []string{v.RemixHashText},
+		})
+		if err != nil {
+			fmt.Printf("Warning: could not fetch textures of %s (%s)\n", v.RemixHashText, v.Name)
+			continue
 		}
 
-		if _, err := httpClient.SetEditLayer(activeLayer.LayerFilePath); err != nil {
-			log.Fatalf("Failed to switch to layer %s", activeLayer.LayerFilePath)
-		}
-
-		params := make([]*IngestTexturesRequestParams, 0)
-		var currentParams *IngestTexturesRequestParams
-		allocateNewParams := func() {
-			currentParams = new(IngestTexturesRequestParams)
-			currentParams.OutputDirectory = path.Join(defaultAssetDirectory, "overrides", packageName)
-			params = append(params, currentParams)
-		}
-		allocateNewParams()
-
-		totalTextureCount := 0
-		for _, v := range PackageMapping[packageName] {
-			for i := 0; i < int(data.TextureType_COUNT); i++ {
-				path := v.ImportTexturePath[i]
-				if len(path) > 0 {
-					currentParams.InputFiles = append(currentParams.InputFiles, struct {
-						InputFilePath string
-						TextureType   string
-					}{
-						InputFilePath: v.ImportTexturePath[i],
-						TextureType:   data.TextureTypeToString(data.TextureType(i)),
+		// Process texture paths
+		for i := data.TextureType(0); i < data.TextureType_COUNT; i++ {
+			path := v.ImportTexturePath[i]
+			if len(path) > 0 {
+				// Check if texture has already been converted
+				if !Options.OverwriteOverrides {
+					expectedRemixFilePath := fmt.Sprintf("/RootNode/Looks/mat_%s/Shader.inputs:%s", v.RemixHashText, data.TextureTypeToShaderInput(i))
+					remixFilePathTuple := utils.SelectFromSlice(remixTextures.Textures, func(p [2]string) bool {
+						return (p[0] == expectedRemixFilePath)
 					})
 
-					if len(currentParams.InputFiles) >= TEXTURES_PER_BATCH {
-						allocateNewParams()
+					if remixFilePathTuple != nil {
+						remixFilePath, _ := filepath.Abs((*remixFilePathTuple)[1])
+						if strings.HasPrefix(remixFilePath, defaultAssetDirectory) &&
+							strings.Contains(remixFilePath, data.TextureTypeToFilenameGlob(i)) {
+							continue
+						}
 					}
 				}
+
+				// Add texture to input for conversion
+				currentParams.InputHashes = append(currentParams.InputHashes, v.RemixHash)
+				currentParams.InputFiles = append(currentParams.InputFiles, v.ImportTexturePath[i])
+				currentParams.InputTextureTypeStrings = append(currentParams.InputTextureTypeStrings, data.TextureTypeToString(data.TextureType(i)))
+				currentParams.InputTextureTypePathGlobs = append(currentParams.InputTextureTypePathGlobs, data.TextureTypeToFilenameGlob(data.TextureType(i)))
+				totalTextureCount++
+
+				// If batch size is reached, allocate new parameters
+				if len(currentParams.InputFiles) >= TEXTURES_PER_BATCH {
+					allocateNewParams()
+				}
 			}
-
-			totalTextureCount += len(currentParams.InputFiles)
 		}
+	}
 
-		batcher := utils.NewJobScheduler(8)
-		processedTextureCount := 0
-		for _, p := range params {
-			//progressf := (float64(processedTextureCount) / float64(totalTextureCount))
-			//log.Printf("Processing package '%s', %d textures, %d%%.", packageName, len(p.InputFiles), uint(progressf*100.0))
-			if len(p.InputFiles) == 0 {
+	return params, totalTextureCount
+}
+
+// executeTexturesIngestion triggers the actual ingestion process
+func executeTexturesIngestion(workload IngestTexturesRequestParams, activeLayer *Layer, httpClient *RestClient, statTotalTextureCount int) (map[string]IngestTexturesResponse, int) {
+	log.Println("Starting texture ingestion...")
+
+	// Mutex to lock results map during concurrent access
+	ingestResultsLock := sync.Mutex{}
+	ingestResults := make(map[string]IngestTexturesResponse)
+	batcher := utils.NewJobScheduler(1)
+	defer batcher.Close()
+
+	// Process each parameter set
+	if len(workload.InputFiles) == 0 {
+		return nil, 0
+	}
+
+	// Schedule texture ingestion jobs
+	processedTextureCount := 0
+	batcher.Schedule(
+		func() {
+			var lastErr error
+			for i := uint(0); i < 5; i++ { // Retry up to 5 times
+				if obj, err := httpClient.IngestTextures(workload); err == nil {
+					// Successful ingestion
+					ingestResultsLock.Lock()
+					ingestResults[strings.Join(workload.InputFiles, ";")] = obj
+					ingestResultsLock.Unlock()
+
+					processedTextureCount += len(workload.InputFiles)
+					break
+				} else {
+					// Handle retry
+					lastErr = err
+					log.Printf("Failed to process textures: %+v\n", workload.InputFiles)
+					log.Printf("error was: %s\n", err.Error())
+					log.Printf("ingestTexture failed %d times, retrying...\n", i+1)
+					time.Sleep(time.Second * time.Duration(5+rand.IntN(15)))
+				}
+			}
+			// Log final error if all retries fail
+			if lastErr != nil {
+				log.Printf("Failed to process textures: %+v", workload.InputFiles)
+				log.Printf("IngestTextures REST call failed with: %s", lastErr.Error())
+			}
+		})
+
+	// Wait for all tasks to be done.
+	batcher.Wait()
+
+	// Save the layer after processing
+	if _, err := httpClient.SaveLayer(activeLayer.LayerFilePath); err != nil {
+		log.Fatalf("Was not able to save layer: %s", err.Error())
+	}
+
+	return ingestResults, processedTextureCount
+}
+
+// ProcessIngestResults processes ingestion results and maps input to output file paths.
+func processIngestResults(originalRequestParam IngestTexturesRequestParams, ingestResults map[string]IngestTexturesResponse) map[string]string {
+	// Initialize the mapping of input to output paths
+	inputOutputMapping := map[string]string{}
+
+	for identifier, r := range ingestResults {
+		for _, completedTasks := range r.CompletedSchemas {
+			plugin := utils.SelectFromSlice(completedTasks.CheckPlugins, func(eval IngestTexturesResponseCheckPlugin) bool {
+				return (eval.Name == "ConvertToDDS")
+			})
+			if plugin == nil {
+				log.Printf("WARNING: Unable to locate the ConvertToDDS plugin of ingestion task '%s'", identifier)
 				continue
 			}
 
-			batcher.Schedule(
-				func() {
-					var lastErr error
-					for i := uint(0); i < 5; i++ {
-						if _, err := httpClient.IngestTextures(*p); err == nil {
-							//success!
-							lastErr = err
-							break
-						} else {
-							//try one more time...
-							lastErr = err
-							log.Printf("Failed to process textures: %+v", p.InputFiles)
-							log.Printf("error was: %s", err.Error())
-							log.Printf("ingestTexture failed %d times, retrying...", i+1)
-							time.Sleep(time.Second * time.Duration(60+rand.IntN(120)))
-						}
-					}
-					if lastErr != nil {
-						log.Printf("Failed to process textures: %+v", p.InputFiles)
-						log.Printf("IngestTextures REST call failed with: %s", lastErr.Error())
-					}
+			inputFlow := utils.SelectFromSlice(completedTasks.ContextPlugin.Data.DataFlows, func(eval IngestTexturesResponseDataFlow) bool {
+				return (eval.Name == "InOutData" && eval.Channel == "Default")
+			})
 
-					processedTextureCount += len(p.InputFiles)
+			outputFlow := utils.SelectFromSlice(plugin.Data.DataFlows, func(eval IngestTexturesResponseDataFlow) bool {
+				// Return the cleanup_files channel as it conveniently has both input and output files.
+				// Otherwise, use ingestion_output.
+				return (eval.Name == "InOutData" && eval.Channel == "cleanup_files")
+			})
+			if outputFlow == nil {
+				log.Printf("WARNING: Unable to locate the InOutData.cleanup_files field of ingestion task '%s'", identifier)
+				continue
+			}
+
+			var outputData []string
+			if slice, convertedOk := outputFlow.OutputData.([]interface{}); convertedOk {
+				for _, s := range slice {
+					if s, ok := s.(string); ok {
+						outputData = append(outputData, s)
+					} else {
+						log.Panicln("ERROR: Unexpected non-string data in output flow.")
+					}
+				}
+			} else {
+				log.Printf("WARNING: Could not convert the dataflow's output_data field to a string array.")
+				continue
+			}
+
+			// Ensure there's at least one output and input path
+			if len(outputData) < 1 {
+				log.Panicf("ERROR: Should have received one or more output path, but received %d", len(outputData))
+			}
+			if len(outputFlow.InputData) < 1 {
+				log.Panicf("ERROR: Should have received one or more input path, but received %d", len(outputFlow.InputData))
+			}
+
+			// Validate that the number of inputs and outputs are consistent
+			if len(outputFlow.InputData) != len(outputData) || len(inputFlow.InputData) != len(outputFlow.InputData) {
+				log.Panicf("ERROR: Mismatch between number of inputs and outputs received")
+			}
+
+			// Map input paths to output paths
+			// The order in the returned arrays is sadly not guaranteed...
+			// So for each input, we'll try to find a matching output based on materialid+texture type.
+			for i := 0; i < len(inputFlow.InputData); i++ {
+				var inputHash uint64
+				var glob string
+				inputPath, _ := filepath.Abs(inputFlow.InputData[i])
+
+				//Acquire the correct index into the originalRequestParam slices by matching the known input path
+				idx := slices.Index(originalRequestParam.InputFiles, inputPath)
+				if idx >= 0 && idx < len(originalRequestParam.InputTextureTypePathGlobs) {
+					glob = originalRequestParam.InputTextureTypePathGlobs[idx]
+					inputHash = originalRequestParam.InputHashes[idx]
+				} else {
+					log.Fatal("Slice access out of bounds.")
+				}
+
+				//Look up the matching textureInfo so we can get the (correctly formatted) hash
+				textureInfo := TextureMapping[inputHash]
+				outputPath := *utils.SelectFromSlice(outputData, func(eval string) bool {
+					return strings.Contains(eval, textureInfo.RemixHashText) && strings.Contains(eval, glob)
 				})
-		}
-		batcher.Close()
-		batcher = nil
-		if _, err := httpClient.SaveLayer(activeLayer.LayerFilePath); err != nil {
-			log.Fatalf("Was not able to save layer: %s", err.Error())
+
+				//Normalize the output path and store it in the lookup mapping for later use.
+				outputPath, _ = filepath.Abs(outputPath)
+				inputOutputMapping[inputPath] = outputPath
+			}
 		}
 	}
+
+	return inputOutputMapping
+}
+
+// ProcessTextureOverrides processes texture mappings and sets override textures
+func processTextureOverrides(inputOutputMapping map[string]string, httpClient *RestClient) {
+	fmt.Println("Done with package, setting overrides...")
+
+	for key, val := range inputOutputMapping {
+		if info, found := TextureFileMapping[key]; found {
+			for i := data.TextureType(0); i < data.TextureType_COUNT; i++ {
+				if info.ImportTexturePath[i] == key {
+					diffusePath := fmt.Sprintf("/RootNode/Looks/mat_%s/Shader.inputs:%s", info.RemixHashText, data.TextureTypeToShaderInput(1))
+					httpClient.ValidateTextureMaterialInputs(diffusePath)
+
+					path := fmt.Sprintf("/RootNode/Looks/mat_%s/Shader.inputs:%s", info.RemixHashText, data.TextureTypeToShaderInput(i))
+					if _, err := httpClient.ValidateTextureMaterialInputs(path); err != nil {
+						log.Printf("[Warning] Failed to validate material inputs of '%s', error: %s", path, err.Error())
+					}
+
+					expectedFilenameTextureType := data.TextureTypeToFilenameGlob(i)
+					if !strings.Contains(val, expectedFilenameTextureType) {
+						log.Fatalf("replacement texture %s did not match expected texture type of *%s*", val, expectedFilenameTextureType)
+					}
+
+					_, err := httpClient.SetOverrideTextures([]string{path}, []string{val}, true)
+					if err != nil {
+						log.Printf("Failed to set override textures, %s", err.Error())
+					}
+
+					fmt.Printf("%s\t%s\t%s\n", info.RemixHashText, data.TextureTypeToString(i), val)
+				}
+			}
+		} else {
+			log.Panicf("Could not find info for file %s", key)
+		}
+	}
+
+	fmt.Println("Done with package, setting overrides: done")
 }

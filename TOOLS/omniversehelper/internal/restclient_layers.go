@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"net/url"
 )
 
 type (
@@ -56,7 +57,7 @@ func (c *RestClient) GetEditLayer() (string, error) {
 }
 
 func (c *RestClient) SetEditLayer(layer_id string) (bool, error) {
-	s, err := c.Put(fmt.Sprintf("/stagecraft/layers/target/%s", layer_id), nil)
+	s, err := c.Put(fmt.Sprintf("/stagecraft/layers/target/%s", url.QueryEscape(layer_id)), nil)
 	if err != nil {
 		return false, err
 	}
@@ -110,7 +111,7 @@ func (c *RestClient) PostCreateLayer(params PostCreateLayerRequestParams) (strin
 }
 
 func (c *RestClient) SaveLayer(layer_id string) (bool, error) {
-	s, err := c.Post(fmt.Sprintf("/stagecraft/layers/%s/save", layer_id), nil)
+	s, err := c.Post(fmt.Sprintf("/stagecraft/layers/%s/save", url.QueryEscape(layer_id)), nil)
 	if err != nil {
 		return false, err
 	}

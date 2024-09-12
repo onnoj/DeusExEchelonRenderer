@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net/url"
 	"os"
+
+	"github.com/onnoj/DeusExEchelonRenderer/OmniverseHelper/utils"
 )
 
 type (
@@ -56,131 +60,57 @@ func (c *RestClient) GetTextures(params GetTexturesRequestParams) (GetTexturesRe
 	return GetTexturesResponse{}, errors.New("unknown response received")
 }
 
-type (
-	IngestTexturesRequestParams struct {
-		InputFiles []struct {
-			InputFilePath string
-			TextureType   string
-		}
-		OutputDirectory string
-	}
-
-	// IngestTexturesResponse structure
-	IngestTexturesResponse struct {
-		CompletedSchemas []IngestTexturesResponseCompletedSchema `json:"completed_schemas,omitempty"`
-	}
-
-	// IngestTexturesResponseCompletedSchema structure
-	IngestTexturesResponseCompletedSchema struct {
-		Name             string                                 `json:"name,omitempty"`
-		UUID             string                                 `json:"uuid,omitempty"`
-		Data             IngestTexturesResponseData             `json:"data,omitempty"`
-		Progress         float64                                `json:"progress,omitempty"`
-		SendRequest      bool                                   `json:"send_request,omitempty"`
-		ContextPlugin    IngestTexturesResponseContextPlugin    `json:"context_plugin,omitempty"`
-		CheckPlugins     []IngestTexturesResponseCheckPlugin    `json:"check_plugins,omitempty"`
-		ResultorPlugins  []IngestTexturesResponseResultorPlugin `json:"resultor_plugins,omitempty"`
-		ValidationPassed bool                                   `json:"validation_passed,omitempty"`
-		Finished         []interface{}                          `json:"finished,omitempty"`
-	}
-
-	// IngestTexturesResponseData structure
-	IngestTexturesResponseData struct {
-		NameTooltip                    string                           `json:"name_tooltip,omitempty"`
-		Channel                        string                           `json:"channel,omitempty"`
-		ExposeMassUI                   bool                             `json:"expose_mass_ui,omitempty"`
-		ExposeMassQueueActionUI        bool                             `json:"expose_mass_queue_action_ui,omitempty"`
-		CookMassTemplate               bool                             `json:"cook_mass_template,omitempty"`
-		DisplayNameMassTemplate        string                           `json:"display_name_mass_template,omitempty"`
-		DisplayNameMassTemplateTooltip string                           `json:"display_name_mass_template_tooltip,omitempty"`
-		UUID                           string                           `json:"uuid,omitempty"`
-		Progress                       []interface{}                    `json:"progress,omitempty"`
-		GlobalProgressValue            float64                          `json:"global_progress_value,omitempty"`
-		LastCheckMessage               string                           `json:"last_check_message,omitempty"`
-		LastCheckTiming                float64                          `json:"last_check_timing,omitempty"`
-		LastCheckResult                bool                             `json:"last_check_result,omitempty"`
-		LastSetMessage                 *string                          `json:"last_set_message,omitempty"`
-		LastSetTiming                  *float64                         `json:"last_set_timing,omitempty"`
-		LastSetResult                  *bool                            `json:"last_set_result,omitempty"`
-		LastOnExitMessage              *string                          `json:"last_on_exit_message,omitempty"`
-		LastOnExitTiming               *float64                         `json:"last_on_exit_timing,omitempty"`
-		LastOnExitResult               *bool                            `json:"last_on_exit_result,omitempty"`
-		HideContextUI                  bool                             `json:"hide_context_ui,omitempty"`
-		ContextName                    string                           `json:"context_name,omitempty"`
-		CreateContextIfNotExist        bool                             `json:"create_context_if_not_exist,omitempty"`
-		ComputedContext                string                           `json:"computed_context,omitempty"`
-		AllowEmptyInputFilesList       bool                             `json:"allow_empty_input_files_list,omitempty"`
-		InputFiles                     [][]string                       `json:"input_files,omitempty"`
-		ErrorOnTextureTypes            *string                          `json:"error_on_texture_types,omitempty"`
-		CreateOutputDirectoryIfMissing bool                             `json:"create_output_directory_if_missing,omitempty"`
-		OutputDirectory                string                           `json:"output_directory,omitempty"`
-		DataFlows                      []IngestTexturesResponseDataFlow `json:"data_flows,omitempty"`
-	}
-
-	// IngestTexturesResponseDataFlow structure
-	IngestTexturesResponseDataFlow struct {
-		Name           string      `json:"name,omitempty"`
-		Channel        string      `json:"channel,omitempty"`
-		InputData      []string    `json:"input_data,omitempty"`
-		PushInputData  bool        `json:"push_input_data,omitempty"`
-		OutputData     interface{} `json:"output_data,omitempty"`
-		PushOutputData bool        `json:"push_output_data,omitempty"`
-	}
-
-	// IngestTexturesResponseContextPlugin structure
-	IngestTexturesResponseContextPlugin struct {
-		Name            string                     `json:"name,omitempty"`
-		Enabled         bool                       `json:"enabled,omitempty"`
-		Data            IngestTexturesResponseData `json:"data,omitempty"`
-		ResultorPlugins interface{}                `json:"resultor_plugins,omitempty"`
-	}
-
-	// IngestTexturesResponseCheckPlugin structure
-	IngestTexturesResponseCheckPlugin struct {
-		Name             string                                 `json:"name,omitempty"`
-		Enabled          bool                                   `json:"enabled,omitempty"`
-		Data             IngestTexturesResponseData             `json:"data,omitempty"`
-		ContextPlugin    IngestTexturesResponseContextPlugin    `json:"context_plugin,omitempty"`
-		SelectorPlugins  []IngestTexturesResponseSelectorPlugin `json:"selector_plugins,omitempty"`
-		ResultorPlugins  interface{}                            `json:"resultor_plugins,omitempty"`
-		StopIfFixFailed  bool                                   `json:"stop_if_fix_failed,omitempty"`
-		PauseIfFixFailed bool                                   `json:"pause_if_fix_failed,omitempty"`
-	}
-
-	// IngestTexturesResponseSelectorPlugin structure
-	IngestTexturesResponseSelectorPlugin struct {
-		Name    string                     `json:"name,omitempty"`
-		Enabled bool                       `json:"enabled,omitempty"`
-		Data    IngestTexturesResponseData `json:"data,omitempty"`
-	}
-
-	// IngestTexturesResponseResultorPlugin structure
-	IngestTexturesResponseResultorPlugin struct {
-		Name    string                     `json:"name,omitempty"`
-		Enabled bool                       `json:"enabled,omitempty"`
-		Data    IngestTexturesResponseData `json:"data,omitempty"`
-	}
-)
-
 func (c *RestClient) IngestTextures(params IngestTexturesRequestParams) (IngestTexturesResponse, error) {
-	jsonMap := make(map[string]any)
-	contextPluginJson := make(map[string]any)
-	dataJson := make(map[string]any)
 
 	inputFiles := make([][]string, 0)
-	for _, input := range params.InputFiles {
-		inputFiles = append(inputFiles, []string{input.InputFilePath, input.TextureType})
+	for i := int(0); i < len(params.InputFiles); i++ {
+		inputFiles = append(inputFiles, []string{params.InputFiles[i], params.InputTextureTypeStrings[i]})
 	}
-	dataJson["input_files"] = inputFiles
-	dataJson["output_directory"] = params.OutputDirectory
 
-	contextPluginJson["data"] = dataJson
-	jsonMap["context_plugin"] = contextPluginJson
-	jsonResponse, err := c.Post("/ingestcraft/mass-validator/queue/material", jsonMap)
+	requestParams := NewIngestTexturesRequestParams()
+	requestParams.CheckPlugins = nil    //[]IngestTexturesRequestParamsCheckPlugin{}
+	requestParams.ResultorPlugins = nil //[]IngestTexturesRequestParamsResultorPluginMain{}
+	requestParams.Executor = utils.NewPtrValue(0)
+	requestParams.Name = nil
+
+	requestData := &requestParams.ContextPlugin.Data
+	requestData.InputFiles = inputFiles
+	requestData.OutputDirectory = params.OutputDirectory
+
+	jsonResponse, err := c.Post("/ingestcraft/mass-validator/queue/material", requestParams)
 	if err != nil {
 		return IngestTexturesResponse{}, err
 	}
-	os.WriteFile("d:\\temp\\mongoose.txt", []byte(jsonResponse), 0777)
+
+	f, _ := os.CreateTemp("", "ingesttextures_*.json")
+	js, _ := json.Marshal(requestParams)
+	f.WriteString("===================== REQ ==================\n")
+	f.WriteString(string(js) + "\n")
+	f.WriteString("===================== RESP ==================\n")
+	f.WriteString(jsonResponse + "\n")
+	defer f.Close()
+
+	/*
+			jsonMap := make(map[string]any)
+		contextPluginJson := make(map[string]any)
+		dataJson := make(map[string]any)
+
+			dataJson["input_files"] = inputFiles
+			dataJson["output_directory"] = params.OutputDirectory
+
+			contextPluginJson["data"] = dataJson
+			jsonMap["context_plugin"] = contextPluginJson
+			jsonMap["check_plugins"]
+			jsonResponse, err := c.Post("/ingestcraft/mass-validator/queue/material", jsonMap)
+			if err != nil {
+				return IngestTexturesResponse{}, err
+			}
+
+	*/
+	//if len(params.InputFiles) > 0 {
+	//	os.WriteFile("d:\\temp\\mongoose.txt", []byte(jsonResponse), 0777)
+	//	panic(1)
+	//}
 
 	var obj IngestTexturesResponse
 	if err := json.Unmarshal([]byte(jsonResponse), &obj); err != nil {
@@ -190,4 +120,46 @@ func (c *RestClient) IngestTextures(params IngestTexturesRequestParams) (IngestT
 	return obj, nil
 }
 
-//func (c *RestClient) PutOverrideTextures()
+func (c *RestClient) ValidateTextureMaterialInputs(texturePath string) ([]string, error) {
+	type response struct {
+		AssetPaths []string `json:"asset_paths"`
+	}
+
+	endpoint := fmt.Sprintf("/stagecraft/textures/%s/material/inputs", url.QueryEscape(texturePath))
+	resp, err := TypedGet[response](c, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil || len(resp.AssetPaths) == 0 {
+		return nil, errors.New("empty response was returned")
+	}
+
+	return resp.AssetPaths, nil
+}
+
+func (c *RestClient) SetOverrideTextures(texturePaths []string, filePaths []string, force bool) (bool, error) {
+	if len(texturePaths) != len(filePaths) {
+		log.Fatal("Number of texturePaths and filePaths need to be the same; it's a 1:1 mapping!")
+	}
+
+	body := struct {
+		Force    bool       `json:"force,omitempty"`
+		Textures [][]string `json:"textures,omitempty"`
+	}{
+		Force: force,
+	}
+	for i := 0; i < len(texturePaths); i++ {
+		body.Textures = append(body.Textures, []string{texturePaths[i], filePaths[i]})
+	}
+
+	s, err := c.Put("/stagecraft/textures/", &body)
+	if err != nil {
+		return false, err
+	}
+
+	if s == "OK" {
+		return true, nil
+	}
+
+	return false, nil
+}

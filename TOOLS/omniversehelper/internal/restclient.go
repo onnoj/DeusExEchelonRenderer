@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/onnoj/DeusExEchelonRenderer/OmniverseHelper/utils"
 )
 
 // RestClient is a basic HTTP client
@@ -77,7 +79,7 @@ func (c *RestClient) Get(endpoint string, parameters *map[string][]string) (stri
 	return string(body), nil
 }
 
-func (c *RestClient) Post(endpoint string, jsonMap map[string]any) (string, error) {
+func (c *RestClient) Post(endpoint string, jsonMap any) (string, error) {
 	client := http.Client{
 		Timeout: c.Timeout,
 	}
@@ -107,7 +109,7 @@ func (c *RestClient) Post(endpoint string, jsonMap map[string]any) (string, erro
 	return string(body), nil
 }
 
-func (c *RestClient) Put(endpoint string, jsonMap map[string]any) (string, error) {
+func (c *RestClient) Put(endpoint string, jsonMap any) (string, error) {
 	client := http.Client{
 		Timeout: c.Timeout,
 	}
@@ -118,6 +120,13 @@ func (c *RestClient) Put(endpoint string, jsonMap map[string]any) (string, error
 		return "", err
 	}
 
+	dbg := utils.NewDebugWriter(endpoint, ".json")
+	defer dbg.Close()
+
+	dbg.Write("=========================== Request ====================\n")
+	dbg.Write(url + "\n")
+	dbg.Write("=========================== Request ====================\n")
+	dbg.Write(string(obj))
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(obj))
 	if err != nil {
 		return "", fmt.Errorf("failed to PUT to %s: %v", url, err)
@@ -133,6 +142,9 @@ func (c *RestClient) Put(endpoint string, jsonMap map[string]any) (string, error
 	if err != nil {
 		return "", fmt.Errorf("error reading response body: %v", err)
 	}
+	dbg.Write("=========================== Answer ====================\n")
+	dbg.Write(string(body) + "\n")
+	dbg.Write("=========================== Answer ====================\n")
 
 	// Optionally check for the status code
 	if resp.StatusCode != http.StatusOK {

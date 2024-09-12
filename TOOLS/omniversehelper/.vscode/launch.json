@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Package",
+            "name": "CLI - Process Textures",
             "type": "go",
             "request": "launch",
             "mode": "auto",
@@ -16,12 +16,56 @@
                 "--input=D:\\development\\misc\\ai\\DeusExUpscaling\\output",
                 "-R",
                 "--jsondump=F:\\Games\\Steam\\steamapps\\common\\Deus Ex - RTXModder\\System\\textureDump.json",
-                "--package-filter=UNATCO.Wood",
-                "--package-filter=UNATCO.Textile",
+                "--package-filter=.*\\.Textile",
+                "--package-filter=.*\\.Concrete",
+                "--package-filter=.*\\.Ceramic",
+                "--package-filter=.*\\.Stone",
+                "--package-filter=.*\\.Stucco",
+                "--package-filter=.*\\.Wood",
+                "--package-filter=.*\\.Brick",
+                "--package-filter=.*\\.Metal",
+                "--package-filter=.*\\.Tiles",
+                "--package-filter=.*\\.Tile",
+                "--package-filter=.*\\.Wood",
+            ],
+            "disabled_args": [
+                "--package-filter=MJ12_lab.Concrete"
             ],
             "buildFlags": "-buildvcs=false",
             "preLaunchTask": "",
             "postDebugTask": ""
-        }
+        },
+        {
+            "name": "CLI - Process Textures (Forced)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "--input=D:\\development\\misc\\ai\\DeusExUpscaling\\output",
+                "-R",
+                "--jsondump=F:\\Games\\Steam\\steamapps\\common\\Deus Ex - RTXModder\\System\\textureDump.json",
+                "--package-filter=MJ12_lab.Concrete",
+                "--overwrite-overrides"
+            ],
+            "disabled_args": [
+                "--package-filter=.*\\.Textile",
+                "--package-filter=.*\\.Concrete",
+                "--package-filter=.*\\.Ceramic",
+                "--package-filter=.*\\.Stone",
+                "--package-filter=.*\\.Stucco",
+                "--package-filter=.*\\.Wood",
+                "--package-filter=.*\\.Brick",
+                "--package-filter=.*\\.Metal",
+                "--package-filter=.*\\.Tiles",
+                "--package-filter=.*\\.Tile",
+                "--package-filter=.*\\.Wood",
+            ],
+            "buildFlags": "-buildvcs=false",
+            "preLaunchTask": "",
+            "postDebugTask": ""
+        },
     ]
 }

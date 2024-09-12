@@ -1,3 +1,4 @@
 Thanks to the following github contributors, for improving and growing the renderer, keeping Deus Ex alive:
-* RCGodward
-* MamiyaOtaru
+* RCGodward (PF_Smooth/Texfiltering support)
+* MamiyaOtaru (gouraud shading fix)
+* shoober420 (many bug reports)

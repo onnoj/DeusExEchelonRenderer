@@ -729,7 +729,7 @@ bool LowlevelRenderer::ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint3
   }
   if (m_Device)
   {
-    return SetViewport(pWidth, pHeight, pWidth, pHeight);
+    return SetViewport(pLeft, pTop, pWidth, pHeight);
   }
   return false;
 }

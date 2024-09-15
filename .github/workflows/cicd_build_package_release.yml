@@ -55,7 +55,7 @@ jobs:
     - name: Upload binaries
       uses: actions/upload-artifact@v4.3.1
       with:
-        name: DeusExEchelonRenderer-${{env.GITHUB_SHA}}-${{github.run_number}}
+        name: DeusExEchelonRenderer-$GITHUB_SHA-${{github.run_number}}
         path: |
           ${{github.workspace}}/dist/*
           ${{github.workspace}}/BIN/DEV/*

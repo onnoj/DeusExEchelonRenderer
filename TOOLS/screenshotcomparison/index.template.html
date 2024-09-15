@@ -1,0 +1,15 @@
+<html>
+<body>
+
+<!-- just an example, replace with your own HTML template -->
+
+{{- range .FileNames }}
+			"{{.}}",
+{{- end }}
+
+{{- range .DataSets }}
+		<span> {{ .Identifier }} </span>			
+{{- end }}
+
+</body>
+</html>

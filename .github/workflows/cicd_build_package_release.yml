@@ -15,7 +15,7 @@ env:
   BUILD_TYPE: Release
 
 jobs:
-  build:
+  build-renderer:
     # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
     # You can convert this to a matrix build if you need cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
@@ -26,17 +26,30 @@ jobs:
       with:
         submodules: 'recursive'
 
+    - name: Compile-Tool-OmniverseHelper
+      working-directory: "${{ github.workspace }}/TOOLS/omniversehelper"
+      run: |
+        mkdir "${{github.workspace}}/BIN/DEV/omniversehelper"
+        go build -o "${{github.workspace}}/BIN/DEV/omniversehelper"
+
+    - name: Compile-Tool-ScreenshotComparison
+      working-directory: "${{ github.workspace }}/TOOLS/screenshotcomparison"
+      run: |
+        mkdir "${{github.workspace}}/BIN/DEV/screenshotcomparison"
+        go build -o "${{github.workspace}}/BIN/DEV/screenshotcomparison"
+        copy "index.template.html" "${{github.workspace}}/BIN/DEV/screenshotcomparison"
+      
     - name: Configure CMake
       env:
         CICD_REFNAME: ${{  github.ref_name }}
         CICD_REF: ${{ github.ref }}
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -G"Visual Studio 17 2022" -A win32 -DEE_DEUSEXFOLDER=${{github.workspace}}/dist
-
-    - name: Build
+      
+    - name: Compile-Renderer
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
-    - name: Install
+    - name: Install-Renderer
       run: cmake --install ${{github.workspace}}/build --config Release
 
     - name: Upload binaries

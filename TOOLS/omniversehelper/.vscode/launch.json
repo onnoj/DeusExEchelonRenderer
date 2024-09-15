@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "CLI - Process Textures",
+            "name": "Process Textures",
             "type": "go",
             "request": "launch",
             "mode": "auto",
@@ -13,9 +13,9 @@
             "program": "${workspaceFolder}",
             "env": {},
             "args": [
-                "--input=D:\\development\\misc\\ai\\DeusExUpscaling\\output",
+                "--input=D:\\development\\misc\\ai\\DeusExUpscaling\\categorized_pbrfusion2",
                 "-R",
-                "--jsondump=F:\\Games\\Steam\\steamapps\\common\\Deus Ex - RTXModder\\System\\textureDump.json",
+                "--jsondump=F:\\Games\\Steam\\steamapps\\common\\Deus Ex - RTXModder2\\System\\textureDump.json",
                 "--package-filter=.*\\.Textile",
                 "--package-filter=.*\\.Concrete",
                 "--package-filter=.*\\.Ceramic",
@@ -26,7 +26,11 @@
                 "--package-filter=.*\\.Metal",
                 "--package-filter=.*\\.Tiles",
                 "--package-filter=.*\\.Tile",
-                "--package-filter=.*\\.Wood",
+                "--package-filter=.*\\.Foliage",
+                "--package-filter=.*\\.Sky",
+                "--package-filter=.*\\.Earth",
+                
+                "ingest"
             ],
             "disabled_args": [
                 "--package-filter=MJ12_lab.Concrete"
@@ -36,7 +40,7 @@
             "postDebugTask": ""
         },
         {
-            "name": "CLI - Process Textures (Forced)",
+            "name": "Process Textures (Forced)",
             "type": "go",
             "request": "launch",
             "mode": "auto",
@@ -62,6 +66,24 @@
                 "--package-filter=.*\\.Tiles",
                 "--package-filter=.*\\.Tile",
                 "--package-filter=.*\\.Wood",
+            ],
+            "buildFlags": "-buildvcs=false",
+            "preLaunchTask": "",
+            "postDebugTask": ""
+        },
+        {
+            "name": "Copy Textures",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "--input=D:\\development\\misc\\ai\\DeusExUpscaling\\output_pbrfusion2",
+                "--jsondump=F:\\Games\\Steam\\steamapps\\common\\Deus Ex - RTXModder\\System\\textureDump.json",
+                "-o=D:\\development\\misc\\ai\\DeusExUpscaling\\categorized_pbrfusion2",
+                "copy"
             ],
             "buildFlags": "-buildvcs=false",
             "preLaunchTask": "",

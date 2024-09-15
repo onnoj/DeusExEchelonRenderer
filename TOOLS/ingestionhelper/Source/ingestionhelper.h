@@ -6,8 +6,8 @@ struct Options
   std::string textureDumpJSON = "textureDump.json";
   std::filesystem::path inputFolderPath = "";
   std::filesystem::path outputFolderPath = "";
-  std::string inputFilenameFormat = "{:X}";
-  std::string outputFormat = "${package}\\${remixhash-hex}.png";
+  std::string inputFilenameFormat = "{:X}{}";
+  std::string outputFormat = "${package}\\${filename}";
   std::vector<std::regex> inputFileFilters{};
   std::map<std::string, std::regex> jsonFilterMap{};
   enum class OperationMode

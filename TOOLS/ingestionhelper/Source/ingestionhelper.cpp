@@ -86,10 +86,11 @@ void IngestionHelper::processFiles()
     }
 
 
-    auto res = scn::scan<uint64_t>(filenameUtf8, m_Options.inputFilenameFormat);
+    auto res = scn::scan<uint64_t, std::wstring>(filenameUtf8, m_Options.inputFilenameFormat);
     if (!res)
     {
       std::cout << inputFile.path() << '\n';
+      return;
     }
     fileHash = std::get<0>(res->values());
 

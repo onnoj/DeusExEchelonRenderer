@@ -14,6 +14,7 @@ const (
 	TextureType_NormalDX  TextureType = iota
 	TextureType_NormalOGL TextureType = iota
 	TextureType_Metalness TextureType = iota
+	TextureType_Height    TextureType = iota
 	TextureType_COUNT     TextureType = iota
 )
 
@@ -29,6 +30,8 @@ func TextureTypeToString(t TextureType) string {
 		return "NORMAL_OGL"
 	case TextureType_Metalness:
 		return "METALLIC"
+	case TextureType_Height:
+		return "HEIGHT"
 	default:
 		log.Fatal("")
 	}
@@ -63,6 +66,8 @@ func TextureTypeToShaderInput(t TextureType) string {
 		return "normalmap_texture"
 	case TextureType_Metalness:
 		return "metallic_texture"
+	case TextureType_Height:
+		return "height_texture"
 	default:
 		log.Fatal("")
 	}
@@ -96,6 +101,8 @@ func TextureTypeToFilenameGlob(t TextureType) string {
 		return "Normal.n"
 	case TextureType_Metalness:
 		return "metallic"
+	case TextureType_Height:
+		return "height"
 	default:
 		log.Fatal("")
 	}

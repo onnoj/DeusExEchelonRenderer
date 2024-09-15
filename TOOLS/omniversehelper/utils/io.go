@@ -12,8 +12,11 @@ type DebugWriter interface {
 	Close()
 }
 
-type debugwriter struct {
+type debugWriter struct {
 	f *os.File
+}
+
+type nullDebugWriter struct {
 }
 
 func stripFilePath(path string) string {
@@ -27,15 +30,25 @@ func stripFilePath(path string) string {
 
 func NewDebugWriter(identifier string, filetype string) DebugWriter {
 	tmpFile, _ := os.CreateTemp("", fmt.Sprintf("%s_*%s", stripFilePath(identifier), filetype))
-	return &debugwriter{
+	return &debugWriter{
 		f: tmpFile,
 	}
 }
 
-func (d *debugwriter) Write(txt string) {
+func NewDebugWriterDummy(identifier string, filetype string) DebugWriter {
+	return &nullDebugWriter{}
+}
+
+func (d *debugWriter) Write(txt string) {
 	d.f.WriteString(txt)
 }
 
-func (d *debugwriter) Close() {
+func (d *debugWriter) Close() {
 	d.f.Close()
+}
+
+func (d *nullDebugWriter) Write(txt string) {
+}
+
+func (d *nullDebugWriter) Close() {
 }

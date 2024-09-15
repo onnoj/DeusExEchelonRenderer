@@ -15,8 +15,9 @@ import (
 
 // RestClient is a basic HTTP client
 type RestClient struct {
-	BaseURL string
-	Timeout time.Duration
+	BaseURL   string
+	Timeout   time.Duration
+	DebugMode bool
 }
 
 // NewClient creates a new RestClient instance
@@ -61,6 +62,17 @@ func (c *RestClient) Get(endpoint string, parameters *map[string][]string) (stri
 		url, _ = strings.CutSuffix(url, "&")
 	}
 
+	var dbg utils.DebugWriter
+	if c.DebugMode {
+		dbg = utils.NewDebugWriter(endpoint, ".json")
+	} else {
+		dbg = utils.NewDebugWriterDummy(endpoint, ".json")
+	}
+	defer dbg.Close()
+	dbg.Write("=========================== GET Request ====================\n")
+	dbg.Write(url + "\n")
+	dbg.Write("=========================== GET PUT Request ================\n")
+
 	resp, err := client.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to GET from %s: %v", url, err)
@@ -71,6 +83,10 @@ func (c *RestClient) Get(endpoint string, parameters *map[string][]string) (stri
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %v", err)
 	}
+
+	dbg.Write("=========================== Answer ====================\n")
+	dbg.Write(string(body) + "\n")
+	dbg.Write("=========================== Answer ====================\n")
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("received non-200 response code: %d", resp.StatusCode)
@@ -90,6 +106,17 @@ func (c *RestClient) Post(endpoint string, jsonMap any) (string, error) {
 		return "", err
 	}
 
+	var dbg utils.DebugWriter
+	if c.DebugMode {
+		dbg = utils.NewDebugWriter(endpoint, ".json")
+	} else {
+		dbg = utils.NewDebugWriterDummy(endpoint, ".json")
+	}
+	defer dbg.Close()
+	dbg.Write("=========================== POST Request ====================\n")
+	dbg.Write(url + "\n")
+	dbg.Write("=========================== POST PUT Request ================\n")
+	dbg.Write(string(obj) + "\n")
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(obj))
 	if err != nil {
 		return "", fmt.Errorf("failed to POST to %s: %v", url, err)
@@ -100,6 +127,9 @@ func (c *RestClient) Post(endpoint string, jsonMap any) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error reading response body: %v", err)
 	}
+	dbg.Write("=========================== Answer ====================\n")
+	dbg.Write(string(body) + "\n")
+	dbg.Write("=========================== Answer ====================\n")
 
 	// Optionally check for the status code
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
@@ -120,13 +150,18 @@ func (c *RestClient) Put(endpoint string, jsonMap any) (string, error) {
 		return "", err
 	}
 
-	dbg := utils.NewDebugWriter(endpoint, ".json")
+	var dbg utils.DebugWriter
+	if c.DebugMode {
+		dbg = utils.NewDebugWriter(endpoint, ".json")
+	} else {
+		dbg = utils.NewDebugWriterDummy(endpoint, ".json")
+	}
 	defer dbg.Close()
 
-	dbg.Write("=========================== Request ====================\n")
+	dbg.Write("=========================== PUT Request ====================\n")
 	dbg.Write(url + "\n")
-	dbg.Write("=========================== Request ====================\n")
-	dbg.Write(string(obj))
+	dbg.Write("=========================== END PUT Request ================\n")
+	dbg.Write(string(obj) + "\n")
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(obj))
 	if err != nil {
 		return "", fmt.Errorf("failed to PUT to %s: %v", url, err)

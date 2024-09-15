@@ -42,13 +42,14 @@ jobs:
     - name: Upload binaries
       uses: actions/upload-artifact@v4.3.1
       with:
-        name: DeusExEchelonRenderer-${{env.GITHUB_SHA_SHORT}}-${{github.run_number}}
+        name: DeusExEchelonRenderer-${{env.GITHUB_SHA}}-${{github.run_number}}
         path: |
           ${{github.workspace}}/dist/*
           ${{github.workspace}}/BIN/DEV/*
 
     - name: Fetch core-mod
       working-directory: "${{ github.workspace }}"
+      if: ${{startsWith(github.ref, 'refs/tags/v') }}
       run: |
           mkdir temp
           cd temp

@@ -66,7 +66,7 @@ public:
 
 void UD3D9FPRenderDevice::StaticConstructor()
 {
-  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE);
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
 }
 
 UD3D9FPRenderDevice::UD3D9FPRenderDevice()
@@ -196,6 +196,16 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
 
   auto m = GWindowManager;
 
+  //Force directinput on, otherwise we're not able to interact with the RTX menu.
+  if (g_ConfigManager.GetAggressiveMouseFix())
+  {
+    pInViewport->SetMouseCapture(TRUE, TRUE, FALSE);
+    GConfig->SetBool(L"WinDrv.WindowsClient", L"CaptureMouse", TRUE, L"DeusEx.ini");
+  }
+
+  GConfig->SetBool(L"WinDrv.WindowsClient", L"UseDirectInput", FALSE, L"DeusEx.ini");
+  GConfig->Flush(FALSE);
+
   return 1;
 }
 
@@ -283,6 +293,12 @@ UBOOL UD3D9FPRenderDevice::SetRes(INT pWidth, INT pHeight, INT pColorBytes, UBOO
     lastWidth = pWidth;
     lastHeight = pHeight;
   }
+
+  if (URenderDevice::Viewport && g_ConfigManager.GetAggressiveMouseFix())
+  {
+    URenderDevice::Viewport->SetMouseCapture(TRUE, FALSE, TRUE);
+  }
+
   return Result;
 }
 

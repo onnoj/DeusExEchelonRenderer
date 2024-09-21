@@ -51,13 +51,22 @@ namespace Hacks
   public:
     /*virtual*/ void PreRender(FSceneNode* Frame)
     {
-      Misc::g_Facade->GetHLRenderer()->OnRenderingBegin(Frame);
+      auto facade = Misc::g_Facade;
+      if (facade->GetHLRenderer() != nullptr && facade->GetLLRenderer() != nullptr)
+      {
+        facade->GetHLRenderer()->OnRenderingBegin(Frame);
+      }
       URenderVTableFuncs::PreRender(GRender, Frame);
     };
     /*virtual*/ void PostRender(FSceneNode* Frame)
     {
       URenderVTableFuncs::PostRender(GRender, Frame);
-      Misc::g_Facade->GetHLRenderer()->OnRenderingEnd(Frame);
+
+      auto facade = Misc::g_Facade;
+      if (facade->GetHLRenderer() != nullptr && facade->GetLLRenderer() != nullptr)
+      {
+        Misc::g_Facade->GetHLRenderer()->OnRenderingEnd(Frame);
+      }
     };
     /*virtual*/ void DrawWorld(FSceneNode* Frame)
     {

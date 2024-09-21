@@ -55,6 +55,9 @@ void ConfigManager::LoadConfig()
   //Misc properties
   GConfig->GetBool(g_RendererName L".Settings", L"RenderPlayerBody", m_RenderPlayerBody, g_ConfigFilename.c_str());
   GConfig->GetBool(g_RendererName L".Settings", L"RenderSkybox", m_RenderSkybox, g_ConfigFilename.c_str());
+
+  //Input:
+  GConfig->GetBool(g_RendererName L".Settings", L"AggressiveMouseFix", m_RenderSkybox, g_ConfigFilename.c_str());
 }
 
 
@@ -94,6 +97,9 @@ void ConfigManager::SaveConfig()
   //Misc properties
   GConfig->SetBool(g_RendererName L".Settings", L"RenderPlayerBody", m_RenderPlayerBody, g_ConfigFilename.c_str());
   GConfig->SetBool(g_RendererName L".Settings", L"RenderSkybox", m_RenderSkybox, g_ConfigFilename.c_str());
+
+  //Input:
+  GConfig->SetBool(g_RendererName L".Input", L"AggressiveMouseFix", m_RenderSkybox, g_ConfigFilename.c_str());
 
   //Store file
   GConfig->Flush(0, g_ConfigFilename.c_str());

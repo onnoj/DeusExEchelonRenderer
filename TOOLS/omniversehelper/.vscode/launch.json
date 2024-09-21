@@ -29,7 +29,6 @@
                 "--package-filter=.*\\.Foliage",
                 "--package-filter=.*\\.Sky",
                 "--package-filter=.*\\.Earth",
-                
                 "ingest"
             ],
             "disabled_args": [
@@ -48,13 +47,10 @@
             "program": "${workspaceFolder}",
             "env": {},
             "args": [
-                "--input=D:\\development\\misc\\ai\\DeusExUpscaling\\output",
+                "--input=D:\\development\\misc\\ai\\DeusExUpscaling\\categorized_pbrify_roughness",
                 "-R",
                 "--jsondump=F:\\Games\\Steam\\steamapps\\common\\Deus Ex - RTXModder\\System\\textureDump.json",
-                "--package-filter=MJ12_lab.Concrete",
-                "--overwrite-overrides"
-            ],
-            "disabled_args": [
+                "--overwrite-overrides",
                 "--package-filter=.*\\.Textile",
                 "--package-filter=.*\\.Concrete",
                 "--package-filter=.*\\.Ceramic",
@@ -66,13 +62,34 @@
                 "--package-filter=.*\\.Tiles",
                 "--package-filter=.*\\.Tile",
                 "--package-filter=.*\\.Wood",
+                "ingest"
+            ],
+            "disabled_args": [
             ],
             "buildFlags": "-buildvcs=false",
             "preLaunchTask": "",
             "postDebugTask": ""
         },
         {
-            "name": "Copy Textures",
+            "name": "Copy Textures (pbrify)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "--input=D:\\development\\misc\\ai\\DeusExUpscaling\\output_pbrify_inv",
+                "--jsondump=F:\\Games\\Steam\\steamapps\\common\\Deus Ex - RTXModder\\System\\textureDump.json",
+                "-o=D:\\development\\misc\\ai\\DeusExUpscaling\\categorized_pbrify_roughness",
+                "copy"
+            ],
+            "buildFlags": "-buildvcs=false",
+            "preLaunchTask": "",
+            "postDebugTask": ""
+        },
+        {
+            "name": "Copy Textures (pbrfusion2)",
             "type": "go",
             "request": "launch",
             "mode": "auto",

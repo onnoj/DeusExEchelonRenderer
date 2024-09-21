@@ -72,6 +72,9 @@ void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
   SetViewState(Frame, ViewType::game);
   SetProjectionState(Frame, ProjectionType::perspective);
 
+  //Material debugging...
+  m_MaterialDebugger.Update(Frame);
+
   //HACK, render fake UI to force early RTX injection:
   if (false)
   {
@@ -114,7 +117,7 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 
   auto& ctx = *g_ContextManager.GetContext();
 
-  m_MaterialDebugger.Update(Frame);
+  
   bool clearEachFrame = false;
   g_DebugMenu.DebugVar("Rendering", "Wipe Render Cache", DebugMenuUniqueID(), clearEachFrame);
   if (clearEachFrame)
@@ -455,12 +458,6 @@ void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, c
   MurmurHash3_x86_32(buffer.data(), buffer.size() * sizeof(buffer[0]), 0, &hash);
   if (m_TextureManager.BindTexture(PF_Modulated, pTexture))
   {
-    m_LLRenderer->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
-    m_LLRenderer->SetRenderState(D3DRS_ALPHATESTENABLE, 0);
-    m_LLRenderer->SetRenderState(D3DRS_ZENABLE, 0);
-    m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 1);
-    m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-
     m_LLRenderer->RenderTriangleList(buffer.data(), faces, buffer.size(), hash, 0);
   }
   m_LLRenderer->PopDeviceState();

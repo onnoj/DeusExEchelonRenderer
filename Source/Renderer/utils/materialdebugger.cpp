@@ -127,9 +127,30 @@ void MaterialDebugger::pfDecoderUtil()
 
 void MaterialDebugger::Update(FSceneNode* Frame)
 {
+  auto ctx = g_ContextManager.GetContext();
   static bool debugMenuEnabled = false;
   nfDecoderUtil();
   pfDecoderUtil();
+
+  //export util
+  if (ctx && !ctx->frameIsRasterized && !ctx->frameIsSkybox && !ctx->renderingUI)
+  {
+    g_DebugMenu.DebugVar("Modding - Export", "Export [RTX Hash <> Name] mapping of\ncurrently loaded textures", DebugMenuUniqueID(), std::function<void()>([&]() {
+      exportHashMappings(false);
+      }));
+    g_DebugMenu.DebugVar("Modding - Export", "Export [RTX Hash <> Name] mapping\nof all textures", DebugMenuUniqueID(), std::function<void()>([&]() {
+      exportHashMappings(true);
+      }));
+
+    bool renderAllTextures = false;
+    g_DebugMenu.DebugVar("Modding - Export", "Emit all textures each frame", DebugMenuUniqueID(), renderAllTextures);
+    if (renderAllTextures)
+    {
+      this->renderAllTextures();
+    }
+  }
+
+  //Inspector
   g_DebugMenu.DebugVar("Modding - Inspector", "Enabled", DebugMenuUniqueID(), debugMenuEnabled);
   if(!debugMenuEnabled)
   {
@@ -324,19 +345,6 @@ void MaterialDebugger::Update(FSceneNode* Frame)
   g_DebugMenu.DebugVar("Modding - Inspector", "Node Flags", DebugMenuUniqueID(), nodeFlagsTxt);
   g_DebugMenu.DebugVar("Modding - Inspector", "Surface Flags", DebugMenuUniqueID(), surfaceFlagTxt);
   g_DebugMenu.DebugVar("Modding - Inspector", "Texture Flags", DebugMenuUniqueID(), textureFlagTxt);
-  g_DebugMenu.DebugVar("Modding - Export", "Export [RTX Hash <> Name] mapping of\ncurrently loaded textures", DebugMenuUniqueID(), std::function<void()>([&]() {
-    exportHashMappings(false);
-    }));
-  g_DebugMenu.DebugVar("Modding - Export", "Export [RTX Hash <> Name] mapping\nof all textures", DebugMenuUniqueID(), std::function<void()>([&]() {
-    exportHashMappings(true);
-    }));
-
-  bool renderAllTextures = false;
-  g_DebugMenu.DebugVar("Modding - Export", "Emit all textures each frame", DebugMenuUniqueID(), renderAllTextures);
-  if (renderAllTextures)
-  {
-    this->renderAllTextures();
-  }
 }
 
 void MaterialDebugger::renderAllTextures()
@@ -349,6 +357,16 @@ void MaterialDebugger::renderAllTextures()
 
 
 #if 1
+  auto ctx = g_ContextManager.GetContext();
+  Utils::ScopedCall scopedRenderStatePushPop{ [&](){ llRenderer->PushDeviceState();}, [&]() {llRenderer->PopDeviceState(); } };
+  
+  hlRenderer->SetViewState(ctx->frameSceneNode, HighlevelRenderer::ViewType::game);
+  hlRenderer->SetProjectionState(ctx->frameSceneNode, HighlevelRenderer::ProjectionType::perspective);
+  llRenderer->SetRenderState(D3DRS_ZENABLE, 1);
+  llRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 1);
+  llRenderer->SetRenderState(D3DRS_DEPTHBIAS, 1.0f);
+  llRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+
   //dump currently loaded textures
   uint32_t count = 0;
   int row = 0;
@@ -376,7 +394,6 @@ void MaterialDebugger::renderAllTextures()
 
     //Do a dummy render call so that Remix picks up the texture
     {
-      auto ctx = g_ContextManager.GetContext();
       assert(ctx != nullptr);
       auto fwd = (ctx->frameSceneNode->Coords.XAxis ^ ctx->frameSceneNode->Coords.YAxis);
       auto widgetPos = ctx->frameSceneNode->Coords.Origin - (fwd * 800.0f);
@@ -459,12 +476,16 @@ continue;
     auto md = textureManager.ProcessTexture(texture->PolyFlags, &textureInfo);
 
     //Do a dummy render call so that Remix picks up the texture
+    g_ContextManager.PushFrameContext();
     {
+      auto ctx = g_ContextManager.GetContext();
+
       textureManager.BindTexture(texture->PolyFlags, md);
       hlRenderer->SetWorldTransformStateToIdentity();
       static LowlevelRenderer::VertexPos3Tex0to4 vbuffer;
       llRenderer->RenderTriangleList(&vbuffer, 1, 1, 0, 0);
     }
+    g_ContextManager.PopFrameContext();
 
     if (textureInfo.Texture != nullptr)
     {
@@ -477,6 +498,8 @@ continue;
       textureObject["remixhash"] = md->remixHash;
       textureObject["flags"] = json::array();
       textureObject["realtime"] = (textureInfo.bRealtime != 0);
+      textureObject["usize"] = textureInfo.USize;
+      textureObject["vsize"] = textureInfo.VSize;
       for (const auto& flag : knownPolyFlags)
       {
         if ((textureInfo.Texture->PolyFlags & flag.first) != 0)

@@ -238,7 +238,7 @@ bool LightManager::CalculateLightInfo(AActor* pActor, LightManager::LightInfo& p
     * the original lighting formula.
     */
     d3dLight.Attenuation0 = 0.0000f;
-    d3dLight.Attenuation1 = 0.0004f;
+    d3dLight.Attenuation1 = 0.0009f; //changed from 0.0004f to 0.0009f, seems to be more compatible with the generated PBR maps.
     d3dLight.Attenuation2 = 0.0000f;
 
     g_DebugMenu.DebugVar("Lighting", "pointlight Attenuation0", DebugMenuUniqueID(), d3dLight.Attenuation0);

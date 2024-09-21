@@ -213,6 +213,7 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
 
   ResizeDisplaySurface(0, 0, m_outputSurface.width, m_outputSurface.height, m_outputSurface.fullscreen);
   InitializeDeviceState();
+
   return 1;
 }
 

@@ -1,16 +1,17 @@
 #include "DeusExEchelonCore_PCH.h"
 #pragma hdrstop
 
+#include "coreutils.h"
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <FFileManagerWindows.h>
 #include <codecvt> // codecvt_utf8
 #include <locale>  // wstring_convert
 #include <filesystem>
 #include <optional>
+#include <cwctype>
 #include "MurmurHash3.h"
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include "coreutils.h"
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include "commandmanager.h"
 
 std::wstring Utils::GetProcessFolder()
 {
@@ -44,6 +45,13 @@ std::wstring Utils::ConvertUtf8ToWc(const std::string& pString)
 {
   static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
   return converter.from_bytes(pString);
+}
+
+std::wstring Utils::ToLower(const std::wstring& pStr)
+{
+  std::wstring returned = pStr;
+  std::transform(returned.begin(), returned.end(), returned.begin(), std::towlower);
+  return returned;
 }
 
 std::optional<decltype(GFileManager)> g_OriginalFileManager;
@@ -136,4 +144,52 @@ void Utils::Screenshot(HWND pHwnd, std::filesystem::path pFilePath)
   DeleteObject(hbmWindow);
   DeleteDC(hdcMemDC);
   ReleaseDC(pHwnd, hdcWindow);
+}
+
+void Utils::ShowMessageBox(const TCHAR* pTitle, const TCHAR* pBody)
+{
+  auto DeusExRootWindowClass = Cast<UClass>(UObject::StaticFindObject(UClass::StaticClass(), ANY_PACKAGE, L"DeusExRootWindow"));
+  auto MenuUIMessageBoxWindow = Cast<UClass>(UObject::StaticFindObject(UClass::StaticClass(), ANY_PACKAGE, L"MenuUIMessageBoxWindow"));
+  auto MessageBoxFunction = Cast<UFunction>(UObject::StaticFindObject(UFunction::StaticClass(), DeusExRootWindowClass, L"MessageBox"));
+  auto PopWindowFunction = Cast<UFunction>(UObject::StaticFindObject(UFunction::StaticClass(), DeusExRootWindowClass, L"PopWindow"));
+
+  auto rootWindow = *FObjectIterator(DeusExRootWindowClass);
+
+  struct Parms
+  {
+    FString msgTitle;
+    FString msgText;
+    int msgBoxMode=0;
+    bool hideCurrentScreen=false;
+    UObject* winParent=0;
+    UObject* returnedMsgBox=0;
+  };
+
+  Parms parms;
+  parms.msgTitle = L"Hi";
+  parms.msgText = L"This is a test.\nWith another line.\nYay.";
+  parms.msgBoxMode = 1;
+  parms.winParent = nullptr;
+  rootWindow->ProcessEvent(MessageBoxFunction, &parms, nullptr);
+  if (parms.returnedMsgBox != nullptr)
+  {
+    UObject* returnedMsgBox = parms.returnedMsgBox;
+    g_CommandManager.QueueCommand(std::make_unique<CommandManager::Command>(
+      []() {
+      },
+      [=]() {
+        UObject* btn = Utils::GetUEProperty<UObject*>(L"btnOK", returnedMsgBox);
+
+        bool btnPressed = Utils::GetUEProperty<bool>(L"bButtonPressed", btn);
+        if (btnPressed)
+        {
+          BYTE buffer[32]{ 0 };
+          rootWindow->ProcessEvent(PopWindowFunction, &buffer[0], nullptr);
+          return true;
+        }
+
+        return false; 
+      }
+    ));
+  }
 }

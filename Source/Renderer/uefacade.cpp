@@ -1,6 +1,7 @@
 #include "DeusExEchelonRenderer_PCH.h"
 #pragma hdrstop
 #include "uefacade.h"
+#include <MurmurHash3.cpp>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -46,6 +47,7 @@ public:
     //printf("[%d] %s\n", int(Event), b);
     //fflush(stdout);
     OutputDebugStringW(V);
+    OutputDebugStringW(L"\n");
 
     Parent->Serialize(V, Event);
   }
@@ -81,6 +83,25 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   if (GetClass() == nullptr)
   {
     return FALSE;
+  }
+  GRenderDevice = this;
+  const HWND hwnd = (HWND)pInViewport->GetWindow();
+
+  /*
+    Deus Ex internally relies on a statically allocated array (in the .data) section
+    that has a maximum of 2880 rows. This is used by the internal software rasterizer
+    used for culling.
+    I only see three locations where this is accessed:
+    - URender::OccludeBsp(FSceneNode *)+F35         8D 14 C5 08 0C B5 10                    lea     edx, unk_10B50C08[eax*8]
+    - URender::OccludeBsp(FSceneNode *)+F57         8D 0C C5 08 0C B5 10                    lea     ecx, unk_10B50C08[eax*8]
+    - SetupRaster +19EF0                            8D 0C 85 08 0C B5 10                    lea     ecx, ds:10B50C08h[eax*4]
+    We could use dynamically allocate a bigger buffer and patch the code (maybe using Zydis).
+  */
+
+  if (pHeight > 2880)
+  {
+    pHeight = min(pHeight, 2880);
+    MessageBox(hwnd, L"Deus Ex does not support render resolutions beyond 2880 pixels tall.\nThe resolution has been capped.", L"Error, maximum resolution exceeded", MB_OK|MB_ICONERROR);
   }
 
 #if !defined(RELEASE_CONFIG)
@@ -157,9 +178,14 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   }
 
   bool rendererInitialized = false;
-  for (int i = 0; i < 5; i++)
+  constexpr auto allowedTries = 5;
+  for (int i = 0; i < allowedTries; i++)
   {
-    if (!m_LLRenderer.Initialize((HWND)pInViewport->GetWindow(), pWidth, pHeight, pColorBytes, pFullscreen))
+    if (i + 1 == allowedTries)
+    {
+      pFullscreen = false;
+    }
+    if (!m_LLRenderer.Initialize(hwnd, pWidth, pHeight, pColorBytes, pFullscreen))
     {
       GWarn->Logf(L"[EchelonRenderer]\t Renderer failed to initialize with parameters {type: %x, width:%d, height:%d, color:%x}", blitType, pWidth, pHeight, pColorBytes);
       ::Sleep(500);

@@ -77,6 +77,7 @@ add_subdirectory ("EXTERNAL/scnlib" EXCLUDE_FROM_ALL)
 unset(CMAKE_FOLDER)
 add_subdirectory (Source/Core)
 add_subdirectory (Source/Renderer)
+add_subdirectory (Source/WindowDrv)
 add_subdirectory (TOOLS/ingestionhelper)
 
 

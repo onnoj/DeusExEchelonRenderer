@@ -46,5 +46,21 @@ setlocal enabledelayedexpansion
 		@echo You'll still want to build the 'INSTALL' target to also copy over the config files, at least once.
 		@echo.
 	)
+	
+	@del /F "!DEUSEXFOLDER!\DeusExEchelonRendererWindowDrv.dll"
+    @mklink "!DEUSEXFOLDER!\DeusExEchelonRendererWindowDrv.dll" "%CD%\..\BIN\USER\DeusExEchelonRendererWindowDrv.dll" && @(
+	    @echo.
+		@echo Symlink created successfully.
+		@echo You'll still want to build the 'INSTALL' target to also copy over the config files, at least once.
+		@echo.
+	)
+	
+	@del /F "!DEUSEXFOLDER!\deusexwindowdrv.exe"
+    @mklink "!DEUSEXFOLDER!\deusexwindowdrv.exe" "!DEUSEXFOLDER!\DeusEx.exe" && @(
+	    @echo.
+		@echo Symlink created successfully.
+		@echo You'll still want to build the 'INSTALL' target to also copy over the config files, at least once.
+		@echo.
+	)
 )
 @pause

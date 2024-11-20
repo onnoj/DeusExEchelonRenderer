@@ -36,8 +36,18 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
     GLog->Log(L"[EchelonRenderer]\t Already had api, didn't (re)initalize.");
   }
 
+  m_API->GetDeviceCaps(D3DADAPTER_DEFAULT, D3DDEVTYPE::D3DDEVTYPE_HAL, &m_caps);
+  if (!pFullscreen)
+  {
+    /*
+    * In (borderless) windowed, it's possible to select any resolution. However, there is a limit
+    * in the driver we cannot exceed, as the render surface texture is limited by the maximum texture dimension.
+    */
+    pWidth = min(pWidth, m_caps.MaxTextureWidth-1);
+    pHeight = min(pHeight, m_caps.MaxTextureHeight-1);
+  }
+
   m_outputSurface.colorBytes = pColorBytes;
-  //m_outputSurface.hwnd = hWnd;
   if (pFullscreen)
   {
     if (auto res = FindClosestResolution(pWidth, pHeight); res)
@@ -85,19 +95,24 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
     return D3DFMT_D16;
     }();
 
-  D3DPRESENT_PARAMETERS d3dpp{0};
-  d3dpp.Windowed = !pFullscreen;
-  d3dpp.hDeviceWindow = hWnd;
-  d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-  d3dpp.BackBufferFormat = (pFullscreen ? D3DFMT_X8R8G8B8 : D3DFMT_UNKNOWN);
-  d3dpp.BackBufferWidth = m_outputSurface.width;
-  d3dpp.BackBufferHeight = m_outputSurface.height;
-  d3dpp.BackBufferCount = 1;
-  d3dpp.EnableAutoDepthStencil = TRUE;
-  d3dpp.AutoDepthStencilFormat = depthFormat;
-  d3dpp.Flags = 0;// D3DPRESENT_DONOTWAIT;//D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
-  d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT; // D3DPRESENT_INTERVAL_IMMEDIATE;
-  d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+  auto createDefaultParameters = [this,hWnd,depthFormat](bool pFullscreen) {
+    D3DPRESENT_PARAMETERS d3dpp{ 0 };
+    d3dpp.Windowed = !pFullscreen;
+    d3dpp.hDeviceWindow = hWnd;
+    d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    d3dpp.BackBufferFormat = (pFullscreen ? D3DFMT_X8R8G8B8 : D3DFMT_UNKNOWN);
+    d3dpp.BackBufferWidth = m_outputSurface.width;
+    d3dpp.BackBufferHeight = m_outputSurface.height;
+    d3dpp.BackBufferCount = 1;
+    d3dpp.EnableAutoDepthStencil = TRUE;
+    d3dpp.AutoDepthStencilFormat = depthFormat;
+    d3dpp.Flags = D3DPRESENT_DONOTWAIT;//D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
+    d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT; // D3DPRESENT_INTERVAL_IMMEDIATE;
+    d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+    return d3dpp;
+  };
+
+  auto d3dpp = createDefaultParameters(pFullscreen);
 
   GLog->Logf(L"D3DPRESENT_PARAMETERS: fullscreen:%d w:%d h:%d", pFullscreen ? 1 : 0, d3dpp.BackBufferWidth, d3dpp.BackBufferHeight);
   if (m_Device == nullptr)
@@ -703,7 +718,14 @@ void LowlevelRenderer::EndFrame()
   {
     m_IsInFrame = false;
     Shutdown();
-    Initialize((HWND)GRenderDevice->Viewport->GetWindow(), m_outputSurface.width, m_outputSurface.height, m_outputSurface.colorBytes, m_outputSurface.fullscreen);
+    if (!Initialize((HWND)GRenderDevice->Viewport->GetWindow(), m_outputSurface.width, m_outputSurface.height, m_outputSurface.colorBytes, m_outputSurface.fullscreen))
+    {
+      if (!Initialize((HWND)GRenderDevice->Viewport->GetWindow(), m_outputSurface.width, m_outputSurface.height, m_outputSurface.colorBytes, !m_outputSurface.fullscreen))
+      {
+        ::MessageBox((HWND)GRenderDevice->Viewport->GetWindow(), L"DirectX9 Device was lost and could not be recovered", L"Error", MB_OK);
+        return;
+      }
+    }
     return;
   }
   check(SUCCEEDED(res));

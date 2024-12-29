@@ -1,7 +1,6 @@
 #include "DeusExEchelonRenderer_PCH.h"
 #pragma hdrstop
 
-#include <MurmurHash3.cpp>
 #include <xxhash.c>
 #include <TlHelp32.h> // Need to include this for CreateToolhelp32Snapshot
 

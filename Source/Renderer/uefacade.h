@@ -18,6 +18,7 @@ public:
 	void StaticConstructor();
 	LowlevelRenderer* GetLLRenderer() { return &m_LLRenderer; }
 	HighlevelRenderer* GetHLRenderer() { return &m_HLRenderer; }
+	UBOOL ValidateRes();
 public:
 	virtual void Tick(FLOAT DeltaTime) final;
   void OnLevelChange();
@@ -46,6 +47,15 @@ public:
   static std::mutex m_Lock; //share lock between instances
 private:
   bool m_NotifyLevelHasChanged = false;
+	std::optional<uint64_t> m_CurrentResWidth; 
+	std::optional<uint64_t> m_CurrentResHeight;
+	std::optional<bool> m_CurrentResFullscreen;
+	std::optional<int32_t> m_CurrentResColorBytes;
+	uint32_t m_TargetResWidth = 0;
+	uint32_t m_TargetResHeight = 0;
+	bool m_TargetResFullscreen = false;
+	int32_t m_TargetResColorBytes = 0;
+
 	static LowlevelRenderer m_LLRenderer; //keep between reinitializations
 	static HighlevelRenderer m_HLRenderer; //keep between reinitializations
 };

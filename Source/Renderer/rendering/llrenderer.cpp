@@ -18,7 +18,8 @@
 bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen)
 {
   check(IsWindow(hWnd));
-  GLog->Log(L"[EchelonRenderer]\t Initializing LLRenderer");
+  GLog->Logf(L"[EchelonRenderer]\t Initializing LLRenderer, requested width:%d height:%d fullscreen:%d\n", pWidth, pHeight, pFullscreen?1:0);
+
   HRESULT hr{};
   if (m_API == nullptr)
   {
@@ -27,7 +28,7 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
     check(m_API != nullptr);
     if (m_API == nullptr)
     {
-      GWarn->Logf(L"[EchelonRenderer-WARN]\t Failed to initialize D3D9/Remix API; last error code was %08x", GetLastError());
+      GWarn->Logf(L"[EchelonRenderer-WARN]\t Failed to initialize D3D9/Remix API; last error code was %08x\n", GetLastError());
       return false;
     }
   }
@@ -36,8 +37,18 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
     GLog->Log(L"[EchelonRenderer]\t Already had api, didn't (re)initalize.");
   }
 
+  m_API->GetDeviceCaps(D3DADAPTER_DEFAULT, D3DDEVTYPE::D3DDEVTYPE_HAL, &m_caps);
+  if (!pFullscreen)
+  {
+    /*
+    * In (borderless) windowed, it's possible to select any resolution. However, there is a limit
+    * in the driver we cannot exceed, as the render surface texture is limited by the maximum texture dimension.
+    */
+    pWidth = min(pWidth, m_caps.MaxTextureWidth-1);
+    pHeight = min(pHeight, m_caps.MaxTextureHeight-1);
+  }
+
   m_outputSurface.colorBytes = pColorBytes;
-  //m_outputSurface.hwnd = hWnd;
   if (pFullscreen)
   {
     if (auto res = FindClosestResolution(pWidth, pHeight); res)
@@ -85,19 +96,24 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
     return D3DFMT_D16;
     }();
 
-  D3DPRESENT_PARAMETERS d3dpp{0};
-  d3dpp.Windowed = !pFullscreen;
-  d3dpp.hDeviceWindow = hWnd;
-  d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-  d3dpp.BackBufferFormat = (pFullscreen ? D3DFMT_X8R8G8B8 : D3DFMT_UNKNOWN);
-  d3dpp.BackBufferWidth = m_outputSurface.width;
-  d3dpp.BackBufferHeight = m_outputSurface.height;
-  d3dpp.BackBufferCount = 1;
-  d3dpp.EnableAutoDepthStencil = TRUE;
-  d3dpp.AutoDepthStencilFormat = depthFormat;
-  d3dpp.Flags = 0;// D3DPRESENT_DONOTWAIT;//D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
-  d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT; // D3DPRESENT_INTERVAL_IMMEDIATE;
-  d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+  auto createDefaultParameters = [this,hWnd,depthFormat](bool pFullscreen) {
+    D3DPRESENT_PARAMETERS d3dpp{ 0 };
+    d3dpp.Windowed = !pFullscreen;
+    d3dpp.hDeviceWindow = hWnd;
+    d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    d3dpp.BackBufferFormat = (pFullscreen ? D3DFMT_X8R8G8B8 : D3DFMT_UNKNOWN);
+    d3dpp.BackBufferWidth = m_outputSurface.width;
+    d3dpp.BackBufferHeight = m_outputSurface.height;
+    d3dpp.BackBufferCount = 1;
+    d3dpp.EnableAutoDepthStencil = TRUE;
+    d3dpp.AutoDepthStencilFormat = depthFormat;
+    d3dpp.Flags = D3DPRESENT_DONOTWAIT;//D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
+    d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT; // D3DPRESENT_INTERVAL_IMMEDIATE;
+    d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+    return d3dpp;
+  };
+
+  auto d3dpp = createDefaultParameters(pFullscreen);
 
   GLog->Logf(L"D3DPRESENT_PARAMETERS: fullscreen:%d w:%d h:%d", pFullscreen ? 1 : 0, d3dpp.BackBufferWidth, d3dpp.BackBufferHeight);
   if (m_Device == nullptr)
@@ -703,7 +719,14 @@ void LowlevelRenderer::EndFrame()
   {
     m_IsInFrame = false;
     Shutdown();
-    Initialize((HWND)GRenderDevice->Viewport->GetWindow(), m_outputSurface.width, m_outputSurface.height, m_outputSurface.colorBytes, m_outputSurface.fullscreen);
+    if (!Initialize((HWND)GRenderDevice->Viewport->GetWindow(), m_outputSurface.width, m_outputSurface.height, m_outputSurface.colorBytes, m_outputSurface.fullscreen))
+    {
+      if (!Initialize((HWND)GRenderDevice->Viewport->GetWindow(), m_outputSurface.width, m_outputSurface.height, m_outputSurface.colorBytes, !m_outputSurface.fullscreen))
+      {
+        ::MessageBox((HWND)GRenderDevice->Viewport->GetWindow(), L"DirectX9 Device was lost and could not be recovered", L"Error", MB_OK);
+        return;
+      }
+    }
     return;
   }
   check(SUCCEEDED(res));
@@ -719,12 +742,13 @@ bool LowlevelRenderer::ResizeDisplaySurface(uint32_t pLeft, uint32_t pTop, uint3
 {
   assert(pWidth != 0 && pHeight != 0);
   bool surfaceChanged = (m_outputSurface.width != pWidth) || (m_outputSurface.height != pHeight);
+  GLog->Logf(L"[EchelonRenderer]\t LLRenderer ResizeDisplaySurface called: requested left:%d top:%d width:%d height:%d fullscreen:%d\n", pLeft, pTop, pWidth, pHeight, pFullScreen?1:0);
   m_outputSurface.width = pWidth;
   m_outputSurface.height = pHeight;
   m_outputSurface.fullscreen = pFullScreen;
   if (surfaceChanged && m_Device != nullptr)
   {
-    GWarn->Log(L"Render surface has changed, we need to shutdown and reinitialize the renderer.");
+    GWarn->Log(L"[EchelonRenderer]\t LLRenderer ResizeDisplaySurface: Render surface has changed, we need to shutdown and reinitialize the renderer.");
     Shutdown();
     Initialize((HWND)GRenderDevice->Viewport->GetWindow(), pWidth, pHeight, m_outputSurface.colorBytes, pFullScreen);
   }
@@ -821,6 +845,7 @@ void LowlevelRenderer::SetProjectionMatrix(const D3DMATRIX& pMatrix)
 
 bool LowlevelRenderer::SetViewport(uint32_t pLeft, uint32_t pTop, uint32_t pWidth, uint32_t pHeight)
 {
+  //GLog->Logf(L"[EchelonRenderer]\t LLRenderer SetViewport called: left:%d top:%d width:%d height:%d\n", pLeft, pTop, pWidth, pHeight);
   m_DesiredViewportLeft = pLeft;
   m_DesiredViewportTop = pTop;
   m_DesiredViewportWidth = pWidth;
@@ -890,6 +915,7 @@ bool LowlevelRenderer::ValidateViewport()
     (m_DesiredViewportMaxZ && (m_CurrentState->m_ViewportMaxZ != *m_DesiredViewportMaxZ))
     )
   {
+    GLog->Logf(L"[EchelonRenderer]\t LLRenderer ValidateViewport change detected: left:%d top:%d width:%d height:%d\n", *m_DesiredViewportLeft, *m_DesiredViewportTop, *m_DesiredViewportWidth, *m_DesiredViewportHeight);
     m_CurrentState->m_ViewportLeft = m_DesiredViewportLeft;
     m_CurrentState->m_ViewportWidth = m_DesiredViewportWidth;
     m_CurrentState->m_ViewportTop = m_DesiredViewportTop;

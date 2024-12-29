@@ -61,8 +61,6 @@ void DebugMenu::Init()
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   ImGui::StyleColorsDark();
 
-  ImGui_ImplWin32_EnableDpiAwareness();
-
   ImGui_ImplSDL2_InitForD3D(m_SDLWindow);
   ImGui_ImplDX11_Init(m_D3DDevice, m_D3DDeviceContext);
   m_Initialized = true;
@@ -87,9 +85,14 @@ void DebugMenu::Render()
   // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
   // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
   // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-  SDL_Event event;
+  SDL_Event event{ 0 };
   while (SDL_PollEvent(&event))
   {
+    if (event.type == SDL_QUIT)
+    {
+      return;
+    }
+
     ImGui_ImplSDL2_ProcessEvent(&event);
     if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED && event.window.windowID == SDL_GetWindowID(m_SDLWindow))
     {

@@ -1,6 +1,7 @@
 #include "DeusExEchelonRenderer_PCH.h"
 #pragma hdrstop
 #include "uefacade.h"
+#include <MurmurHash3.cpp>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -46,6 +47,7 @@ public:
     //printf("[%d] %s\n", int(Event), b);
     //fflush(stdout);
     OutputDebugStringW(V);
+    OutputDebugStringW(L"\n");
 
     Parent->Serialize(V, Event);
   }
@@ -66,7 +68,6 @@ public:
 
 void UD3D9FPRenderDevice::StaticConstructor()
 {
-  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
 }
 
 UD3D9FPRenderDevice::UD3D9FPRenderDevice()
@@ -78,9 +79,29 @@ UD3D9FPRenderDevice::UD3D9FPRenderDevice()
 UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t pHeight, int32_t pColorBytes, UBOOL pFullscreen)
 {
   std::unique_lock lock(m_Lock);
+  GLog->Logf(L"[EchelonRenderer]\t UD3D9FPRenderDevice init called with: width:%d height:%d fullscreen:%d\n", pWidth, pHeight, pFullscreen!=0);
   if (GetClass() == nullptr)
   {
     return FALSE;
+  }
+  GRenderDevice = this;
+  const HWND hwnd = (HWND)pInViewport->GetWindow();
+
+  /*
+    Deus Ex internally relies on a statically allocated array (in the .data) section
+    that has a maximum of 2880 rows. This is used by the internal software rasterizer
+    used for culling.
+    I only see three locations where this is accessed:
+    - URender::OccludeBsp(FSceneNode *)+F35         8D 14 C5 08 0C B5 10                    lea     edx, unk_10B50C08[eax*8]
+    - URender::OccludeBsp(FSceneNode *)+F57         8D 0C C5 08 0C B5 10                    lea     ecx, unk_10B50C08[eax*8]
+    - SetupRaster +19EF0                            8D 0C 85 08 0C B5 10                    lea     ecx, ds:10B50C08h[eax*4]
+    We could use dynamically allocate a bigger buffer and patch the code (maybe using Zydis).
+  */
+
+  if (pHeight > 2880)
+  {
+    pHeight = min(pHeight, 2880);
+    MessageBox(hwnd, L"Deus Ex does not support render resolutions beyond 2880 pixels tall.\nThe resolution has been capped.", L"Error, maximum resolution exceeded", MB_OK|MB_ICONERROR);
   }
 
 #if !defined(RELEASE_CONFIG)
@@ -149,7 +170,10 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   auto n = this->GetClass()->GetName();
   const auto blitType = (pFullscreen ? (BLIT_Fullscreen | BLIT_Direct3D) : (BLIT_HardwarePaint | BLIT_Direct3D));
   URenderDevice::Viewport = pInViewport;
+
+  GWarn->Log(L"[EchelonRenderer]\t Calling Viewport->ResizeViewport with -1,-1");
   UD3D9FPRenderDevice::Viewport->ResizeViewport(BLIT_HardwarePaint | BLIT_Direct3D);
+  GWarn->Logf(L"[EchelonRenderer]\t Calling Viewport->ResizeViewport again with width:%d height:%d\n", pWidth, pHeight);
   UBOOL Result = UD3D9FPRenderDevice::Viewport->ResizeViewport(blitType, pWidth, pHeight, pColorBytes);
   if (!Result) {
     GError->Logf(L"[EchelonRenderer]\t Unreal Engine failed to resize the viewport with parameters {type:%x, width:%d, height:%d, color:%x}", blitType, pWidth, pHeight, pColorBytes);
@@ -157,9 +181,15 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   }
 
   bool rendererInitialized = false;
-  for (int i = 0; i < 5; i++)
+  constexpr auto allowedTries = 5;
+  for (int i = 0; i < allowedTries; i++)
   {
-    if (!m_LLRenderer.Initialize((HWND)pInViewport->GetWindow(), pWidth, pHeight, pColorBytes, pFullscreen))
+    if (i + 1 == allowedTries)
+    {
+      pFullscreen = false;
+    }
+    GWarn->Logf(L"[EchelonRenderer]\t Calling attempt #%02d\n", i+1);
+    if (!m_LLRenderer.Initialize(hwnd, pWidth, pHeight, pColorBytes, pFullscreen))
     {
       GWarn->Logf(L"[EchelonRenderer]\t Renderer failed to initialize with parameters {type: %x, width:%d, height:%d, color:%x}", blitType, pWidth, pHeight, pColorBytes);
       ::Sleep(500);
@@ -245,39 +275,65 @@ void UD3D9FPRenderDevice::Exit()
 
 UBOOL UD3D9FPRenderDevice::SetRes(INT pWidth, INT pHeight, INT pColorBytes, UBOOL pFullscreen)
 {
-  static INT lastWidth = pWidth;
-  static INT lastHeight = pHeight;
+  auto mx = URenderDevice::Viewport->GetOuterUClient()->WindowedViewportX;
+  auto my = URenderDevice::Viewport->GetOuterUClient()->WindowedViewportY;
+  m_TargetResWidth = pWidth;
+  m_TargetResHeight = pHeight;
+  m_TargetResColorBytes = pColorBytes;
+  m_TargetResFullscreen = pFullscreen;
+  GLog->Logf(L"[EchelonRenderer]\t Set called with: width:%d height:%d fullscreen:%d\n", m_TargetResWidth, m_TargetResHeight, m_TargetResFullscreen?1:0);
 
-  if (pWidth == 0 || pHeight == 0)
+  if (!m_CurrentResWidth.has_value() ||
+    !m_CurrentResHeight.has_value() ||
+    !m_CurrentResColorBytes.has_value() ||
+    !m_CurrentResFullscreen.has_value())
   {
-    pFullscreen = 0;
-    pWidth = lastWidth;
-    pHeight = lastHeight;
+    return ValidateRes();
   }
 
-  if (pFullscreen)
+  return TRUE;
+}
+
+UBOOL UD3D9FPRenderDevice::ValidateRes()
+{
+  const bool hasChanged = (m_TargetResWidth != m_CurrentResWidth) || (m_TargetResHeight != m_CurrentResHeight) || (m_TargetResFullscreen != m_CurrentResFullscreen);
+  if (!hasChanged)
   {
-    if (auto res = m_LLRenderer.FindClosestResolution(pWidth, pHeight); res)
+    return TRUE;
+  }
+
+  GLog->Logf(L"[EchelonRenderer]\t ValidateRes called with: width:%d height:%d fullscreen:%d\n", m_TargetResWidth, m_TargetResHeight, m_TargetResFullscreen?1:0);
+
+  if (m_TargetResWidth == 0 || m_TargetResHeight == 0)
+  {
+    m_TargetResFullscreen = false;
+    m_TargetResWidth = m_CurrentResWidth ? *m_CurrentResWidth : 128;
+    m_TargetResHeight = m_CurrentResHeight ? *m_CurrentResHeight : 128;
+  }
+
+  if (m_TargetResFullscreen)
+  {
+    if (auto res = m_LLRenderer.FindClosestResolution(m_TargetResWidth, m_TargetResHeight); res)
     {
-      GLog->Logf(L"[EchelonRenderer]\t Fullscreen Setres was requested, and matched %dx%d to available resolution %dx%d.", pWidth, pHeight, res->Width, res->Height);
-      pWidth = res->Width;
-      pHeight = res->Height;
+      GLog->Logf(L"[EchelonRenderer]\t Fullscreen Setres was requested, and matched %dx%d to available resolution %dx%d.", m_TargetResWidth, m_TargetResHeight, res->Width, res->Height);
+      m_TargetResWidth = res->Width;
+      m_TargetResHeight = res->Height;
     }
     else
     {
-      pFullscreen = false;
-      GLog->Logf(L"[EchelonRenderer]\t SetRes failed, could not find matching fullscreen resolution for %dx%d, possible device returned no modes. Swithing to windowed.", pWidth, pHeight);
+      m_TargetResFullscreen = false;
+      GLog->Logf(L"[EchelonRenderer]\t SetRes failed, could not find matching fullscreen resolution for %dx%d, possible device returned no modes. Swithing to windowed.", m_TargetResWidth, m_TargetResHeight);
     }
   }
 
-  const auto blitType = (pFullscreen ? (BLIT_Fullscreen | BLIT_Direct3D) : (BLIT_HardwarePaint | BLIT_Direct3D));
-  UBOOL Result = URenderDevice::Viewport->ResizeViewport(blitType, pWidth, pHeight, pColorBytes);
+  const auto blitType = (m_TargetResFullscreen ? (BLIT_Fullscreen | BLIT_Direct3D) : (BLIT_HardwarePaint | BLIT_Direct3D));
+  UBOOL Result = URenderDevice::Viewport->ResizeViewport(blitType, m_TargetResWidth, m_TargetResHeight, m_TargetResColorBytes);
   if (!Result)
   {
     GError->Log(L"SetRes failed: Error resizing viewport.");
     return 0;
   }
-  if (!m_LLRenderer.ResizeDisplaySurface(0, 0, pWidth, pHeight, (pFullscreen != 0)))
+  if (!m_LLRenderer.ResizeDisplaySurface(0, 0, m_TargetResWidth, m_TargetResHeight, m_TargetResFullscreen))
   {
     GError->Log(L"SetRes failed due to internal error in m_LLRenderer.Resize()");
     return 0;
@@ -287,11 +343,13 @@ UBOOL UD3D9FPRenderDevice::SetRes(INT pWidth, INT pHeight, INT pColorBytes, UBOO
   //customFOV = Misc::getFov(defaultFOV,Viewport->SizeX,Viewport->SizeY);
   //Does this need to be set on Viewport->Actor->FovAngle?
 #endif
-  Result = m_LLRenderer.ResizeDisplaySurface(0, 0, pWidth, pHeight, pFullscreen);
+  Result = m_LLRenderer.ResizeDisplaySurface(0, 0, m_TargetResWidth, m_TargetResHeight, m_TargetResFullscreen);
   if (Result)
   {
-    lastWidth = pWidth;
-    lastHeight = pHeight;
+    m_CurrentResWidth = m_TargetResWidth;
+    m_CurrentResHeight = m_TargetResHeight;
+    m_CurrentResFullscreen = m_TargetResFullscreen;
+    m_CurrentResColorBytes = m_TargetResColorBytes;
   }
 
   if (URenderDevice::Viewport && g_ConfigManager.GetAggressiveMouseFix())
@@ -314,6 +372,8 @@ void UD3D9FPRenderDevice::Flush(UBOOL AllowPrecache)
 static auto renderStart = std::chrono::high_resolution_clock::now();
 void UD3D9FPRenderDevice::Lock(FPlane FlashScale, FPlane FlashFog, FPlane ScreenClear, DWORD RenderLockFlags, BYTE* InHitData, INT* InHitSize)
 {
+  std::unique_lock lock(m_Lock);
+  
   renderStart = std::chrono::high_resolution_clock::now();
   if (!g_options.renderingDisabled)
   {
@@ -367,6 +427,8 @@ void UD3D9FPRenderDevice::Unlock(UBOOL Blit)
       m_LLRenderer.EndFrame();
     }
   }
+
+  ValidateRes();
 }
 
 void UD3D9FPRenderDevice::Tick(FLOAT DeltaTime)
@@ -463,20 +525,30 @@ UBOOL UD3D9FPRenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar)
 
       auto count = 0;
       auto displayModes = m_LLRenderer.GetDisplayModes();
+      std::vector<D3DDISPLAYMODE> processedDisplayModes;
 
       for (const auto& m : displayModes)
       {
-        wchar_t tmpString[100]{ 0 };
-        swprintf_s(tmpString, L"%dx%d", m.Width, m.Height);
-        displayModeString += tmpString;
+        const bool alreadyRegistered = std::any_of(processedDisplayModes.begin(), processedDisplayModes.end(), 
+          [&](const D3DDISPLAYMODE& pComp) {
+            return pComp.Width == m.Width && pComp.Height == m.Height;
+          });
 
-        if (count++ >= 16)
+        if (!alreadyRegistered)
         {
-          break;
-        }
-        else
-        {
-          displayModeString += L" ";
+          wchar_t tmpString[100]{ 0 };
+          swprintf_s(tmpString, L"%dx%d", m.Width, m.Height);
+          displayModeString += tmpString;
+          processedDisplayModes.push_back(m);
+
+          if (count++ >= 16)
+          {
+            break;
+          }
+          else
+          {
+            displayModeString += L" ";
+          }
         }
       }
 
@@ -485,6 +557,16 @@ UBOOL UD3D9FPRenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar)
         Ar.Log(displayModeString.c_str());
       }
       return 1;
+    }
+    else if (ParseCommand(&Cmd, L"SetRes"))
+    {
+      if (m_CurrentResColorBytes && m_CurrentResFullscreen)
+      {
+        INT X=appAtoi(Cmd);
+        TCHAR* CmdTemp = appStrchr(Cmd,'x') ? appStrchr(Cmd,'x')+1 : appStrchr(Cmd,'X') ? appStrchr(Cmd,'X')+1 : TEXT("");
+        INT Y=appAtoi(CmdTemp);
+        SetRes(X, Y, *m_CurrentResColorBytes, *m_CurrentResFullscreen);
+      }
     }
     else if ((ptr = (wchar_t*)wcswcs(Cmd, L"Brightness"))) //Brightness is sent as "brightness [val]".
     {

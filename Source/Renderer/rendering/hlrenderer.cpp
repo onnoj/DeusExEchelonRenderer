@@ -309,7 +309,7 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
               if (isUnlitEmissive)
               {
                 //Additional 2x renders with a tiny offset, otherwise the effect might not get picked up per-ray.
-                if (!ctx.frameIsSkybox && &bucket != &m_dynamicGeometryMeshes)
+                if (!ctx.frameIsSkybox)
                 {
                   D3DXMATRIX s;
                   D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);

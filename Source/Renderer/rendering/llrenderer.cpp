@@ -15,6 +15,8 @@
 #include "utils/utils.h"
 #include "utils/materialdebugger.h"
 
+bool g_debugAllowCameraJump = true;
+
 bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen)
 {
   check(IsWindow(hWnd));
@@ -445,10 +447,24 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0
   );
 }
 
-void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
+void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::PreTransformedVertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
   return RenderTriangleListBuffer(
     D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
+    pVertices,
+    primitiveCount,
+    pVertexCount,
+    sizeof(LowlevelRenderer::VertexPos4Color0Tex0),
+    pHash,
+    pDebug
+  );
+}
+
+
+void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
+{
+  return RenderTriangleListBuffer(
+    D3DFVF_XYZW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
     pVertices,
     primitiveCount,
     pVertexCount,
@@ -770,7 +786,9 @@ void LowlevelRenderer::CheckDirtyMatrices()
     m_CurrentState->m_WorldMatrixPending.reset();
   }
 
-  if (m_CurrentState->m_ViewMatrixPending)
+  bool allowViewMatrixChange = true;
+  g_DebugMenu.DebugVar("Rendering", "Allow ViewMatrix Change", DebugMenuUniqueID(), allowViewMatrixChange);
+  if (m_CurrentState->m_ViewMatrixPending && allowViewMatrixChange)
   {
     auto& m = *(m_CurrentState->m_ViewMatrixPending);
 
@@ -835,6 +853,21 @@ void LowlevelRenderer::SetWorldMatrix(const D3DMATRIX& pMatrix)
 
 void LowlevelRenderer::SetViewMatrix(const D3DMATRIX& pMatrix)
 {
+  if (m_CurrentState->m_ViewMatrix)
+  {
+    auto m = *(m_CurrentState->m_ViewMatrix);
+    D3DXVECTOR3 diff;
+    D3DXVECTOR3 camera_origin{ pMatrix.m[3][0], pMatrix.m[3][1], pMatrix.m[3][2] };
+    D3DXVECTOR3 prev_origin{ m.m[3][0], m.m[3][1], m.m[3][2] };
+    D3DXVec3Subtract(&diff, &camera_origin, &prev_origin);
+    float f = fabsf(D3DXVec3Length(&diff));
+
+    if (!g_debugAllowCameraJump && f > 5.0f)
+    {
+      GLog->Log(L"Camera moved");
+    }
+  }
+
   m_CurrentState->m_ViewMatrixPending = pMatrix;
 }
 
@@ -907,15 +940,22 @@ bool LowlevelRenderer::ValidateViewport()
   if(m_DesiredViewportWidth) g_DebugMenu.DebugVar("Rendering", "Viewport.Width", DebugMenuUniqueID(), *m_DesiredViewportWidth, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 4096 });
   if(m_DesiredViewportHeight) g_DebugMenu.DebugVar("Rendering", "Viewport.Height", DebugMenuUniqueID(), *m_DesiredViewportHeight, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 4096 });
 
-  if ((m_DesiredViewportLeft && (m_CurrentState->m_ViewportLeft != *m_DesiredViewportLeft)) ||
-    (m_DesiredViewportWidth && (m_CurrentState->m_ViewportWidth != *m_DesiredViewportWidth)) ||
-    (m_DesiredViewportTop && (m_CurrentState->m_ViewportLeft != *m_DesiredViewportTop)) ||
-    (m_DesiredViewportHeight && (m_CurrentState->m_ViewportHeight != *m_DesiredViewportHeight)) ||
-    (m_DesiredViewportMinZ && (m_CurrentState->m_ViewportMinZ != *m_DesiredViewportMinZ)) ||
-    (m_DesiredViewportMaxZ && (m_CurrentState->m_ViewportMaxZ != *m_DesiredViewportMaxZ))
-    )
+  const bool dimensionChanged = (m_DesiredViewportLeft && (m_CurrentState->m_ViewportLeft != *m_DesiredViewportLeft)) ||
+                                (m_DesiredViewportWidth && (m_CurrentState->m_ViewportWidth != *m_DesiredViewportWidth)) ||
+                                (m_DesiredViewportTop && (m_CurrentState->m_ViewportLeft != *m_DesiredViewportTop)) ||
+                                (m_DesiredViewportHeight && (m_CurrentState->m_ViewportHeight != *m_DesiredViewportHeight));
+
+  const bool zChanged = (m_DesiredViewportMinZ && (m_CurrentState->m_ViewportMinZ != *m_DesiredViewportMinZ)) ||
+                             (m_DesiredViewportMaxZ && (m_CurrentState->m_ViewportMaxZ != *m_DesiredViewportMaxZ));
+  
+
+  if (dimensionChanged || zChanged)
   {
-    GLog->Logf(L"[EchelonRenderer]\t LLRenderer ValidateViewport change detected: left:%d top:%d width:%d height:%d\n", *m_DesiredViewportLeft, *m_DesiredViewportTop, *m_DesiredViewportWidth, *m_DesiredViewportHeight);
+    if (!zChanged)
+    {
+      GLog->Logf(L"[EchelonRenderer]\t LLRenderer ValidateViewport change detected: left:%d top:%d width:%d height:%d\n", *m_DesiredViewportLeft, *m_DesiredViewportTop, *m_DesiredViewportWidth, *m_DesiredViewportHeight);
+    }
+
     m_CurrentState->m_ViewportLeft = m_DesiredViewportLeft;
     m_CurrentState->m_ViewportWidth = m_DesiredViewportWidth;
     m_CurrentState->m_ViewportTop = m_DesiredViewportTop;

@@ -36,9 +36,11 @@ void HighlevelRenderer::Shutdown()
   m_renderingScope.release();
   for(auto& n : m_DrawnNodes) n.clear();
   m_dynamicMeshes.clear();
-  m_staticMeshes.clear();
+  m_staticGeometryMeshes.clear();
+  m_dynamicGeometryMeshes.clear();
   m_DebugMesh = {};
   m_UIMeshes.clear();
+  m_SpriteMeshes.clear();
   m_LightManager.Shutdown();
   m_TextureManager.Shutdown();
   m_LLRenderer = nullptr;
@@ -105,6 +107,7 @@ void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
       m_LLRenderer->EndScene();
     }
     m_UIMeshes.clear();
+    m_SpriteMeshes.clear();
   }
 }
 
@@ -122,9 +125,10 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
   g_DebugMenu.DebugVar("Rendering", "Wipe Render Cache", DebugMenuUniqueID(), clearEachFrame);
   if (clearEachFrame)
   {
-    m_staticMeshes.clear();
+    m_staticGeometryMeshes.clear();
     for(auto& n : m_DrawnNodes) n.clear();
   }
+  m_dynamicGeometryMeshes.clear();
 
 #if 0
   //axis widget
@@ -174,6 +178,8 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
   {
     //DrawFullscreenQuad(Frame, m_TextureManager.GetFakeTexture());
   }
+
+  m_SpriteMeshes.clear();
 
   m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnRenderingEnd");
   m_renderingScope.reset();
@@ -253,75 +259,81 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
     {  //Render all static geometry
       enum class pass { solid, translucent };
       constexpr pass passes[] = { pass::solid, pass::translucent };
+      GeometryMeshesMap* buckets[] = { &m_staticGeometryMeshes, &m_dynamicGeometryMeshes};
 
-      for (auto pass : passes)
+      for (auto bucketPtr : buckets)
       {
-        for (auto& cachedMeshInfoIt : m_staticMeshes)
+        for (auto pass : passes)
         {
-          //Utils::ScopedCall scopedRenderStatePushPop{ [&](){ m_LLRenderer->PushDeviceState();}, [&]() {m_LLRenderer->PopDeviceState(); } };
-
-          auto& info = cachedMeshInfoIt.second;
-          auto& vtxBuffer = *info.buffer.get();
-          if (vtxBuffer.empty())
+          GeometryMeshesMap& bucket = *bucketPtr;
+          for (auto& cachedMeshInfoIt : bucket)
           {
-            continue;
-          }
+            //Utils::ScopedCall scopedRenderStatePushPop{ [&](){ m_LLRenderer->PushDeviceState();}, [&]() {m_LLRenderer->PopDeviceState(); } };
 
-          if (!info.zoneIndices.test(Frame->ZoneNumber))
-          {
-            continue;
-          }
-
-          auto flags = info.flags;
-          const bool isTranslucent = (flags & PF_Translucent) != 0;
-          const bool isUnlitEmissive = ((flags & PF_Unlit) != 0);
-          auto wm = info.worldMatrix;
-
-          if (pass == pass::solid)
-          {
-            if (isTranslucent)
+            auto& info = cachedMeshInfoIt.second;
+            auto& vtxBuffer = *info.buffer.get();
+            if (vtxBuffer.empty())
             {
               continue;
             }
 
-            if (isUnlitEmissive)
-            { //render without unlit flag
-              flags &= ~PF_Unlit;
-            }
-          }
-          else if (pass == pass::translucent)
-          {
-            if (!(isTranslucent || isUnlitEmissive))
+            if (!info.zoneIndices.test(Frame->ZoneNumber))
             {
               continue;
             }
 
-            if (isUnlitEmissive)
+            auto flags = info.flags;
+            const bool isTranslucent = (flags & PF_Translucent) != 0 && false;
+            const bool isUnlitEmissive = ((flags & PF_Unlit) != 0) && false;
+            auto wm = info.worldMatrix;
+
+            if (pass == pass::solid)
             {
-              //Additional 2x renders with a tiny offset, otherwise the effect might not get picked up per-ray.
-              if (!ctx.frameIsSkybox)
+              if (isTranslucent)
               {
-                D3DXMATRIX s;
-                D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
-                D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
-                SetWorldTransformState(wm);
-                m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle);
-                m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
-              
-                D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
-                D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
-                SetWorldTransformState(wm);
-                m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle);
-                m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
                 continue;
               }
-            }
-          }
 
-          SetWorldTransformState(wm);
-          if (m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle))
-          {
-            m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+              if (isUnlitEmissive)
+              { //render without unlit flag
+                flags &= ~PF_Unlit;
+              }
+            }
+            else if (pass == pass::translucent)
+            {
+              if (!(isTranslucent || isUnlitEmissive))
+              {
+                continue;
+              }
+
+              if (isUnlitEmissive)
+              {
+                //Additional 2x renders with a tiny offset, otherwise the effect might not get picked up per-ray.
+                if (!ctx.frameIsSkybox && &bucket != &m_dynamicGeometryMeshes)
+                {
+                  D3DXMATRIX s;
+                  D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
+                  D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+                  SetWorldTransformState(wm);
+                  m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle);
+                  m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+
+                  D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
+                  D3DXMatrixMultiply(&wm, &info.worldMatrix, &s);
+                  SetWorldTransformState(wm);
+                  m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle);
+                  m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+                  continue;
+                }
+              }
+            }
+
+            
+            SetWorldTransformState(wm);
+            if (m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle))
+            {
+              m_LLRenderer->RenderTriangleList(info.buffer->data(), info.primitiveCount, info.buffer->size(), info.hash, info.debug);
+            }
           }
         }
       }
@@ -365,6 +377,32 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
       HasSpecialCoords = originalHasSpecialCoords;
     }
   }
+
+  //
+  if (!ctx.frameIsSkybox && !ctx.renderingUI && Frame->Parent == nullptr)
+  {
+    //Render sprites
+    m_LLRenderer->EmitDebugText(L"[EchelonRenderer] Sprites pass");
+    m_LLRenderer->PushDeviceState();
+    SetViewState(Frame, ViewType::game);
+    SetProjectionState(Frame, ProjectionType::perspective);
+
+    for (auto& rc : m_SpriteMeshes)
+    {
+      if (rc.primitiveCount > 0)
+      {
+        SetWorldTransformState(rc.worldmatrix);
+        auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
+        m_TextureManager.BindTexture(rc.flags, textureHandle);
+        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+
+        m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
+      }
+    }
+    m_LLRenderer->PopDeviceState();
+  }
   //
   m_LLRenderer->EndScene();
   m_LLRenderer->PopDeviceState();
@@ -389,7 +427,7 @@ void HighlevelRenderer::Draw2DScreenQuad(FSceneNode* Frame, float pX, float pY, 
   m_LLRenderer->RenderTriangleList(&quad[0], 2, std::size(quad), 0, 0);
 }
 
-void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, const DeusExD3D9TextureHandle& pTexture, float Size/*=1.0f*/)
+void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, DWORD pPrimitiveFlags, const DeusExD3D9TextureHandle& pTexture,float Size/*=1.0f*/)
 {
   if (!g_options.hasDebugDraw)
   {
@@ -456,7 +494,7 @@ void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, c
   }
   uint32_t hash = 0;
   MurmurHash3_x86_32(buffer.data(), buffer.size() * sizeof(buffer[0]), 0, &hash);
-  if (m_TextureManager.BindTexture(PF_Modulated, pTexture))
+  if (m_TextureManager.BindTexture(pPrimitiveFlags, pTexture))
   {
     m_LLRenderer->RenderTriangleList(buffer.data(), faces, buffer.size(), hash, 0);
   }
@@ -510,7 +548,7 @@ void HighlevelRenderer::DrawFullscreenQuad(FSceneNode* Frame, const DeusExD3D9Te
 
     D3DXMatrixTranslation(&wm, newOrigin.X, newOrigin.Y, newOrigin.Z);
 
-    StaticMeshesVertexBuffer buffer;
+    GeometryMeshesVertexBuffer buffer;
     buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
     buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
     buffer.push_back({ { -1.0f,  1.0f, 0.0f },  {0.0f, 0.0f} });
@@ -536,10 +574,12 @@ void HighlevelRenderer::DrawFullscreenQuad(FSceneNode* Frame, const DeusExD3D9Te
 
 void HighlevelRenderer::OnLevelChange()
 {
-  m_staticMeshes.clear();
+  m_staticGeometryMeshes.clear();
+  m_dynamicGeometryMeshes.clear();
   m_dynamicMeshes.clear();
   for(auto& n : m_DrawnNodes) n.clear();
   m_UIMeshes.clear();
+  m_SpriteMeshes.clear();
   m_LightManager.OnLevelChange();
 }
 
@@ -776,50 +816,32 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
   }
 
   //3. Find static mesh for key. If it does not exist, create one. 
-  StaticMeshesValue* sharedMesh = nullptr;
-
-  if (!surfaceIsDynamic)
+  GeometryMeshesValue* sharedMesh = nullptr;
+  auto& meshBucket = (surfaceIsDynamic ? m_dynamicGeometryMeshes : m_staticGeometryMeshes);
+  if (auto it = meshBucket.find(key); it != meshBucket.end())
   {
-    if (auto it = m_staticMeshes.find(key); it != m_staticMeshes.end())
+    sharedMesh = &it->second;
+    if (sharedMesh->primitiveCount == 0)
     {
-      sharedMesh = &it->second;
-      if (sharedMesh->primitiveCount == 0)
-      {
-        sharedMesh->hash = 0;
-        sharedMesh->buffer->clear();
-      }
-    }
-    else
-    {
-      StaticMeshesValue mesh;
-      mesh.buffer = std::make_unique<StaticMeshesVertexBuffer>();
-      mesh.flags = Surface.PolyFlags;
-      mesh.primitiveCount = 0;
-      mesh.albedoTextureHandle = albedoTextureHandle;
-      mesh.lightmapTextureHandle = lightmapTextureHandle;
-      FVector localOrigin = GVertPoints(GVerts(Node.iVertPool + 0).pVertex);
-      D3DXMatrixTranslation(&mesh.worldMatrix, localOrigin.X, localOrigin.Y, localOrigin.Z);
-      D3DXMatrixInverse(&mesh.worldMatrixInverse, nullptr, &mesh.worldMatrix);
-      it = m_staticMeshes.insert(std::make_pair(key, std::move(mesh)));
-      sharedMesh = &it->second;
+      sharedMesh->hash = 0;
+      sharedMesh->buffer->clear();
     }
   }
   else
   {
-    static StaticMeshesValue fakemesh;
-    fakemesh = {};
-    fakemesh.buffer = std::make_unique<StaticMeshesVertexBuffer>();
-    fakemesh.flags = Surface.PolyFlags;
-    fakemesh.primitiveCount = 0;
-    //fakemesh.textureSet = textureSet;
-    fakemesh.albedoTextureHandle = albedoTextureHandle;
-    fakemesh.lightmapTextureHandle = lightmapTextureHandle;
-    fakemesh.hash = 0;
+    GeometryMeshesValue mesh;
+    mesh.buffer = std::make_unique<GeometryMeshesVertexBuffer>();
+    mesh.flags = Surface.PolyFlags;
+    mesh.primitiveCount = 0;
+    mesh.albedoTextureHandle = albedoTextureHandle;
+    mesh.lightmapTextureHandle = lightmapTextureHandle;
     FVector localOrigin = GVertPoints(GVerts(Node.iVertPool + 0).pVertex);
-    D3DXMatrixTranslation(&fakemesh.worldMatrix, localOrigin.X, localOrigin.Y, localOrigin.Z);
-    D3DXMatrixInverse(&fakemesh.worldMatrixInverse, nullptr, &fakemesh.worldMatrix);
-    sharedMesh = &fakemesh;
+    D3DXMatrixTranslation(&mesh.worldMatrix, localOrigin.X, localOrigin.Y, localOrigin.Z);
+    D3DXMatrixInverse(&mesh.worldMatrixInverse, nullptr, &mesh.worldMatrix);
+    it = meshBucket.insert(std::make_pair(key, std::move(mesh)));
+    sharedMesh = &it->second;
   }
+  
 
   //4. Append to mesh vertex buffer.
   // for (auto Poly = Facet.Polys; Poly; Poly = Poly->Next)
@@ -895,22 +917,6 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
     }
   }
   sharedMesh->hash ^= hash;
-
-  //5. All static meshes are drawn at the end of the frame, dynamic ones are drawn right away.
-  SetWorldTransformState(sharedMesh->worldMatrix);
-  if (surfaceIsDynamic)
-  {
-    auto flags = sharedMesh->flags;
-    if ((flags & PF_Unlit) != 0)
-    {
-      m_TextureManager.BindTexture(flags, sharedMesh->albedoTextureHandle, sharedMesh->lightmapTextureHandle);
-      m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), 0, sharedMesh->debug);
-      flags &= ~PF_Unlit;
-    }
-    m_TextureManager.BindTexture(flags, sharedMesh->albedoTextureHandle, sharedMesh->lightmapTextureHandle);
-    m_LLRenderer->RenderTriangleList(sharedMesh->buffer->data(), sharedMesh->primitiveCount, sharedMesh->buffer->size(), 0, sharedMesh->debug);
-  }
-
 }
 
 void HighlevelRenderer::OnDrawGeometryEnd(FSceneNode* Frame)
@@ -1051,7 +1057,7 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Actor)
   {
     m_LightManager.AddFrameLight(light->Actor, &light->Location);
   }
-
+  
   D3DXMATRIX wm;
   SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
   SetViewState(Frame, ViewType::game);
@@ -1120,6 +1126,25 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Actor)
         m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
       }
     }
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void HighlevelRenderer::PushRenderObject(const void* pData, uint32_t pSize)
+{
+  if (pSize >= 4)
+  {
+    m_RenderObjectStack.push_back(std::make_pair(pSize, pData));
+  }
+}
+
+void HighlevelRenderer::PopRenderObject(uint32_t pSize)
+{
+  if (pSize >= 4)
+  {
+    check(pSize == m_RenderObjectStack.back().first);
+    m_RenderObjectStack.pop_back();
   }
 }
 
@@ -1196,8 +1221,96 @@ void HighlevelRenderer::OnDrawUIEnd(FSceneNode* Frame)
   m_LLRenderer->EmitDebugText(L"[EchelonRenderer] EndUI");
 }
 
+void HighlevelRenderer::OnDrawSprite(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags)
+{
+  auto& ctx = *g_ContextManager.GetContext();
 
-void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZDepth, FPlane pColor, FPlane pFog, DWORD pPolyFlags)
+  auto actorContainer = GetRenderObjectTopT<HActor>();
+  if (actorContainer == nullptr)
+  {
+    return;
+  }
+
+  FDynamicSprite* sprite = [&]() -> FDynamicSprite* {
+    for (FDynamicSprite* Sprite = Frame->Sprite; Sprite; Sprite = Sprite->RenderNext)
+    {
+      if (Sprite->Actor == actorContainer->Actor && Sprite->SpanBuffer == Span && Sprite->Z == pZ)
+      {
+        return Sprite;
+      }
+    }
+    return nullptr;
+  }();
+  if (sprite == nullptr)
+  {
+    return;
+  }
+
+  const auto& texture = m_TextureManager.ProcessTexture(pPolyFlags, &TextureInfo);
+
+  // Handle color processing
+  FColor clampedColor = FColor(pColor);
+  check(TextureInfo.MaxColor != nullptr);
+  FColor maxColor = *TextureInfo.MaxColor;
+  if (pPolyFlags & (PF_Modulated | PF_Masked)) {
+    maxColor = FColor(0xFF, 0xFF, 0xFF, 0xFF);
+  }
+  D3DCOLOR Clr = (pPolyFlags & (PF_Modulated)) ?
+    (maxColor.TrueColor() | 0xFF000000) :
+    (FColor{
+    Min(clampedColor.R, maxColor.R),
+    Min(clampedColor.G, maxColor.G),
+    Min(clampedColor.B, maxColor.B),
+    Min(clampedColor.A, maxColor.A)
+      }.TrueColor() | 0xFF000000);
+  
+
+  DWORD flags = (pPolyFlags & ~PF_Memorized) | TextureInfo.Texture->PolyFlags;
+  if (TextureInfo.Palette && TextureInfo.Palette[128].A != 255 && !(pPolyFlags & PF_Translucent)) {
+    flags |= PF_Highlighted;
+  }
+
+  D3DXVECTOR3 scaling{TextureInfo.Texture->USize * actorContainer->Actor->DrawScale, 
+                      TextureInfo.Texture->VSize * actorContainer->Actor->DrawScale, 
+                      1.0f};
+  D3DXVECTOR3 translation{sprite->Location.X, sprite->Location.Y, sprite->Location.Z};
+
+  D3DXQUATERNION rot{};
+  D3DXMATRIX viewMatrix;
+  this->GetViewMatrix(Frame->Coords, viewMatrix);
+  D3DXMatrixInverse(&viewMatrix, NULL, &viewMatrix);
+  D3DXQuaternionRotationMatrix(&rot, &viewMatrix);
+  
+
+#if 0
+  D3DXVECTOR3 depthOffset{ 0.0f, 0.0f, 1.0f };
+  constexpr float unrealSpriteZOffset = 32.0f;
+  D3DXVec3TransformNormal(&depthOffset, &depthOffset, &viewMatrix);
+  depthOffset *= unrealSpriteZOffset;
+  translation += depthOffset;
+#endif
+
+  D3DXMATRIX wm;
+  D3DXMatrixTransformation(&wm, nullptr, nullptr, &scaling, nullptr, &rot, &translation);
+
+  SpriteMeshesValue* allocatedSpriteMesh = &m_SpriteMeshes.emplace_back();
+  allocatedSpriteMesh->worldmatrix = wm;
+  allocatedSpriteMesh->flags = flags;
+  allocatedSpriteMesh->buffer = std::make_unique<SpriteMeshesVertexBuffer>();
+  allocatedSpriteMesh->primitiveCount = 0;
+  allocatedSpriteMesh->textureInfo = TextureInfo;
+  allocatedSpriteMesh->textureKey = TextureHash::FromTextureInfo(&TextureInfo, allocatedSpriteMesh->flags);
+  allocatedSpriteMesh->sceneNode = std::make_unique<FSceneNode>(*Frame);
+
+  allocatedSpriteMesh->buffer->push_back({ {-0.5f, -0.5f, 0.0f, 1.0f }, Clr, {0.0f, 1.0f} });
+  allocatedSpriteMesh->buffer->push_back({ {+0.5f, -0.5f, 0.0f, 1.0f }, Clr, {1.0f, 1.0f} });
+  allocatedSpriteMesh->buffer->push_back({ {+0.5f, +0.5f, 0.0f, 1.0f }, Clr, {1.0f, 0.0f} }); allocatedSpriteMesh->primitiveCount++;
+  allocatedSpriteMesh->buffer->push_back({ {-0.5f, -0.5f, 0.0f, 1.0f }, Clr, {0.0f, 1.0f} });
+  allocatedSpriteMesh->buffer->push_back({ {+0.5f, +0.5f, 0.0f, 1.0f }, Clr, {1.0f, 0.0f} });
+  allocatedSpriteMesh->buffer->push_back({ {-0.5f, +0.5f, 0.0f, 1.0f }, Clr, {0.0f, 0.0f} }); allocatedSpriteMesh->primitiveCount++;
+}
+
+void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags)
 {
   auto& ctx = *g_ContextManager.GetContext();
   UIMeshesValue* latestUIMesh = (!m_UIMeshes.empty() ? &m_UIMeshes.back() : nullptr);
@@ -1223,7 +1336,7 @@ void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, f
   }
 
 
-  const float RZ = 1.0f / pZDepth;
+  const float RZ = 1.0f / pZ;
   const float X1 = (pX + Frame->XB - 0.5);
   const float Y1 = (pY + Frame->YB - 0.5);
   const float	X2 = (X1 + pWidth);
@@ -1255,13 +1368,13 @@ void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, f
                        Min(clampedColor.A, maxColor.A)
                    }.TrueColor() | 0xFF000000);
 
-  latestUIMesh->buffer->push_back({ {X1, Y1, pZDepth, 1.0f}, Clr, {U1, V1} });
-  latestUIMesh->buffer->push_back({ {X2, Y1, pZDepth, 1.0f}, Clr, {U2, V1} });
-  latestUIMesh->buffer->push_back({ {X2, Y2, pZDepth, 1.0f}, Clr, {U2, V2} });
+  latestUIMesh->buffer->push_back({ {X1, Y1, pZ, 1.0f}, Clr, {U1, V1} });
+  latestUIMesh->buffer->push_back({ {X2, Y1, pZ, 1.0f}, Clr, {U2, V1} });
+  latestUIMesh->buffer->push_back({ {X2, Y2, pZ, 1.0f}, Clr, {U2, V2} });
   latestUIMesh->primitiveCount++;
-  latestUIMesh->buffer->push_back({ {X1, Y1, pZDepth, 1.0f}, Clr, {U1, V1} });
-  latestUIMesh->buffer->push_back({ {X2, Y2, pZDepth, 1.0f}, Clr, {U2, V2} });
-  latestUIMesh->buffer->push_back({ {X1, Y2, pZDepth, 1.0f}, Clr, {U1, V2	} });
+  latestUIMesh->buffer->push_back({ {X1, Y1, pZ, 1.0f}, Clr, {U1, V1} });
+  latestUIMesh->buffer->push_back({ {X2, Y2, pZ, 1.0f}, Clr, {U2, V2} });
+  latestUIMesh->buffer->push_back({ {X1, Y2, pZ, 1.0f}, Clr, {U1, V2	} });
   latestUIMesh->primitiveCount++;
 }
 

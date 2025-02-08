@@ -404,7 +404,7 @@ void MaterialDebugger::renderAllTextures()
 #if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
       widgetPos.X *= -1.0f;
 #endif
-      hlRenderer->Draw3DCube(ctx->frameSceneNode, widgetPos, md, 10.0f);
+      hlRenderer->Draw3DCube(ctx->frameSceneNode, widgetPos, PF_Modulated, md, 10.0f);
     }
     texture->Unlock(textureInfo);
   }

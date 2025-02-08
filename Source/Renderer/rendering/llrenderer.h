@@ -9,6 +9,8 @@
 
 #include "rendering/dxtexturemanager.h"
 
+extern bool g_debugAllowCameraJump;
+
 template <typename T>
 struct Rect
 {
@@ -80,6 +82,7 @@ public:
 	struct VertexPos3Tex0to4;
 	struct VertexPos4Color0Tex0;
 	struct VertexPos3Color0;
+	struct PreTransformedVertexPos4Color0Tex0;
 public:
 	bool Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen);
 	void Shutdown();
@@ -130,6 +133,7 @@ public:
 	void RenderTriangleList(const VertexPos3Norm3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Tex0Tex1* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void RenderTriangleList(const PreTransformedVertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void RenderTriangleList(const VertexPos3Color0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
 	void EmitDebugText(const wchar_t* pTxt);
@@ -170,7 +174,7 @@ private:
 		std::optional<D3DMATRIX> m_ProjectionMatrixPending;
 	} m_States[16];
 	State* m_CurrentState = &m_States[0];
-
+	
 	std::optional<uint32_t> m_DesiredViewportLeft;
 	std::optional<uint32_t> m_DesiredViewportTop;
 	std::optional<uint32_t> m_DesiredViewportWidth;
@@ -215,6 +219,13 @@ private:
 	};
 
 	struct VertexPos4Color0Tex0
+	{
+		D3DXVECTOR4 Pos;
+		uint32_t Color=0xFFFFFFFF;
+		D3DXVECTOR2 Tex0;
+	};
+
+	struct PreTransformedVertexPos4Color0Tex0
 	{
 		D3DXVECTOR4 Pos;
 		uint32_t Color=0xFFFFFFFF;

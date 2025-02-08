@@ -368,7 +368,10 @@ namespace Hacks
       ctx->frameIsRasterized |= frameIsSkybox;
     }
 
-    if (Frame->Parent == nullptr || frameIsSkybox)
+    static int64_t lastFrameWithSkybox = 0;
+    bool allowSkyBox = g_ConfigManager.GetRenderSkybox();
+
+    if ((Frame->Parent == nullptr) || (frameIsSkybox && allowSkyBox))
     {
       g_SceneManager.PushScene(Frame);
       (GRender->*URenderFuncs::DrawFrame)(Frame);

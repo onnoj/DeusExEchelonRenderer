@@ -102,6 +102,7 @@ void Stats::EndScene()
 void Stats::DrawMainFrame()
 {
   mainFrameCount++;
+  mainFrameCountTotal++;
 }
 
 void Stats::DrawCall()

@@ -388,6 +388,10 @@ void UD3D9FPRenderDevice::Lock(FPlane FlashScale, FPlane FlashFog, FPlane Screen
       m_NotifyLevelHasChanged = false;
     }
 
+    if (InHitData == nullptr)
+    {
+      this->Viewport->HitTesting = true;
+    }
     m_LLRenderer.BeginFrame();
   }
 
@@ -451,8 +455,10 @@ void UD3D9FPRenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Su
 
 void UD3D9FPRenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X, FLOAT Y, FLOAT XL, FLOAT YL, FLOAT U, FLOAT V, FLOAT UL, FLOAT VL, class FSpanBuffer* Span, FLOAT Z, FPlane Color, FPlane Fog, DWORD PolyFlags)
 {
+
   g_SceneManager.Validate();
   std::wstring textureName = Info.Texture->GetFullName();
+  m_LLRenderer.EmitDebugTextF(L"[EchelonRenderer] DrawTile: %s", textureName.c_str());
   if (textureName.find(L"Corona") != -1)
   {
     constexpr float scale = 0.5f;
@@ -464,7 +470,15 @@ void UD3D9FPRenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT 
     XL *= scale;
     YL *= scale;
   }
-  m_HLRenderer.OnDrawUI(Frame, Info, X, Y, XL, YL, U, V, UL, VL, Span, Z, Color, Fog, PolyFlags);
+
+  if (Z > 1.0f)
+  {
+    m_HLRenderer.OnDrawSprite(Frame, Info, X, Y, XL, YL, U, V, UL, VL, Span, Z, Color, Fog, PolyFlags);
+  }
+  else
+  {
+    m_HLRenderer.OnDrawUI(Frame, Info, X, Y, XL, YL, U, V, UL, VL, Span, Z, Color, Fog, PolyFlags);
+  }
 }
 
 void UD3D9FPRenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2)
@@ -484,12 +498,18 @@ void UD3D9FPRenderDevice::ClearZ(FSceneNode* Frame)
 
 void UD3D9FPRenderDevice::PushHit(const BYTE* Data, INT Count)
 {
-  assert(false);
+  if (Count >= 4)
+  {
+    m_HLRenderer.PushRenderObject(Data, Count);
+  }
 }
 
 void UD3D9FPRenderDevice::PopHit(INT Count, UBOOL bForce)
 {
-  assert(false);
+  if (Count >= 4)
+  {
+    m_HLRenderer.PopRenderObject(Count);
+  }
 }
 
 /**
@@ -595,8 +615,23 @@ void UD3D9FPRenderDevice::SetSceneNode(FSceneNode* Frame)
 {
 }
 
+std::unordered_set<void*> _processed;
+std::unordered_set<void*> _seen;
 void UD3D9FPRenderDevice::PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags)
 {
+  if (auto it = _processed.insert(Info.Texture); it.second)
+  {
+    return;
+  }
+
+  bool isAnimated = Info.Texture->AnimNext != nullptr && Info.Texture->AnimNext != Info.Texture;
+  if (isAnimated)
+  {
+    if (auto it = _seen.insert(Info.Texture->AnimNext); it.second)
+    {
+      int x = 1;
+    }
+  }
 }
 
 void UD3D9FPRenderDevice::EndFlash()
@@ -605,6 +640,8 @@ void UD3D9FPRenderDevice::EndFlash()
 
 void UD3D9FPRenderDevice::OnLevelChange()
 {
+  _seen.clear();
+  _processed.clear();
   m_NotifyLevelHasChanged = true;
 }
 

@@ -283,8 +283,8 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
             }
 
             auto flags = info.flags;
-            const bool isTranslucent = (flags & PF_Translucent) != 0 && false;
-            const bool isUnlitEmissive = ((flags & PF_Unlit) != 0) && false;
+            const bool isTranslucent = (flags & PF_Translucent) != 0;
+            const bool isUnlitEmissive = ((flags & PF_Unlit) != 0);
             auto wm = info.worldMatrix;
 
             if (pass == pass::solid)

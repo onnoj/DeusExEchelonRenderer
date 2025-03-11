@@ -64,8 +64,8 @@ namespace RenderRanges
 	static const RangeDefinition Skybox{
 		/*NearRange = */Game.FarRange,
 		/*FarRange =  */Engine.FarRange,
-		/*DepthMin =  */Game.DepthMax,
-		/*DepthMax =  */Engine.DepthMax,
+		/*DepthMin =  */1.0f,
+		/*DepthMax =  */1.0f,
 	};
 
 	extern const RangeDefinition& FromContext(FrameContextManager::Context* pCtx);
@@ -83,6 +83,13 @@ public:
 	struct VertexPos4Color0Tex0;
 	struct VertexPos3Color0;
 	struct PreTransformedVertexPos4Color0Tex0;
+
+	struct State;
+public:
+	enum class RenderStateSaveSlot {
+		Sky = 0,
+		COUNT = 1,
+	};
 public:
 	bool Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen);
 	void Shutdown();
@@ -113,6 +120,8 @@ public:
 	void InitializeDeviceState();
 	void PushDeviceState();
 	void PopDeviceState();
+	void SaveDeviceState(RenderStateSaveSlot pSlot);
+	bool RestoreDeviceState(RenderStateSaveSlot pSlot);
 	DWORD GetRenderState(D3DRENDERSTATETYPE State) const;
 	HRESULT SetRenderState(D3DRENDERSTATETYPE State,DWORD Value);
 	DWORD GetTextureStageState(DWORD Stage,D3DTEXTURESTAGESTATETYPE Type) const;
@@ -146,6 +155,7 @@ public:
 	bool SetTextureOnDevice(const uint32_t pSlot, const DeusExD3D9Texture* pTexture);
 
 protected:
+	void ApplyDeviceState(State* pPendingState);
 
 	LPDIRECT3DDEVICE9 getDevice() { return m_Device; }
 private:
@@ -174,7 +184,9 @@ private:
 		std::optional<D3DMATRIX> m_ProjectionMatrixPending;
 	} m_States[16];
 	State* m_CurrentState = &m_States[0];
-	
+
+	std::optional<State> m_SavedStates[uint32_t(RenderStateSaveSlot::COUNT)];
+
 	std::optional<uint32_t> m_DesiredViewportLeft;
 	std::optional<uint32_t> m_DesiredViewportTop;
 	std::optional<uint32_t> m_DesiredViewportWidth;

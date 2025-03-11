@@ -248,6 +248,17 @@ void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
 void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
 {
   auto& ctx = *g_ContextManager.GetContext();
+  Utils::ScopedCall scopedCall
+  {
+    [&]() {},
+    [&]()
+    {
+      m_LLRenderer->EndScene();
+      m_LLRenderer->PopDeviceState();
+      m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnSceneEnd");
+    }
+  };
+
   if (!ctx.frameIsSkybox || (ctx.frameIsSkybox && g_ConfigManager.GetRenderSkybox()))
   {
     UModel* Model = Frame->Level->Model;
@@ -328,7 +339,6 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
               }
             }
 
-            
             SetWorldTransformState(wm);
             if (m_TextureManager.BindTexture(flags, info.albedoTextureHandle, info.lightmapTextureHandle))
             {
@@ -403,10 +413,6 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
     }
     m_LLRenderer->PopDeviceState();
   }
-  //
-  m_LLRenderer->EndScene();
-  m_LLRenderer->PopDeviceState();
-  m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnSceneEnd");
 }
 
 void HighlevelRenderer::Draw2DScreenQuad(FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB/* = 0xFF000000ul*/)

@@ -566,8 +566,7 @@ void LowlevelRenderer::FlushLights()
     res = m_Device->SetStreamSource(0, m_fakeLightBuffer, 0, sizeof(float) * 3 * 3); check(SUCCEEDED(res));
     res = m_Device->SetIndices(nullptr); check(SUCCEEDED(res));
     res = m_Device->SetFVF(D3DFVF_XYZ); check(SUCCEEDED(res));
-    res = m_Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1);
-    check(SUCCEEDED(res));
+    res = m_Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1); check(SUCCEEDED(res));
     m_CanFlushLights = false;
   }
 }
@@ -826,7 +825,8 @@ void LowlevelRenderer::CheckDirtyMatrices()
 
     //debugging:
     D3DXMATRIX vm;
-    m_Device->GetTransform(D3DTS_VIEW, &vm);
+    auto res = m_Device->GetTransform(D3DTS_VIEW, &vm);
+    check(SUCCEEDED(res));
     auto diff = memcmp(&vm, &m, sizeof(vm));
     check(diff == 0);
   }
@@ -1360,61 +1360,69 @@ void LowlevelRenderer::PushDeviceState()
 
 void LowlevelRenderer::PopDeviceState()
 {
-  const auto device = m_Device;
   const bool canPop = ((m_CurrentState - 1) >= &m_States[0]);
   check(canPop);
   if (canPop)
   {
     auto pendingState = (m_CurrentState - 1);
-    //Restore states:
-    for (int i = 0; i < std::size(m_CurrentState->m_RenderStates); i++)
-    {
-      auto& currentRs = m_CurrentState->m_RenderStates[i];
-      auto& pendingRs = pendingState->m_RenderStates[i];
-      check(
-        (!currentRs.has_value() && !pendingRs.has_value()) ||
-        (currentRs.has_value() && pendingRs.has_value())
-      );
+    ApplyDeviceState(pendingState);
+    m_CurrentState--;
+  }
+}
 
-      if (pendingRs)
+void LowlevelRenderer::ApplyDeviceState(LowlevelRenderer::State* pPendingState)
+{
+  const auto device = m_Device;
+
+  //Restore states:
+  for (int i = 0; i < std::size(m_CurrentState->m_RenderStates); i++)
+  {
+    auto& currentRs = m_CurrentState->m_RenderStates[i];
+    auto& pendingRs = pPendingState->m_RenderStates[i];
+    check(
+      (!currentRs.has_value() && !pendingRs.has_value()) ||
+      (currentRs.has_value() && pendingRs.has_value())
+    );
+
+    if (pendingRs)
+    {
+      m_Device->SetRenderState(D3DRENDERSTATETYPE(i), *pendingRs);
+    }
+  }
+
+  for (int i = 0; i < std::size(pPendingState->m_TextureSlots); i++)
+  {
+
+    auto& pendingTexSlot = (pPendingState->m_TextureSlots[i]);
+    auto& currentTexSlot = (m_CurrentState->m_TextureSlots[i]);
+    if (pendingTexSlot != currentTexSlot)
+    {
+      //TODO: when releasing a texture, crawl up through all states and remove it from any slots.
+      //m_Device->SetTexture(i, pendingTexSlot ? *pendingTexSlot : nullptr);
+    }
+  }
+
+  for (int stageId = 0; stageId < pPendingState->MAX_TEXTURESTAGES; stageId++)
+  {
+    for (int stateId = 0; stateId < pPendingState->MAX_TEXTURESTAGESTATES; stateId++)
+    {
+      auto& slot = pPendingState->m_TextureStageStates[stageId][stateId];
+      if (slot)
       {
-        m_Device->SetRenderState(D3DRENDERSTATETYPE(i), *pendingRs);
+        m_Device->SetTextureStageState(stageId, D3DTEXTURESTAGESTATETYPE(stateId), *slot);
       }
     }
-
-    for (int i = 0; i < std::size(pendingState->m_TextureSlots); i++)
+    for (int samplerStateId = 0; samplerStateId < pPendingState->MAX_SAMPLERSTATES; samplerStateId++)
     {
-
-      auto& pendingTexSlot = (pendingState->m_TextureSlots[i]);
-      auto& currentTexSlot = (m_CurrentState->m_TextureSlots[i]);
-      if (pendingTexSlot != currentTexSlot)
+      auto& slot = pPendingState->m_SamplerStates[stageId][samplerStateId];
+      if (slot)
       {
-        //TODO: when releasing a texture, crawl up through all states and remove it from any slots.
-        //m_Device->SetTexture(i, pendingTexSlot ? *pendingTexSlot : nullptr);
+        m_Device->SetSamplerState(stageId, D3DSAMPLERSTATETYPE(samplerStateId), *slot);
       }
     }
+  }
 
-    for (int stageId = 0; stageId < pendingState->MAX_TEXTURESTAGES; stageId++)
-    {
-      for (int stateId = 0; stateId < pendingState->MAX_TEXTURESTAGESTATES; stateId++)
-      {
-        auto& slot = pendingState->m_TextureStageStates[stageId][stateId];
-        if (slot)
-        {
-          m_Device->SetTextureStageState(stageId, D3DTEXTURESTAGESTATETYPE(stateId), *slot);
-        }
-      }
-      for (int samplerStateId = 0; samplerStateId < pendingState->MAX_SAMPLERSTATES; samplerStateId++)
-      {
-        auto& slot = pendingState->m_SamplerStates[stageId][samplerStateId];
-        if (slot)
-        {
-          m_Device->SetSamplerState(stageId, D3DSAMPLERSTATETYPE(samplerStateId), *slot);
-        }
-      }
-    }
-
-    auto checkMatrix = [device](D3DTRANSFORMSTATETYPE pState, std::optional<D3DMATRIX>& pMatrixSlotNew, std::optional<D3DMATRIX>& pMatrixSlotOld) 
+  auto checkMatrix = [device](D3DTRANSFORMSTATETYPE pState, std::optional<D3DMATRIX>& pMatrixSlotNew, std::optional<D3DMATRIX>& pMatrixSlotOld) 
     {
       if (pMatrixSlotNew && pMatrixSlotOld)
       {
@@ -1424,6 +1432,7 @@ void LowlevelRenderer::PopDeviceState()
         {
           device->SetTransform(pState, &newM);
         }
+        oldM = newM;
       }
       else
       {
@@ -1431,16 +1440,31 @@ void LowlevelRenderer::PopDeviceState()
       }
     };
 
-    checkMatrix(D3DTS_WORLD, pendingState->m_WorldMatrix, m_CurrentState->m_WorldMatrix);
-    checkMatrix(D3DTS_VIEW, pendingState->m_ViewMatrix, m_CurrentState->m_ViewMatrix);
-    checkMatrix(D3DTS_PROJECTION, pendingState->m_ProjectionMatrix, m_CurrentState->m_ProjectionMatrix);
+  checkMatrix(D3DTS_WORLD, pPendingState->m_WorldMatrix, m_CurrentState->m_WorldMatrix);
+  checkMatrix(D3DTS_VIEW, pPendingState->m_ViewMatrix, m_CurrentState->m_ViewMatrix);
+  checkMatrix(D3DTS_PROJECTION, pPendingState->m_ProjectionMatrix, m_CurrentState->m_ProjectionMatrix);
 
-    //this->SetWorldMatrix(*(newState->m_WorldMatrix));
-    //this->SetViewMatrix(*(newState->m_ViewMatrix));
-    //this->SetProjectionMatrix(*(newState->m_ProjectionMatrix));
-    SetViewport(*pendingState->m_ViewportLeft, *pendingState->m_ViewportTop, *pendingState->m_ViewportWidth, *pendingState->m_ViewportHeight);
-    m_CurrentState--;
+  //this->SetWorldMatrix(*(newState->m_WorldMatrix));
+  //this->SetViewMatrix(*(newState->m_ViewMatrix));
+  //this->SetProjectionMatrix(*(newState->m_ProjectionMatrix));
+  SetViewportDepth(*pPendingState->m_ViewportMinZ, *pPendingState->m_ViewportMaxZ);
+  SetViewport(*pPendingState->m_ViewportLeft, *pPendingState->m_ViewportTop, *pPendingState->m_ViewportWidth, *pPendingState->m_ViewportHeight);
+}
+
+void LowlevelRenderer::SaveDeviceState(RenderStateSaveSlot pSlot)
+{
+  m_SavedStates[uint32_t(pSlot)] = *m_CurrentState;
+}
+
+bool LowlevelRenderer::RestoreDeviceState(RenderStateSaveSlot pSlot)
+{
+  if (m_SavedStates[uint32_t(pSlot)])
+  {
+    State* savedState = &(m_SavedStates[uint32_t(pSlot)].value());
+    ApplyDeviceState(savedState);
+    return true;
   }
+  return false;
 }
 
 DWORD LowlevelRenderer::GetRenderState(D3DRENDERSTATETYPE State) const

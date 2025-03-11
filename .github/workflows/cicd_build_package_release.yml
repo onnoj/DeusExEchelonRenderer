@@ -80,9 +80,11 @@ jobs:
           mkdir rtx-remix\mods\DeusExEchelonRenderer
           copy -Recurse "${{ github.workspace }}\temp\DeusEx\package\*" rtx-remix\mods\DeusExEchelonRenderer\
           7z a "..\DeusExEchelonRenderer-${{  github.ref_name }}.zip" *
-    
+          7z a "..\DeusExEchelonRenderer-${{  github.ref_name }}-devtools.zip" "${{github.workspace}}/BIN/DEV/*"
     - name: upload binaries to release
       uses: softprops/action-gh-release@v2.0.4
       if: ${{startsWith(github.ref, 'refs/tags/v') }}
       with:
-          files: DeusExEchelonRenderer-${{  github.ref_name }}.zip
+          files: |
+            DeusExEchelonRenderer-${{  github.ref_name }}.zip
+            DeusExEchelonRenderer-${{  github.ref_name }}-devtools.zip

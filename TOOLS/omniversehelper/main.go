@@ -5,8 +5,10 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
+	"github.com/onnoj/DeusExEchelonRenderer/OmniverseHelper/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +43,10 @@ var rootCmd = &cobra.Command{
 	Short: "Omniverse Helper CLI",
 	Long:  `Omniverse Helper CLI is a tool for interacting with various REST APIs and performing useful tasks.`,
 	Args:  cobra.MinimumNArgs(1),
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		RootCmdOptions.InputFolder = utils.Unquote(RootCmdOptions.InputFolder)
+		RootCmdOptions.TextureDumpJSON = utils.Unquote(RootCmdOptions.TextureDumpJSON)
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Omniverse Helper CLI")
 	},
@@ -55,6 +61,9 @@ func init() {
 		Args:  cobra.NoArgs,
 		Short: "Mass ingests and assigns ingested textures",
 		Long:  "Mass ingests and assigns ingested textures to RTX Remix, requires the toolkit to be running with an active project loaded.",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			IngestCmdOptions.PackageFilters = utils.Unquote(IngestCmdOptions.PackageFilters)
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			for _, s := range IngestCmdOptions.PackageFilters {
 				IngestCmdOptions.PackageFiltersRegexes = append(IngestCmdOptions.PackageFiltersRegexes, regexp.MustCompile(s))
@@ -72,8 +81,20 @@ func init() {
 		Args:  cobra.NoArgs,
 		Short: "Conditionally copy files in the given folder",
 		Long:  "Conditionally copy files in the given folder, and applies some basic name processing",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			CopyCmdOptions.OutputFolderPath = utils.Unquote(CopyCmdOptions.OutputFolderPath)
+			CopyCmdOptions.InputFilenameFormat = utils.Unquote(CopyCmdOptions.InputFilenameFormat)
+			CopyCmdOptions.OutputFormat = utils.Unquote(CopyCmdOptions.OutputFormat)
+			CopyCmdOptions.JsonFilters = utils.Unquote(CopyCmdOptions.JsonFilters)
+			CopyCmdOptions.InputFileFilters = utils.Unquote(CopyCmdOptions.InputFileFilters)
+		},
 		Run: func(cmd *cobra.Command, args []string) {
+			CopyCmdOptions.JsonFilterMap = make(map[string]*regexp.Regexp)
 			for _, s := range CopyCmdOptions.JsonFilters {
+				if unquoted, err := strconv.Unquote(s); err == nil {
+					s = unquoted
+				}
+
 				if strings.Contains(s, "=") {
 					p := strings.Split(s, "=")
 					CopyCmdOptions.JsonFilterMap[p[0]] = regexp.MustCompile(p[1])

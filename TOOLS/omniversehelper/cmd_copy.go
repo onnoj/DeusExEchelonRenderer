@@ -131,8 +131,8 @@ func ExecuteCopy(inputDirectory string) {
 					replacementValue = replacementValue[1 : len(replacementValue)-1]
 				}
 
-				if regex, exists := CopyCmdOptions.JsonFilterMap[variable]; exists {
-					hasMatch = regex.MatchString(replacementValue)
+				if regex, exists := CopyCmdOptions.JsonFilterMap[variableName]; exists {
+					hasMatch = regex.MatchString(replacementValue) || hasMatch
 				}
 
 				replacementValue = sanitizeName(replacementValue)

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 )
@@ -48,6 +49,8 @@ func Unquote[T any](potentiallyQuotedStr T) T {
 	if inputStr, ok := any(potentiallyQuotedStr).(string); ok {
 		if s, e := strconv.Unquote(inputStr); e == nil {
 			return any(s).(T)
+		} else {
+			fmt.Printf("failed to unquote path, error %s\r\n", e.Error())
 		}
 	}
 

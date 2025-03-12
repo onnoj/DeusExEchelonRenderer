@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -51,4 +52,10 @@ func (d *nullDebugWriter) Write(txt string) {
 }
 
 func (d *nullDebugWriter) Close() {
+}
+
+func GetFileBaseName(path string) string {
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	return strings.TrimSuffix(base, ext)
 }

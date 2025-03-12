@@ -154,19 +154,21 @@ func ExecuteMassIngest() {
 		var hashIdentifier uint64
 		var remainder string
 		_, err = fmt.Sscanf(d.Name(), "%X_%s", &hashIdentifier, &remainder)
+		fileBaseName := utils.GetFileBaseName(d.Name())
+
 		if mappedTextureData, ok := TextureMapping[hashIdentifier]; ok {
-			if strings.HasPrefix(remainder, "diffuse") {
+			if strings.HasSuffix(fileBaseName, "diffuse") {
 				textureType = data.TextureType_Albedo
-			} else if strings.HasPrefix(remainder, "roughness") {
+			} else if strings.HasSuffix(fileBaseName, "roughness") {
 				textureType = data.TextureType_Roughness
-			} else if strings.HasPrefix(remainder, "normal_dx") {
+			} else if strings.HasSuffix(fileBaseName, "normal_dx") {
 				textureType = data.TextureType_NormalDX
-			} else if strings.HasPrefix(remainder, "normal") {
+			} else if strings.HasSuffix(fileBaseName, "normal") {
 				textureType = data.TextureType_NormalDX
-			} else if strings.HasPrefix(remainder, "height") {
+			} else if strings.HasSuffix(fileBaseName, "height") {
 				textureType = data.TextureType_Height
 			} else {
-				log.Fatal("option not implemented, please fix me")
+				log.Fatalf("Could not extract the texture type from the filename. Filename without extension was '%s' and did not end with _diffuse, _roughness, etc", fileBaseName)
 			}
 			TextureFileMapping[path] = mappedTextureData
 			mappedTextureData.ImportTexturePath[uint(textureType)] = path

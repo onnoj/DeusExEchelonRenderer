@@ -11,6 +11,8 @@ type (
 		Realtime      bool     `json:"realtime"`
 		RemixHash     uint64   `json:"remixhash"`
 		RemixHashText string   `json:"remixhash-hex"`
+		USize         uint64   `json:"usize,omitempty"`
+		VSize         uint64   `json:"vsize,omitempty"`
 	}
 	JSONTextureInfoSlice []JSONTextureInfo
 

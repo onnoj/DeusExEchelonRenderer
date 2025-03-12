@@ -46,7 +46,7 @@ func copyFile(src, dst string) error {
 func ExecuteCopy(inputDirectory string) {
 	jsonFile, err := os.Open(RootCmdOptions.TextureDumpJSON)
 	if err != nil {
-		log.Fatalf("Could not open '%s', exiting.", RootCmdOptions.TextureDumpJSON)
+		log.Fatalf("Could not open TextureDump JSON '%s', exiting.", RootCmdOptions.TextureDumpJSON)
 	}
 	var dump JSONTextureObj
 	jsonData, _ := io.ReadAll(jsonFile)
@@ -114,6 +114,38 @@ func ExecuteCopy(inputDirectory string) {
 		if data, ok := TextureMapping[fileHash]; ok {
 			hasMatch := false
 			fileNameCandidate := CopyCmdOptions.OutputFormat
+
+			if CopyCmdOptions.RequireEqualWidthHeight {
+				if data.USize != data.VSize {
+					continue
+				}
+			}
+			if CopyCmdOptions.RejectEqualWidthHeight {
+				if data.USize == data.VSize {
+					continue
+				}
+			}
+
+			if CopyCmdOptions.RequireMinWidth > 0 {
+				if data.USize < CopyCmdOptions.RequireMinWidth {
+					continue
+				}
+			}
+			if CopyCmdOptions.RequireMinHeight > 0 {
+				if data.VSize < CopyCmdOptions.RequireMinHeight {
+					continue
+				}
+			}
+			if CopyCmdOptions.RejectMinWidth > 0 {
+				if data.USize >= CopyCmdOptions.RejectMinWidth {
+					continue
+				}
+			}
+			if CopyCmdOptions.RejectMinHeight > 0 {
+				if data.VSize >= CopyCmdOptions.RejectMinHeight {
+					continue
+				}
+			}
 
 			for _, field := range reflect.VisibleFields(reflect.TypeOf(*data)) {
 				var variableName string

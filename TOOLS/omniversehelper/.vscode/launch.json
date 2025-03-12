@@ -111,16 +111,15 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "cwd": "${workspaceFolder}",
+            "cwd": "D:\\development\\misc\\DeusExRemixSampleMod",
             "program": "${workspaceFolder}",
             "env": {},
             "args": [
-                "--input=F:\\games\\steam\\steamapps\\common\\Deus Ex\\system\\rtx-remix\\captures\\textures",
-                "--jsondump=F:\\Games\\Steam\\steamapps\\common\\Deus Ex - RTXModder\\System\\textureDump.json",
-                "-o=d:\\tmp\\deusexdump\\",
                 "copy",
-                "--inputfilenameformat=\"%X.dds\"",
-                "--jsonfilter=\"path=.*Glass.*\""
+                "--jsondump=textureDump.json",
+                "-i", "f:\\games\\steam\\steamapps\\common\\Deus Ex\\system\\rtx-remix\\captures\\textures",
+                "-o", "import\\raw",
+                "--outputformat=\"${name}_${usize}_${vsize}.dds\""
             ],
             "buildFlags": "-buildvcs=false",
             "preLaunchTask": "",

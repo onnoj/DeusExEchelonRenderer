@@ -34,6 +34,12 @@ var (
 		//JsonFiltersRegexes       []*regexp.Regexp
 		InputFileFilters        []string
 		InputFileFiltersRegexes []*regexp.Regexp
+		RequireEqualWidthHeight bool
+		RejectEqualWidthHeight  bool
+		RequireMinWidth         uint64
+		RequireMinHeight        uint64
+		RejectMinWidth          uint64
+		RejectMinHeight         uint64
 	}
 )
 
@@ -54,7 +60,10 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&RootCmdOptions.InputFolder, "input", "i", "", "--input=<folder>")
+	rootCmd.MarkFlagRequired("input")
+
 	rootCmd.PersistentFlags().StringVarP(&RootCmdOptions.TextureDumpJSON, "jsondump", "j", "", "--jsondump=<path/to/.json>")
+	rootCmd.MarkFlagRequired("jsondump")
 
 	ingestCommand := cobra.Command{
 		Use:   "ingest",
@@ -118,10 +127,17 @@ func init() {
 	copyCommand.Flags().StringVar(&CopyCmdOptions.OutputFormat, "outputformat", "${package}\\${filename}", "The format for the output file operation, sourced directly from the dump .json")
 	copyCommand.Flags().StringArrayVar(&CopyCmdOptions.JsonFilters, "jsonfilter", []string{}, "Match against specific key/value pairs in the JSON. ie, 'path=.*Glass.*'")
 	copyCommand.Flags().StringArrayVar(&CopyCmdOptions.InputFileFilters, "inputfilter", []string{}, "Match against specific files, ie, '.*_diffuse.png'")
+	copyCommand.Flags().BoolVar(&CopyCmdOptions.RequireEqualWidthHeight, "require-equal-widthheight", false, "Only copy textures that have an equal width and height")
+	copyCommand.Flags().BoolVar(&CopyCmdOptions.RejectEqualWidthHeight, "reject-equal-widthheight", false, "Only copy textures that have a mismatching width and height")
+	copyCommand.Flags().Uint64Var(&CopyCmdOptions.RequireMinWidth, "require-min-width", 0, "Skip textures that are below this width")
+	copyCommand.Flags().Uint64Var(&CopyCmdOptions.RequireMinHeight, "require-min-height", 0, "Skip textures that are below this height")
+	copyCommand.Flags().Uint64Var(&CopyCmdOptions.RejectMinWidth, "reject-min-width", 0, "Skip textures that are above this width are")
+	copyCommand.Flags().Uint64Var(&CopyCmdOptions.RejectMinHeight, "reject-min-height", 0, "Skip textures that are above this height are")
 	rootCmd.AddCommand(&copyCommand)
 }
 
 func main() {
+	cobra.EnableTraverseRunHooks = true
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

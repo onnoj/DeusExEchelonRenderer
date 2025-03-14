@@ -185,9 +185,18 @@ func ExecuteMassIngest() {
 	}
 	defaultAssetDirectory, _ = filepath.Abs(defaultAssetDirectory)
 
+	// Iterate over textures in the package
+	remixTextures, err := httpClient.GetTextures(GetTexturesRequestParams{})
+	if err != nil {
+		log.Fatalln("Error: could not fetch textures.")
+	}
+
 	//Start processing each package.
 	for packageIdx, packageName := range PackageNames {
 		if !utils.MatchAnyOfRegex(IngestCmdOptions.PackageFiltersRegexes, packageName) {
+			continue
+		}
+		if len(PackageMapping[packageName]) == 0 {
 			continue
 		}
 		fmt.Printf("Processing package %s\t%d/%d", packageName, packageIdx, len(PackageNames))
@@ -195,7 +204,7 @@ func ExecuteMassIngest() {
 		totalProcessedTextureCount := 0
 		layerName := fmt.Sprintf("Overrides_%s.usda", packageName)
 		activeLayer := prepareLayer(layerName, httpClient)
-		workloads, totaltextureCount := generateIngestionWorkload(packageName, defaultAssetDirectory, httpClient)
+		workloads, totaltextureCount := generateIngestionWorkload(packageName, defaultAssetDirectory, remixTextures)
 		for _, workload := range workloads {
 			ingestResults, processedTextureCount := executeTexturesIngestion(*workload, activeLayer, httpClient)
 
@@ -243,9 +252,10 @@ func prepareLayer(layerName string, httpClient *RestClient) *Layer {
 	return activeLayer
 }
 
-func generateIngestionWorkload(packageName string, defaultAssetDirectory string, httpClient *RestClient) ([]*IngestTexturesRequestParams, int) {
+func generateIngestionWorkload(packageName string, defaultAssetDirectory string, remixTextures GetTexturesResponse) ([]*IngestTexturesRequestParams, int) {
 	totalTextureCount := 0
 	params := make([]*IngestTexturesRequestParams, 0)
+
 	var currentParams *IngestTexturesRequestParams
 	allocateNewParams := func() {
 		currentParams = new(IngestTexturesRequestParams)
@@ -253,13 +263,6 @@ func generateIngestionWorkload(packageName string, defaultAssetDirectory string,
 		params = append(params, currentParams)
 	}
 	allocateNewParams()
-
-	// Iterate over textures in the package
-	remixTextures, err := httpClient.GetTextures(GetTexturesRequestParams{})
-	if err != nil {
-		log.Fatalln("Error: could not fetch textures.")
-		return nil, 0
-	}
 
 	for _, v := range PackageMapping[packageName] {
 		// Process texture paths

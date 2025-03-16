@@ -11,6 +11,7 @@
 
 #include "rendering/llrenderer.h"
 #include "rendering/scenemanager.h"
+#include "utils/configmanager.h"
 #include "utils/debugmenu.h"
 #include "utils/utils.h"
 #include "utils/materialdebugger.h"
@@ -109,7 +110,7 @@ bool LowlevelRenderer::Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, 
     d3dpp.BackBufferCount = 1;
     d3dpp.EnableAutoDepthStencil = TRUE;
     d3dpp.AutoDepthStencilFormat = depthFormat;
-    d3dpp.Flags = D3DPRESENT_DONOTWAIT;//D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
+    d3dpp.Flags = 0;
     d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT; // D3DPRESENT_INTERVAL_IMMEDIATE;
     d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
     return d3dpp;
@@ -305,8 +306,64 @@ void LowlevelRenderer::EndScene()
   check(m_IsInScene == 0);
 }
 
+void ValidateFVF(const void* pBuffer, DWORD pFVF, const uint32_t pVertexCount)
+{
+  auto isFloatValid = [](float pValue) {
+    return std::isfinite(pValue) && !std::isnan(pValue);
+    };
+
+  auto checkDWORD = [](const void*& BufferContainingDWORDS, int pNumDWORDS)
+    {
+      const uint32_t* pDWORDBuffer = reinterpret_cast<const uint32_t*>(BufferContainingDWORDS);
+      for (int i = 0; i < pNumDWORDS; i++)
+      {
+        check((*pDWORDBuffer) >= 0 || (*pDWORDBuffer) <= UINT32_MAX);
+        pDWORDBuffer++;
+      }
+      BufferContainingDWORDS = pDWORDBuffer;
+    };
+
+  auto checkFloats = [isFloatValid](const void*& BufferContainingFloats, int pNumFloats)
+    {
+      const float* pFloatBuffer = reinterpret_cast<const float*>(BufferContainingFloats);
+      for (int i = 0; i < pNumFloats; i++)
+      {
+        check(isFloatValid(*pFloatBuffer));
+        pFloatBuffer++;
+      }
+      BufferContainingFloats = pFloatBuffer;
+    };
+
+  if ((pFVF & D3DFVF_XYZW) == D3DFVF_XYZW) { checkFloats(pBuffer, /*upto?*/4); }
+  else if ((pFVF & D3DFVF_XYZ) == D3DFVF_XYZ) { checkFloats(pBuffer, 3); }
+  else if ((pFVF & D3DFVF_XYZRHW) == D3DFVF_XYZRHW) { checkFloats(pBuffer, 4); }
+  else if ((pFVF & D3DFVF_XYZB1) == D3DFVF_XYZB1) { checkFloats(pBuffer, /*upto?*/3); }
+  else if ((pFVF & D3DFVF_XYZB2) == D3DFVF_XYZB2) { checkFloats(pBuffer, /*upto?*/3); }
+  else if ((pFVF & D3DFVF_XYZB3) == D3DFVF_XYZB3) { checkFloats(pBuffer, /*upto?*/3); }
+  else if ((pFVF & D3DFVF_XYZB4) == D3DFVF_XYZB4) { checkFloats(pBuffer, /*upto?*/3); }
+  else if ((pFVF & D3DFVF_XYZB5) == D3DFVF_XYZB5) { checkFloats(pBuffer, /*upto?*/3); }
+
+  if ((pFVF & D3DFVF_NORMAL) == D3DFVF_NORMAL) { checkFloats(pBuffer, 3); }
+  else if ((pFVF & D3DFVF_PSIZE) == D3DFVF_PSIZE) { checkFloats(pBuffer, 1);}
+  else if ((pFVF & D3DFVF_DIFFUSE) == D3DFVF_DIFFUSE) { checkDWORD(pBuffer, 1);}
+  else if ((pFVF & D3DFVF_SPECULAR) == D3DFVF_SPECULAR) { checkDWORD(pBuffer, 1);}
+
+  if ((pFVF & D3DFVF_TEX1) == D3DFVF_TEX1) { checkFloats(pBuffer, 2); }
+  else if ((pFVF & D3DFVF_TEX2) == D3DFVF_TEX2) { checkFloats(pBuffer, 2); }
+  else if ((pFVF & D3DFVF_TEX3) == D3DFVF_TEX3) { checkFloats(pBuffer, 2); }
+  else if ((pFVF & D3DFVF_TEX4) == D3DFVF_TEX4) { checkFloats(pBuffer, 2); }
+  else if ((pFVF & D3DFVF_TEX5) == D3DFVF_TEX5) { checkFloats(pBuffer, 2); }
+  else if ((pFVF & D3DFVF_TEX6) == D3DFVF_TEX6) { checkFloats(pBuffer, 2); }
+  else if ((pFVF & D3DFVF_TEX7) == D3DFVF_TEX7) { checkFloats(pBuffer, 2); }
+  else if ((pFVF & D3DFVF_TEX8) == D3DFVF_TEX8) { checkFloats(pBuffer, 2); }
+}
+
+
 void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug)
 {
+#if defined(EE_DEBUG)
+  ValidateFVF(pVertices, pFVF, pVertexCount);
+#endif
   auto& ctx = *g_ContextManager.GetContext();
 
   g_SceneManager.Validate();
@@ -397,7 +454,7 @@ void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertice
 void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
   return RenderTriangleListBuffer(
-    D3DFVF_XYZ | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
+    D3DFVF_XYZ | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
     pVertices,
     primitiveCount,
     pVertexCount,
@@ -410,7 +467,7 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0
 void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0Tex1* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
   return RenderTriangleListBuffer(
-    D3DFVF_XYZ | /*D3DFVF_DIFFUSE | D3DFVF_TEX1 | */ D3DFVF_TEX2 /*| D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5 */,
+    D3DFVF_XYZ | /*D3DFVF_DIFFUSE | D3DFVF_TEX1 | */ D3DFVF_TEX2 /*| D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5 */ | D3DFVF_TEXCOORDSIZE2(2) | D3DFVF_TEXCOORDSIZE2(1),
     pVertices,
     primitiveCount,
     pVertexCount,
@@ -424,7 +481,7 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0
 void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Norm3Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
   return RenderTriangleListBuffer(
-    D3DFVF_XYZ | D3DFVF_NORMAL | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
+    D3DFVF_XYZ | D3DFVF_NORMAL | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
     pVertices,
     primitiveCount,
     pVertexCount,
@@ -437,7 +494,7 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Norm
 void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0to4* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
   return RenderTriangleListBuffer(
-    D3DFVF_XYZ | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
+    D3DFVF_XYZ | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
     pVertices,
     primitiveCount,
     pVertexCount,
@@ -449,8 +506,9 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0
 
 void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::PreTransformedVertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
+
   return RenderTriangleListBuffer(
-    D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
+    D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
     pVertices,
     primitiveCount,
     pVertexCount,
@@ -464,7 +522,7 @@ void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::PreTransformed
 void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
 {
   return RenderTriangleListBuffer(
-    D3DFVF_XYZW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
+    D3DFVF_XYZW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
     pVertices,
     primitiveCount,
     pVertexCount,
@@ -595,7 +653,7 @@ void LowlevelRenderer::BeginFrame()
   m_IsInFrame = true;
   static auto lastSeconds = 0.0f;
   float now = appSeconds();
-  //if (now - lastSeconds > 5.0f)
+  //if (now - lastSeconds > 1.0f)
   {
     lastSeconds = now;
 
@@ -603,11 +661,12 @@ void LowlevelRenderer::BeginFrame()
     m_FrameOldResourcesIdx = (m_FrameOldResourcesIdx + 1) % (sizeof(m_OldResources) / sizeof(m_OldResources[0]));
 
     //Clean the upcoming bucket:
-    for (auto r : m_OldResources[m_FrameOldResourcesIdx])
+    for (auto& r : m_OldResources[m_FrameOldResourcesIdx])
     {
       auto newRetCount = static_cast<IDirect3DVertexBuffer9*>(r.second)->Release();
       assert(newRetCount == 0);
       m_bufferedGeo.erase(r.first);
+      r.second = nullptr;
       m_vtxBufferAllocations--;
     }
     m_OldResources[m_FrameOldResourcesIdx].clear();
@@ -681,6 +740,16 @@ void LowlevelRenderer::EndFrame()
   CheckDirtyMatrices();
 
 #if 1
+  //Since rtx remix v1.0.0, a VK_DEVICE_LOST occurs.
+  //This renderer assumes that texture and vertex buffer allocations created with D3DPOOL_MANAGED
+  //have their contents copied out by RTX Remix's 32->64 bit bridge. ie, all further resource
+  //management is done in RTX Remix's runtime. The fact that a DMA pagefault can happen is probably
+  //a synchronisation or lifetime bug in RTX Remix. Adding a 1ms sleep seems to step around the bug,
+  //and shouldn't affect our renderer's performance too badly. Ideally, this bug is fixed.
+  if (g_ConfigManager.GetHasRemixIssue745WorkaroundEnabled())
+  {
+    ::Sleep(1);
+  }
   auto res = m_Device->Present(NULL, NULL, NULL, NULL);
 #else
   HRESULT res = D3D_OK;

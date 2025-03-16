@@ -87,6 +87,22 @@ UBOOL UD3D9FPRenderDevice::Init(UViewport* pInViewport, int32_t pWidth, int32_t 
   GRenderDevice = this;
   const HWND hwnd = (HWND)pInViewport->GetWindow();
 
+  // Get device context and draw text
+  auto hFont = (HFONT)GetStockObject(SYSTEM_FONT);
+  HDC hdc = GetDC(hwnd);
+  if (hFont = (HFONT)SelectObject(hdc, hFont))
+  {
+    std::wstring txt = L"Initializing Echelon Renderer.";
+    TextOut(hdc, 50, 50, txt.c_str(), txt.length());
+    SIZE txtSize;
+    GetTextExtentPoint32(hdc, txt.c_str(), txt.length(), &txtSize);
+
+    txt = L"May take a while on first-boot, new RTX Remix version or new GPU driver version...";
+    TextOut(hdc, 50, 50 + (float(txtSize.cy) * 1.5f), txt.c_str(), txt.length());
+    
+  }
+  ReleaseDC(hwnd, hdc);
+
   /*
     Deus Ex internally relies on a statically allocated array (in the .data) section
     that has a maximum of 2880 rows. This is used by the internal software rasterizer

@@ -35,8 +35,8 @@ public:
   void Initialize(LowlevelRenderer* pLLRenderer);
   void Shutdown();
 
-  void Update(FSceneNode* Frame);
-  void Render(FSceneNode* Frame);
+  void Update(const FSceneNode* Frame);
+  void Render(const FSceneNode* Frame);
 
   void OnLevelChange();
 

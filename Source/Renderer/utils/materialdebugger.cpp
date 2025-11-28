@@ -125,7 +125,7 @@ void MaterialDebugger::pfDecoderUtil()
 }
 
 
-void MaterialDebugger::Update(FSceneNode* Frame)
+void MaterialDebugger::Update(const FSceneNode* Frame)
 {
   auto ctx = g_ContextManager.GetContext();
   static bool debugMenuEnabled = false;
@@ -482,8 +482,8 @@ continue;
 
       textureManager.BindTexture(texture->PolyFlags, md);
       hlRenderer->SetWorldTransformStateToIdentity();
-      static LowlevelRenderer::VertexPos3Tex0to4 vbuffer;
-      llRenderer->RenderTriangleList(&vbuffer, 1, 1, 0, 0);
+      //static VertexPos3Tex0to4 vbuffer;
+      //llRenderer->RenderTriangleList(&vbuffer, 1, 1, 0, 0);
     }
     g_ContextManager.PopFrameContext();
 

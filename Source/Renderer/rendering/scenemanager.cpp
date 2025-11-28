@@ -32,12 +32,12 @@ void SceneManager::Validate()
   }
 }
 
-void SceneManager::PushScene(FSceneNode* pFrame)
+void SceneManager::PushScene(const FSceneNode* pFrame)
 {
   m_SceneStack.push_back(std::make_pair(false,pFrame));
 }
 
-void SceneManager::PopScene(FSceneNode* pFrame)
+void SceneManager::PopScene(const FSceneNode* pFrame)
 { 
   check(!m_SceneStack.empty());
 

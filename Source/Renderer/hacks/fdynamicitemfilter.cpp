@@ -12,13 +12,13 @@ namespace Hacks
   std::vector<std::shared_ptr<PLH::IHook>> DynamicItemFilterDetours;
   namespace DynamicItemFilterVTableFuncs
   {
-    void(__thiscall* Filter)(FDynamicItem* pThis, UViewport* Viewport, FSceneNode* Frame, INT iNode, INT Outside) = nullptr;
-    void(__thiscall* PreRender)(FDynamicFinalChunk* pThis, UViewport* Viewport, FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics);
+    void(__thiscall* Filter)(FDynamicItem* pThis, UViewport* Viewport, const FSceneNode* Frame, INT iNode, INT Outside) = nullptr;
+    void(__thiscall* PreRender)(FDynamicFinalChunk* pThis, UViewport* Viewport, const FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics);
   }
   class FakeDynamicItemFilter
   {
   public:
-    void Filter(UViewport* Viewport, FSceneNode* Frame, INT iNode, INT Outside)
+    void Filter(UViewport* Viewport, const FSceneNode* Frame, INT iNode, INT Outside)
     {
       auto ctx = g_ContextManager.GetContext();
       if (!ctx->overrides.skipDynamicFiltering)
@@ -30,7 +30,7 @@ namespace Hacks
   };
   struct FakeFDynamicFinalChunk
   {
-    void PreRender(UViewport* Viewport, FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics)
+    void PreRender(UViewport* Viewport, const FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics)
     {
       DynamicItemFilterVTableFuncs::PreRender(reinterpret_cast<FDynamicFinalChunk*>(this), Viewport, Frame, SpanBuffer, iNode, Volumetrics);
     }
@@ -38,8 +38,8 @@ namespace Hacks
 
   namespace DynamicItemFilterVTableOverrides
   {
-    void(FakeDynamicItemFilter::* Filter)(UViewport* Viewport, FSceneNode* Frame, INT iNode, INT Outside) = &FakeDynamicItemFilter::Filter;
-    void(FakeFDynamicFinalChunk::* PreRender)(UViewport* Viewport, FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics) = &FakeFDynamicFinalChunk::PreRender;
+    void(FakeDynamicItemFilter::* Filter)(UViewport* Viewport, const FSceneNode* Frame, INT iNode, INT Outside) = &FakeDynamicItemFilter::Filter;
+    void(FakeFDynamicFinalChunk::* PreRender)(UViewport* Viewport, const FSceneNode* Frame, FSpanBuffer* SpanBuffer, INT iNode, FVolActorLink* Volumetrics) = &FakeFDynamicFinalChunk::PreRender;
   }
 
   /*

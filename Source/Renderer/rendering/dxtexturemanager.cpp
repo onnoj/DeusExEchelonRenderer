@@ -64,7 +64,7 @@ void TextureManager::FlushTextures()
   m_InstanceCache.clear();
 }
 
-DeusExD3D9TextureHandle TextureManager::ProcessTexture(UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo)
+DeusExD3D9TextureHandle TextureManager::ProcessTexture(UnrealPolyFlags pFlags, const FTextureInfo* pUETextureInfo)
 {
   auto key = TextureHash::FromTextureInfo(pUETextureInfo, pFlags);
   if (auto it = m_InstanceCache.find(key); it != m_InstanceCache.end())
@@ -122,7 +122,7 @@ DeusExD3D9TextureHandle TextureManager::ProcessTexture(UnrealPolyFlags pFlags, F
   return handle;
 }
 
-void TextureManager::ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle)
+void TextureManager::ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlags, const FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle)
 {
   //We _only_ process mip0, we're not really interested in the other mips for remix...
   auto textureMip0 = pUETextureInfo->Mips[0];
@@ -178,7 +178,7 @@ void TextureManager::ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlag
   };
 }
 
-void TextureManager::ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle)
+void TextureManager::ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlags, const FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle)
 {
   ProcessUETexture(pKey, pFlags, pUETextureInfo, handle);
   assert(pUETextureInfo->Texture != nullptr);
@@ -283,7 +283,7 @@ DeusExD3D9TextureHandle TextureManager::FindRTXTexture(uint64_t pRTXTextureHash)
   return {};
 }
 
-TextureHash TextureHash::FromTextureInfo(FTextureInfo* pTextureInfo, UnrealPolyFlags pFlags)
+TextureHash TextureHash::FromTextureInfo(const FTextureInfo* pTextureInfo, UnrealPolyFlags pFlags)
 {
   pFlags |= (pTextureInfo->Texture != nullptr) ? pTextureInfo->Texture->PolyFlags : 0;
 

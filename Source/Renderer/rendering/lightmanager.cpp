@@ -36,12 +36,12 @@ void LightManager::Shutdown()
   m_LLRenderer = nullptr;
 }
 
-void LightManager::Update(FSceneNode* Frame)
+void LightManager::Update(const FSceneNode* Frame)
 {
   assert(m_LLRenderer != nullptr);
 }
 
-void LightManager::Render(FSceneNode* Frame)
+void LightManager::Render(const FSceneNode* Frame)
 {
   Update(Frame); //move to hlrenderer
   //

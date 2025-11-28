@@ -516,7 +516,7 @@ void UD3D9FPRenderDevice::PushHit(const BYTE* Data, INT Count)
 {
   if (Count >= 4)
   {
-    m_HLRenderer.PushRenderObject(Data, Count);
+    m_HLRenderer.PushUERenderObject(Data, Count);
   }
 }
 
@@ -524,7 +524,7 @@ void UD3D9FPRenderDevice::PopHit(INT Count, UBOOL bForce)
 {
   if (Count >= 4)
   {
-    m_HLRenderer.PopRenderObject(Count);
+    m_HLRenderer.PopUERenderObject(Count);
   }
 }
 

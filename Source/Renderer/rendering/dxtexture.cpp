@@ -3,7 +3,7 @@
 
 #include "rendering/dxtexture.h"
 
-void DeusExD3D9Texture::ConvertFrom8bpp(FTextureInfo* pUETextureInfo, UnrealPolyFlags pFlags)
+void DeusExD3D9Texture::ConvertFrom8bpp(const FTextureInfo* pUETextureInfo, UnrealPolyFlags pFlags)
 {
   assert(pUETextureInfo->Texture != nullptr);
   const auto flags = pFlags | pUETextureInfo->Texture->PolyFlags;
@@ -37,7 +37,7 @@ void DeusExD3D9Texture::ConvertFrom8bpp(FTextureInfo* pUETextureInfo, UnrealPoly
   this->textureDataPitch = textureMip0->USize * 4/*channels*/;
 }
 
-void DeusExD3D9Texture::ConvertFromRGBA7(FTextureInfo* pUETextureInfo, UnrealPolyFlags pFlags)
+void DeusExD3D9Texture::ConvertFromRGBA7(const FTextureInfo* pUETextureInfo, UnrealPolyFlags pFlags)
 {
   const auto flags = pFlags | ((pUETextureInfo->Texture != nullptr) ? pUETextureInfo->Texture->PolyFlags : 0);
   const bool isMasked = (flags & PF_Masked) != 0;

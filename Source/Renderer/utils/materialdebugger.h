@@ -3,7 +3,7 @@
 class MaterialDebugger
 {
 public:
-  void Update(FSceneNode* Frame);
+  void Update(const FSceneNode* Frame);
 private:
   void renderAllTextures();
   void nfDecoderUtil();

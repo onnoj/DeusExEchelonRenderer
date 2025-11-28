@@ -48,7 +48,7 @@ void HighlevelRenderer::Shutdown()
 }
 
 //OnRenderingBegin is called before Deus Ex starts rendering the scene graph.
-void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
+void HighlevelRenderer::OnRenderingBegin(const FSceneNode* Frame)
 {
   m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnRenderingBegin");
   m_renderingScope = std::make_unique<FrameContextManager::ScopedContext>();
@@ -111,7 +111,7 @@ void HighlevelRenderer::OnRenderingBegin(FSceneNode* Frame)
   }
 }
 
-void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
+void HighlevelRenderer::OnRenderingEnd(const FSceneNode* Frame)
 {
   check(Frame->Parent == nullptr);
 
@@ -191,7 +191,7 @@ void HighlevelRenderer::OnRenderingEnd(FSceneNode* Frame)
 //In UE1, multiple cameras is done through portal rendering. When the renderer encounters a
 //portal surface, it switches camera and continues to draw within the shape of the portal surface.
 //Sadly, camera switching is not quite supported with RTX Remix.
-void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
+void HighlevelRenderer::OnSceneBegin(const FSceneNode* Frame)
 {
   auto& ctx = *g_ContextManager.GetContext();
   m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnSceneBegin");
@@ -223,7 +223,7 @@ void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
     SkyCoords *= Frame->Parent->Coords.Origin;
     SkyCoords /= SkyZone->Rotation;
     SkyCoords /= SkyZone->Location;
-    Frame->Coords = SkyCoords;
+    const_cast<FSceneNode*>(Frame)->Coords = SkyCoords;
     g_Stats.Writer().DrawSkyBox();
   }
   //  
@@ -245,7 +245,7 @@ void HighlevelRenderer::OnSceneBegin(FSceneNode* Frame)
   }
 }
 
-void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
+void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
 {
   auto& ctx = *g_ContextManager.GetContext();
   Utils::ScopedCall scopedCall
@@ -372,7 +372,7 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
         HasSpecialCoords = 0;
         player->bBehindView = 1;
         GRender->DrawMesh(
-          Frame,
+          const_cast<FSceneNode*>(Frame),
           player,
           player,
           nullptr,
@@ -415,7 +415,7 @@ void HighlevelRenderer::OnSceneEnd(FSceneNode* Frame)
   }
 }
 
-void HighlevelRenderer::Draw2DScreenQuad(FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB/* = 0xFF000000ul*/)
+void HighlevelRenderer::Draw2DScreenQuad(const FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB/* = 0xFF000000ul*/)
 {
   const LowlevelRenderer::VertexPos3Color0 quad[] = {
     { { pX+0.0f,    pY+0.0f,    1.0f }, {pARGB} },
@@ -433,7 +433,7 @@ void HighlevelRenderer::Draw2DScreenQuad(FSceneNode* Frame, float pX, float pY, 
   m_LLRenderer->RenderTriangleList(&quad[0], 2, std::size(quad), 0, 0);
 }
 
-void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, DWORD pPrimitiveFlags, const DeusExD3D9TextureHandle& pTexture,float Size/*=1.0f*/)
+void HighlevelRenderer::Draw3DCube(const FSceneNode* Frame, const FVector& Position, DWORD pPrimitiveFlags, const DeusExD3D9TextureHandle& pTexture,float Size/*=1.0f*/)
 {
   if (!g_options.hasDebugDraw)
   {
@@ -507,7 +507,7 @@ void HighlevelRenderer::Draw3DCube(FSceneNode* Frame, const FVector& Position, D
   m_LLRenderer->PopDeviceState();
 }
 
-void HighlevelRenderer::Draw3DLine(FSceneNode* Frame, const FVector& PositionFrom, const FVector& PositionTo, FColor Color, float Size/* = 1.0f*/)
+void HighlevelRenderer::Draw3DLine(const FSceneNode* Frame, const FVector& PositionFrom, const FVector& PositionTo, FColor Color, float Size/* = 1.0f*/)
 {
   if (!g_options.hasDebugDraw)
   {
@@ -535,7 +535,7 @@ void HighlevelRenderer::Draw3DLine(FSceneNode* Frame, const FVector& PositionFro
   m_DebugMesh.primitiveCount++;
 }
 
-void HighlevelRenderer::DrawFullscreenQuad(FSceneNode* Frame, const DeusExD3D9TextureHandle& pTexture)
+void HighlevelRenderer::DrawFullscreenQuad(const FSceneNode* Frame, const DeusExD3D9TextureHandle& pTexture)
 {
   m_LLRenderer->PushDeviceState();
   {
@@ -651,7 +651,7 @@ void HighlevelRenderer::GetViewMatrix(const FCoords& FrameCoords, D3DXMATRIX& vi
   D3DXMatrixMultiply(&viewMatrix, &cameraMatrix, &initialMatrix);
 }
 
-void HighlevelRenderer::GetPerspectiveProjectionMatrix(FSceneNode* Frame, D3DXMATRIX& projMatrix)
+void HighlevelRenderer::GetPerspectiveProjectionMatrix(const FSceneNode* Frame, D3DXMATRIX& projMatrix)
 {
   /*
   * At the time of writing, RTX Remix does not honor the X and Y offsets of the viewport
@@ -711,11 +711,11 @@ void HighlevelRenderer::GetPerspectiveProjectionMatrix(FSceneNode* Frame, D3DXMA
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void HighlevelRenderer::OnDrawGeometryBegin(FSceneNode* Frame)
+void HighlevelRenderer::OnDrawGeometryBegin(const FSceneNode* Frame)
 {
 }
 
-void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet)
+void HighlevelRenderer::OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet)
 {
   auto& ctx = *g_ContextManager.GetContext();
 
@@ -925,13 +925,13 @@ void HighlevelRenderer::OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface,
   sharedMesh->hash ^= hash;
 }
 
-void HighlevelRenderer::OnDrawGeometryEnd(FSceneNode* Frame)
+void HighlevelRenderer::OnDrawGeometryEnd(const FSceneNode* Frame)
 {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void HighlevelRenderer::OnDrawMeshBegin(FSceneNode* Frame, AActor* Owner)
+void HighlevelRenderer::OnDrawMeshBegin(const FSceneNode* Frame, AActor* Owner)
 {
   auto renderContext = g_ContextManager.GetContext();
   if (!renderContext->drawcallInfo)
@@ -950,7 +950,7 @@ void HighlevelRenderer::OnDrawMeshBegin(FSceneNode* Frame, AActor* Owner)
   }
 }
 
-void HighlevelRenderer::OnDrawMeshPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span)
+void HighlevelRenderer::OnDrawMeshPolygon(const FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span)
 {
   if (g_options.renderingDisabled)
   {
@@ -1028,7 +1028,7 @@ void HighlevelRenderer::OnDrawMeshPolygon(FSceneNode* Frame, FTextureInfo& Info,
     }
 }
 
-void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Actor)
+void HighlevelRenderer::OnDrawMeshEnd(const FSceneNode* Frame, AActor* Actor)
 {
   auto renderContext = g_ContextManager.GetContext();
   if (!renderContext->drawcallInfo)
@@ -1137,7 +1137,7 @@ void HighlevelRenderer::OnDrawMeshEnd(FSceneNode* Frame, AActor* Actor)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void HighlevelRenderer::PushRenderObject(const void* pData, uint32_t pSize)
+void HighlevelRenderer::PushUERenderObject(const void* pData, uint32_t pSize)
 {
   if (pSize >= 4)
   {
@@ -1145,7 +1145,7 @@ void HighlevelRenderer::PushRenderObject(const void* pData, uint32_t pSize)
   }
 }
 
-void HighlevelRenderer::PopRenderObject(uint32_t pSize)
+void HighlevelRenderer::PopUERenderObject(uint32_t pSize)
 {
   if (pSize >= 4)
   {
@@ -1156,7 +1156,7 @@ void HighlevelRenderer::PopRenderObject(uint32_t pSize)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void HighlevelRenderer::OnDrawUIBegin(FSceneNode* Frame)
+void HighlevelRenderer::OnDrawUIBegin(const FSceneNode* Frame)
 {
   m_LLRenderer->ClearDepth();
   g_ContextManager.PushFrameContext();
@@ -1210,7 +1210,7 @@ void HighlevelRenderer::OnDrawUIBegin(FSceneNode* Frame)
   m_LLRenderer->ClearDepth();
 }
 
-void HighlevelRenderer::OnDrawUIEnd(FSceneNode* Frame)
+void HighlevelRenderer::OnDrawUIEnd(const FSceneNode* Frame)
 {
 
   auto ctx = g_ContextManager.GetContext();
@@ -1227,7 +1227,7 @@ void HighlevelRenderer::OnDrawUIEnd(FSceneNode* Frame)
   m_LLRenderer->EmitDebugText(L"[EchelonRenderer] EndUI");
 }
 
-void HighlevelRenderer::OnDrawSprite(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags)
+void HighlevelRenderer::OnDrawSprite(const FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags)
 {
   auto& ctx = *g_ContextManager.GetContext();
 
@@ -1316,7 +1316,7 @@ void HighlevelRenderer::OnDrawSprite(FSceneNode* Frame, FTextureInfo& TextureInf
   allocatedSpriteMesh->buffer->push_back({ {-0.5f, +0.5f, 0.0f, 1.0f }, Clr, {0.0f, 0.0f} }); allocatedSpriteMesh->primitiveCount++;
 }
 
-void HighlevelRenderer::OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags)
+void HighlevelRenderer::OnDrawUI(const FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags)
 {
   auto& ctx = *g_ContextManager.GetContext();
   UIMeshesValue* latestUIMesh = (!m_UIMeshes.empty() ? &m_UIMeshes.back() : nullptr);
@@ -1399,7 +1399,7 @@ void HighlevelRenderer::SetWorldTransformState(const D3DXMATRIX& pMatrix)
 }
 
 
-void HighlevelRenderer::SetViewState(FSceneNode* Frame, ViewType viewType)
+void HighlevelRenderer::SetViewState(const FSceneNode* Frame, ViewType viewType)
 {
   auto& ctx = *g_ContextManager.GetContext();
 
@@ -1440,7 +1440,7 @@ void HighlevelRenderer::SetViewState(FSceneNode* Frame, ViewType viewType)
   }
 }
 
-void HighlevelRenderer::SetProjectionState(FSceneNode* Frame, ProjectionType projection) {
+void HighlevelRenderer::SetProjectionState(const FSceneNode* Frame, ProjectionType projection) {
   D3DXMATRIX d3dProj;
   if (projection == ProjectionType::perspective)
   {

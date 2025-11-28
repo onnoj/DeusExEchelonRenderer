@@ -70,7 +70,7 @@ namespace Misc /*should probably rename to util*/
 
   struct DebugContext
   {
-    FSceneNode* m_Frame = nullptr;
+    const FSceneNode* m_Frame = nullptr;
   };
 
   enum class DeusExDLLs

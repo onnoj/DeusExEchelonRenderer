@@ -56,7 +56,7 @@ public:
   void Update();
   void Render();
 
-  void VisitTexture(FTextureInfo* pUETextureInfo);
+  void VisitTexture(const FTextureInfo* pUETextureInfo);
   
   template <typename T>
   void DebugVar(const char* pCategory, const char* pDisplayName, uint64_t pIdentifier, T& pmValue, DebugMenuValueOptions options = {});

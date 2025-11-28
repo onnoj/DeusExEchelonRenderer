@@ -15,13 +15,13 @@ namespace Hacks
   }
   namespace FDynamicSpriteFuncs
   {
-    HookableFunction<UBOOL(__thiscall FDynamicSprite::*)(FSceneNode* Frame)> Setup = nullptr;
-    HookableFunction<FDynamicSprite* (__thiscall FDynamicSprite::*)(FSceneNode* Frame, int NodeIndex, AActor* Actor)> Constructor0 = nullptr;
+    HookableFunction<UBOOL(__thiscall FDynamicSprite::*)(const FSceneNode* Frame)> Setup = nullptr;
+    HookableFunction<FDynamicSprite* (__thiscall FDynamicSprite::*)(const FSceneNode* Frame, int NodeIndex, AActor* Actor)> Constructor0 = nullptr;
   }
   class FakeFDynamicSprite
   {
   public:
-    UBOOL __thiscall Setup(FSceneNode* Frame)
+    UBOOL __thiscall Setup(const FSceneNode* Frame)
     {
       auto ctx = g_ContextManager.GetContext();
       //if (ctx->overrides.disableFDynamicSpriteSetup)
@@ -41,7 +41,7 @@ namespace Hacks
       return (reinterpret_cast<FDynamicSprite*>(this)->*FDynamicSpriteFuncs::Setup)(Frame);
     }
 
-    FDynamicSprite* __thiscall Constructor0(FSceneNode* Frame, int NodeIndex, AActor* Actor)
+    FDynamicSprite* __thiscall Constructor0(const FSceneNode* Frame, int NodeIndex, AActor* Actor)
     {
       //FrameContextManager::ScopedContext ctx;
       //ctx->overrides.disableFDynamicSpriteSetup = true;

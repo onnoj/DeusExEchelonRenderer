@@ -14,11 +14,11 @@ public:
 
   void Validate();
 
-  void PushScene(FSceneNode* pFrame);
-  void PopScene(FSceneNode* pFrame);
+  void PushScene(const FSceneNode* pFrame);
+  void PopScene(const FSceneNode* pFrame);
 private:
   LowlevelRenderer* m_LLRenderer = nullptr;
   HighlevelRenderer* m_HLRenderer = nullptr;
 
-  std::deque<std::pair<bool/*processed*/, FSceneNode*>> m_SceneStack;
+  std::deque<std::pair<bool/*processed*/, const FSceneNode*>> m_SceneStack;
 } extern g_SceneManager;

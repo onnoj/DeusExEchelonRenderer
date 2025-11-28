@@ -432,7 +432,7 @@ const DebugMenu::TextureDesc* DebugMenu::FindTexture(uint32_t pCacheID) const
   return nullptr;
 }
 
-void DebugMenu::VisitTexture(FTextureInfo* pUETextureInfo)
+void DebugMenu::VisitTexture(const FTextureInfo* pUETextureInfo)
 {
   if (!EE_HAS_IMGUI() || !m_Initialized) return;
   if (FindTexture(pUETextureInfo->CacheID) != nullptr)

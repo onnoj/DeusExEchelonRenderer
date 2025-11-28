@@ -1,6 +1,8 @@
 #include <string>
 #include <filesystem>
 
+#include "MurmurHash3.h"
+
 namespace Utils
 {
   extern std::wstring GetProcessFolder();
@@ -42,5 +44,15 @@ namespace Utils
     }
 
     return {0};
+  }
+
+  template<typename... TArgs>
+  uint32_t CalculateKey(const TArgs&... args)
+  {
+    uint32_t seed = 0;
+    (void)std::initializer_list<int>{
+      ([&](){ ::MurmurHash3_x86_32(&args, sizeof(args), seed, &seed); }(), 0)...
+    };
+    return seed;
   }
 }

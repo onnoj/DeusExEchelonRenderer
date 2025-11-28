@@ -22,35 +22,35 @@ public:
 
 	void SetWorldTransformStateToIdentity();
 	void SetWorldTransformState(const D3DXMATRIX& pMatrix);
-	void SetViewState(FSceneNode* Frame, ViewType viewType);
-	void SetProjectionState(FSceneNode* Frame, ProjectionType projection);
+	void SetViewState(const FSceneNode* Frame, ViewType viewType);
+	void SetProjectionState(const FSceneNode* Frame, ProjectionType projection);
 
-	void Draw2DScreenQuad(FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB = 0xFF000000ul);
-	void Draw3DCube(FSceneNode* Frame, const FVector& Position, DWORD pPrimitiveFlags, const DeusExD3D9TextureHandle& pTexture, float Size = 1.0f);
-	void Draw3DLine(FSceneNode* Frame, const FVector& PositionFrom, const FVector& PositionTo, FColor Color, float Size = 1.0f);
-	void DrawFullscreenQuad(FSceneNode* Frame, const DeusExD3D9TextureHandle& pTexture);
-	void OnRenderingBegin(FSceneNode* Frame);
-	void OnRenderingEnd(FSceneNode* Frame);
-	void OnSceneBegin(FSceneNode* Frame);
-	void OnSceneEnd(FSceneNode* Frame);
-	void OnDrawGeometryBegin(FSceneNode* Frame);
-	void OnDrawGeometry(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
-	void OnDrawGeometryEnd(FSceneNode* Frame);
-	void OnDrawMeshBegin(FSceneNode* Frame, AActor* Owner);
-	void OnDrawMeshPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span);
-	void OnDrawMeshEnd(FSceneNode* Frame, AActor* Owner);
-	void OnDrawSprite(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags);;
-	void OnDrawUIBegin(FSceneNode* Frame);
-	void OnDrawUI(FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags);
-	void OnDrawUIEnd(FSceneNode* Frame);
+	void Draw2DScreenQuad(const FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB = 0xFF000000ul);
+	void Draw3DCube(const FSceneNode* Frame, const FVector& Position, DWORD pPrimitiveFlags, const DeusExD3D9TextureHandle& pTexture, float Size = 1.0f);
+	void Draw3DLine(const FSceneNode* Frame, const FVector& PositionFrom, const FVector& PositionTo, FColor Color, float Size = 1.0f);
+	void DrawFullscreenQuad(const FSceneNode* Frame, const DeusExD3D9TextureHandle& pTexture);
+	void OnRenderingBegin(const FSceneNode* Frame);
+	void OnRenderingEnd(const FSceneNode* Frame);
+	void OnSceneBegin(const FSceneNode* Frame);
+	void OnSceneEnd(const FSceneNode* Frame);
+	void OnDrawGeometryBegin(const FSceneNode* Frame);
+	void OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
+	void OnDrawGeometryEnd(const FSceneNode* Frame);
+	void OnDrawMeshBegin(const FSceneNode* Frame, AActor* Owner);
+	void OnDrawMeshPolygon(const FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span);
+	void OnDrawMeshEnd(const FSceneNode* Frame, AActor* Owner);
+	void OnDrawSprite(const FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags);;
+	void OnDrawUIBegin(const FSceneNode* Frame);
+	void OnDrawUI(const FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags);
+	void OnDrawUIEnd(const FSceneNode* Frame);
 	void GetViewMatrix(const FCoords& FrameCoords, D3DXMATRIX& viewMatrix);
-	void GetPerspectiveProjectionMatrix(FSceneNode* Frame, D3DXMATRIX& projMatrix);
+	void GetPerspectiveProjectionMatrix(const FSceneNode* Frame, D3DXMATRIX& projMatrix);
 
 	using RenderObjectStack = std::deque<std::pair<uint32_t, const void*>>;
 	const RenderObjectStack& GetRenderObjectStack() const { return m_RenderObjectStack; };
 	RenderObjectStack::const_reference GetRenderObjectTop() const { return m_RenderObjectStack.back(); }
-	void PushRenderObject(const void* pData, uint32_t pSize);
-	void PopRenderObject(uint32_t pSize);
+	void PushUERenderObject(const void* pData, uint32_t pSize);
+	void PopUERenderObject(uint32_t pSize);
 
 	template <typename T>
 	const T* GetRenderObjectTopT() const

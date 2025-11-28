@@ -5,7 +5,7 @@ class FrameContextManager
 public:
   struct Context
   {
-    FSceneNode* frameSceneNode = nullptr;
+    const FSceneNode* frameSceneNode = nullptr;
 
     std::shared_ptr<FSceneNode> skyframeSceneNode;
     bool frameIsRasterized = false;

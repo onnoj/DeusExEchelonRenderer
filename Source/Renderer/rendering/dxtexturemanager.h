@@ -10,7 +10,7 @@ struct TextureHash
 {
   uint32_t m_Hash = 0;
   operator uint32_t() const { return m_Hash; }
-  static TextureHash FromTextureInfo(FTextureInfo* pTextureInfo, UnrealPolyFlags pFlags);
+  static TextureHash FromTextureInfo(const FTextureInfo* pTextureInfo, UnrealPolyFlags pFlags);
 };
 
 struct TextureSet
@@ -42,9 +42,9 @@ public:
 
   void FlushTextures();
 
-  DeusExD3D9TextureHandle ProcessTexture(UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo);
-  void ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);
-  void ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlags, FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);
+  DeusExD3D9TextureHandle ProcessTexture(UnrealPolyFlags pFlags, const FTextureInfo* pUETextureInfo);
+  void ProcessUETexture(const uint32_t pKey, UnrealPolyFlags pFlags, const FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);
+  void ProcessHijackedTexture(uint32_t pKey, UnrealPolyFlags pFlags, const FTextureInfo* pUETextureInfo, DeusExD3D9TextureHandle& handle);
   bool BindTexture(DWORD polygonFlags, DeusExD3D9TextureHandle pTextureHandle, DeusExD3D9TextureHandle pOptionalLightTexture = {});
   std::vector<DeusExD3D9TextureHandle> FindTextures(uint32_t pUETextureCacheID);
   DeusExD3D9TextureHandle FindRTXTexture(uint64_t pRTXTextureHash);

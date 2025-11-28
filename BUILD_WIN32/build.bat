@@ -17,12 +17,15 @@ setlocal enabledelayedexpansion
 ) ELSE IF EXIST "D:\Games\Steam\steamapps\common\Deus Ex" @(
 	@set DEUSEXFOLDER="D:\Games\Steam\steamapps\common\Deus Ex\System"
 	@echo Environment variable DEUSEXFOLDER not set, detected at: !DEUSEXFOLDER!
+) ELSE IF EXIST "E:\Games\Steam\steamapps\common\Deus Ex\System" @(
+	@set DEUSEXFOLDER="E:\Games\Steam\steamapps\common\Deus Ex\System"
+	@echo Environment variable DEUSEXFOLDER not set, detected at: !DEUSEXFOLDER!
 ) ELSE IF EXIST "F:\Games\Steam\steamapps\common\Deus Ex\System" @(
 	@set DEUSEXFOLDER="F:\Games\Steam\steamapps\common\Deus Ex\System"
 	@echo Environment variable DEUSEXFOLDER not set, detected at: !DEUSEXFOLDER!
 ) ELSE @(
-	@echo Environment Variable DEUSEXFOLDER is either not set, or is invalid.
-	@exit 1
+	@echo Could not find Deus Ex installation folder. Try setting DEUSEXFOLDER, or adjust paths in batch file.
+	@exit /b 1
 )
 @set "DEUSEXFOLDER=!DEUSEXFOLDER:"=!"
 

@@ -7,7 +7,21 @@
 #include "rendering/llrenderer.h"
 #include "rendering/dxtexturemanager.h"
 #include "rendering/lightmanager.h"
+#include "rendering/renderobjectmanager.h"
 #include "utils/materialdebugger.h"
+
+enum class RenderCommandQueue
+{
+	main,
+	staticGeo,
+	dynamicGeo,
+	dynamicMesh,
+	ui,
+	pfx,
+	COUNT,
+};
+using RenderCall = std::function<void()>;
+constexpr uint32_t RenderCommandQueueMax = static_cast<uint32_t>(RenderCommandQueue::COUNT);
 
 class HighlevelRenderer
 {
@@ -25,6 +39,7 @@ public:
 	void SetViewState(const FSceneNode* Frame, ViewType viewType);
 	void SetProjectionState(const FSceneNode* Frame, ProjectionType projection);
 
+	void DrawPlayerBody(const FSceneNode* Frame);
 	void Draw2DScreenQuad(const FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB = 0xFF000000ul);
 	void Draw3DCube(const FSceneNode* Frame, const FVector& Position, DWORD pPrimitiveFlags, const DeusExD3D9TextureHandle& pTexture, float Size = 1.0f);
 	void Draw3DLine(const FSceneNode* Frame, const FVector& PositionFrom, const FVector& PositionTo, FColor Color, float Size = 1.0f);
@@ -35,6 +50,7 @@ public:
 	void OnSceneEnd(const FSceneNode* Frame);
 	void OnDrawGeometryBegin(const FSceneNode* Frame);
 	void OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
+	void OnDrawGeometryOld(const FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
 	void OnDrawGeometryEnd(const FSceneNode* Frame);
 	void OnDrawMeshBegin(const FSceneNode* Frame, AActor* Owner);
 	void OnDrawMeshPolygon(const FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span);
@@ -46,11 +62,16 @@ public:
 	void GetViewMatrix(const FCoords& FrameCoords, D3DXMATRIX& viewMatrix);
 	void GetPerspectiveProjectionMatrix(const FSceneNode* Frame, D3DXMATRIX& projMatrix);
 
+
 	using RenderObjectStack = std::deque<std::pair<uint32_t, const void*>>;
 	const RenderObjectStack& GetRenderObjectStack() const { return m_RenderObjectStack; };
 	RenderObjectStack::const_reference GetRenderObjectTop() const { return m_RenderObjectStack.back(); }
 	void PushUERenderObject(const void* pData, uint32_t pSize);
 	void PopUERenderObject(uint32_t pSize);
+
+	void AddRenderCommand(RenderCommandQueue pQueue, std::function<void()>&& pCB);
+	void ExecuteCommandQueue(RenderCommandQueue pQueue);
+	void ClearCommandQueue(RenderCommandQueue pQueue);
 
 	template <typename T>
 	const T* GetRenderObjectTopT() const
@@ -71,11 +92,11 @@ public:
 private:
 	using DynamicMeshesKey = uint32_t;
 	using GeometryMeshesKey = uint32_t;
-	using UIMeshesVertexBuffer = std::vector<LowlevelRenderer::PreTransformedVertexPos4Color0Tex0>;
-	using SpriteMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos4Color0Tex0>;
-	using DynamicMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Norm3Tex0>;
-	using DebugMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Tex0>;
-	using GeometryMeshesVertexBuffer = std::vector<LowlevelRenderer::VertexPos3Tex0Tex1>;
+	//using UIMeshesVertexBuffer = std::vector<PreTransformedVertexPos4Color0Tex0>;
+	using SpriteMeshesVertexBuffer = std::vector<VertexPos4Color0Tex0>;
+	using DynamicMeshesVertexBuffer = std::vector<VertexPos3Norm3Tex0>;
+	using DebugMeshesVertexBuffer = std::vector<VertexPos3Tex0>;
+	using GeometryMeshesVertexBuffer = std::vector<VertexPos3Tex0Tex1>;
 
 	struct GeometryMeshesValue {
 		TextureSet textureSet{};
@@ -97,12 +118,11 @@ private:
 	struct DynamicMeshesValue {
 		FTextureInfo textureInfo{};
 		UnrealPolyFlags flags = 0;
-		std::unique_ptr<DynamicMeshesVertexBuffer> buffer;
-		uint32_t primitiveCount = 0;
+		std::shared_ptr<RenderObject> renderObject;
 		float lastVertexSum=0.0f;
 		uint32_t lastDrawcallHash = 0;
 	};
-
+#if 0
 	struct UIMeshesValue {
 		FTextureInfo textureInfo{};
 		TextureHash textureKey{};
@@ -111,6 +131,7 @@ private:
 		std::unique_ptr<UIMeshesVertexBuffer> buffer;
 		uint32_t primitiveCount = 0;
 	};
+#endif
 
 	struct SpriteMeshesValue {
 		FTextureInfo textureInfo{};
@@ -124,16 +145,15 @@ private:
 
 	struct DebugMeshValue {
 		UnrealPolyFlags flags = 0;
-		std::vector<LowlevelRenderer::VertexPos3Color0> buffer;
+		std::vector<VertexPos3Color0> buffer;
 		uint32_t primitiveCount = 0;
 	};
 private:
+	RenderObjectManager m_RenderObjectManager;
 	LowlevelRenderer* m_LLRenderer = nullptr;
 	LightManager m_LightManager;
 	TextureManager m_TextureManager;
 	MaterialDebugger m_MaterialDebugger;
-	std::vector<UIMeshesValue> m_UIMeshes;
-	std::vector<SpriteMeshesValue> m_SpriteMeshes;
 	DebugMeshValue m_DebugMesh;
 	GeometryMeshesMap m_staticGeometryMeshes;
 	GeometryMeshesMap m_dynamicGeometryMeshes;
@@ -141,4 +161,5 @@ private:
 	std::unordered_set<uint32_t> m_DrawnNodes[FBspNode::MAX_ZONES];
 	std::unique_ptr<FrameContextManager::ScopedContext> m_renderingScope;
 	std::deque<std::pair<uint32_t, const void*>> m_RenderObjectStack;
+	std::vector<RenderCall> m_CommandQueues[RenderCommandQueueMax];
 };

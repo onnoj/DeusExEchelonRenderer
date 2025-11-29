@@ -60,6 +60,8 @@ public:
   
   template <typename T>
   void DebugVar(const char* pCategory, const char* pDisplayName, uint64_t pIdentifier, T& pmValue, DebugMenuValueOptions options = {});
+
+  void DebugUEFrame(const char* pCategoryName, FSceneNode* Frame);
 protected:
   bool CreateDeviceD3D(HWND _hwnd);
   void CleanupDeviceD3D();

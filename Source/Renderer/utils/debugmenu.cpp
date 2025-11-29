@@ -493,5 +493,36 @@ void DebugMenu::VisitTexture(const FTextureInfo* pUETextureInfo)
     check(SUCCEEDED(hr));
     textureData.m_TextureID = pUETextureInfo->CacheID;
   }
+}
 
+void DebugMenu::DebugUEFrame(const char* pCategoryName, FSceneNode* Frame)
+{
+  DebugVar(pCategoryName, "Zoom", DebugMenuUniqueID(), Frame->Zoom, { DebugMenuValueOptions::editor::slider, -10.0f, 10.0f });
+  DebugVar(pCategoryName, "ViewPlanes[0]", DebugMenuUniqueID(), Frame->ViewPlanes[0], {});
+  DebugVar(pCategoryName, "ViewPlanes[1]", DebugMenuUniqueID(), Frame->ViewPlanes[1], {});
+  DebugVar(pCategoryName, "ViewPlanes[2]", DebugMenuUniqueID(), Frame->ViewPlanes[2], {});
+  DebugVar(pCategoryName, "ViewPlanes[3]", DebugMenuUniqueID(), Frame->ViewPlanes[3], {});
+
+  DebugVar(pCategoryName, "ViewSides[0]", DebugMenuUniqueID(), Frame->ViewSides[0], {});
+  DebugVar(pCategoryName, "ViewSides[1]", DebugMenuUniqueID(), Frame->ViewSides[1], {});
+  DebugVar(pCategoryName, "ViewSides[2]", DebugMenuUniqueID(), Frame->ViewSides[2], {});
+  DebugVar(pCategoryName, "ViewSides[3]", DebugMenuUniqueID(), Frame->ViewSides[3], {});
+
+  DebugVar(pCategoryName, "X", DebugMenuUniqueID(), Frame->X, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 4000 });
+  DebugVar(pCategoryName, "Y", DebugMenuUniqueID(), Frame->Y, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 4000 });
+  DebugVar(pCategoryName, "XB", DebugMenuUniqueID(), Frame->XB, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 4000 });
+  DebugVar(pCategoryName, "YB", DebugMenuUniqueID(), Frame->YB, { DebugMenuValueOptions::editor::slider, 0.0f, 0.0f, 0, 4000 });
+  DebugVar(pCategoryName, "FX", DebugMenuUniqueID(), Frame->FX, { DebugMenuValueOptions::editor::slider, -4000.0f, 4000.0f });
+  DebugVar(pCategoryName, "FY", DebugMenuUniqueID(), Frame->FY, { DebugMenuValueOptions::editor::slider, -4000.0f, 2880.0f });
+  DebugVar(pCategoryName, "FX15", DebugMenuUniqueID(), Frame->FX15, { DebugMenuValueOptions::editor::slider, -4000.0f, 4000.0f });
+  DebugVar(pCategoryName, "FY15", DebugMenuUniqueID(), Frame->FY15, { DebugMenuValueOptions::editor::slider, -4000.0f, 4000.0f });
+  DebugVar(pCategoryName, "FX2", DebugMenuUniqueID(), Frame->FX2, { DebugMenuValueOptions::editor::slider, -4000.0f, 4000.0f });
+  DebugVar(pCategoryName, "FY2", DebugMenuUniqueID(), Frame->FY2, { DebugMenuValueOptions::editor::slider, -4000.0f, 4000.0f });
+  DebugVar(pCategoryName, "PrjXM", DebugMenuUniqueID(), Frame->PrjXM, { DebugMenuValueOptions::editor::slider, -400.0f, 4000.0f });
+  DebugVar(pCategoryName, "PrjXP", DebugMenuUniqueID(), Frame->PrjXP, { DebugMenuValueOptions::editor::slider, -400.0f, 4000.0f });
+  DebugVar(pCategoryName, "PrjYM", DebugMenuUniqueID(), Frame->PrjYM, { DebugMenuValueOptions::editor::slider, -400.0f, 4000.0f });
+  DebugVar(pCategoryName, "PrjYP", DebugMenuUniqueID(), Frame->PrjYP, { DebugMenuValueOptions::editor::slider, -400.0f, 4000.0f });
+  DebugVar(pCategoryName, "Proj", DebugMenuUniqueID(), Frame->Proj);
+  DebugVar(pCategoryName, "RProj", DebugMenuUniqueID(), Frame->RProj);
+  DebugVar(pCategoryName, "Nearclip", DebugMenuUniqueID(), Frame->NearClip);
 }

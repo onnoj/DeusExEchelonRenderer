@@ -371,8 +371,11 @@ namespace Hacks
     bool allowSkyBox = g_ConfigManager.GetRenderSkybox();
     if ((Frame->Parent == nullptr) || (frameIsSkybox && allowSkyBox))
     {
+      auto facade = Misc::g_Facade;
+
       g_SceneManager.PushScene(Frame);
       (GRender->*URenderFuncs::DrawFrame)(Frame);
+      facade->GetHLRenderer()->DrawPlayerBody(Frame);
       g_SceneManager.PopScene(Frame);
     }
 
@@ -667,6 +670,8 @@ namespace Hacks
         return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
       }();
 
+      g_DebugMenu.DebugUEFrame("DrawMeshFrame", Frame);
+
       FrameContextManager::ScopedContext ctx;
       ctx->frameSceneNode = Frame;
       ctx->drawcallInfo.emplace();
@@ -726,6 +731,11 @@ namespace Hacks
       Actor->Location = FVector(0.0f, 0.0f, 0.0f) + offset;
       Actor->Rotation = FRotator(0, 0, 0);
       const_cast<FCoords&>(Coords) = FCoords(FVector(0.0f, 0.0f, 0.0f));;
+#pragma push_macro("min")
+#undef min
+      Actor->DrawScale = Clamp(Actor->DrawScale, std::numeric_limits<float>::min(), Actor->DrawScale);
+#pragma pop_macro("min")
+      check(Actor->DrawScale > 0.0f);
       (GRender->*URenderFuncs::DrawMesh)(Frame, Actor, LightSink, SpanBuffer, Zone, Coords, LeafLights, Volumetrics, PolyFlags);
       const_cast<FCoords&>(Coords) = origCoords;
       Actor->Location = origLocation;

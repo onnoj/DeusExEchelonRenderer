@@ -35,12 +35,10 @@ void HighlevelRenderer::Shutdown()
 {
   m_renderingScope.release();
   for(auto& n : m_DrawnNodes) n.clear();
-  m_dynamicMeshes.clear();
   m_staticGeometryMeshes.clear();
   m_dynamicGeometryMeshes.clear();
+  m_dynamicMeshes.clear();
   m_DebugMesh = {};
-  m_UIMeshes.clear();
-  m_SpriteMeshes.clear();
   m_LightManager.Shutdown();
   m_TextureManager.Shutdown();
   m_LLRenderer = nullptr;
@@ -106,8 +104,6 @@ void HighlevelRenderer::OnRenderingBegin(const FSceneNode* Frame)
       m_LLRenderer->PopDeviceState();
       m_LLRenderer->EndScene();
     }
-    m_UIMeshes.clear();
-    m_SpriteMeshes.clear();
   }
 }
 
@@ -129,6 +125,8 @@ void HighlevelRenderer::OnRenderingEnd(const FSceneNode* Frame)
     for(auto& n : m_DrawnNodes) n.clear();
   }
   m_dynamicGeometryMeshes.clear();
+
+  m_dynamicMeshes.clear();
 
 #if 0
   //axis widget
@@ -157,21 +155,45 @@ void HighlevelRenderer::OnRenderingEnd(const FSceneNode* Frame)
     m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG0, D3DTA_DIFFUSE);
     m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
     SetWorldTransformStateToIdentity();
+#if 0
     m_LLRenderer->RenderTriangleListBuffer(
       D3DFVF_XYZ | D3DFVF_DIFFUSE /*| D3DFVF_TEX1 | D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
       m_DebugMesh.buffer.data(),
       m_DebugMesh.primitiveCount,
       m_DebugMesh.buffer.size(),
-      sizeof(LowlevelRenderer::VertexPos3Color0),
+      sizeof(VertexPos3Color0),
       0,
       0xdeafbeef
     );
+#endif
     m_DebugMesh.buffer.clear();
     m_DebugMesh.primitiveCount = 0;
     m_LLRenderer->PopDeviceState();
   };
 
+  m_LLRenderer->BeginScene();
+  m_LLRenderer->PushDeviceState();
+  {
+    m_LLRenderer->EmitDebugText(L"[EchelonRenderer] Begin 2D UI");
+    m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+    m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
+    m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+    m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+    m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
+    SetViewState(Frame, ViewType::identity);
+    SetProjectionState(Frame, ProjectionType::uiorthogonal);
+    ExecuteCommandQueue(RenderCommandQueue::ui);
+  }
+  ClearCommandQueue(RenderCommandQueue::ui);
+  ClearCommandQueue(RenderCommandQueue::staticGeo);
+  ClearCommandQueue(RenderCommandQueue::dynamicGeo);
+  ClearCommandQueue(RenderCommandQueue::dynamicMesh);
+  ClearCommandQueue(RenderCommandQueue::pfx);
 
+  m_RenderObjectManager.ResetRenderObjects(RenderObjectLifetime::Frame);
+
+  m_LLRenderer->PopDeviceState();
+  m_LLRenderer->EndScene();
 
   //Render Remix warning screen
   if (!IsDebuggerPresent())
@@ -179,10 +201,52 @@ void HighlevelRenderer::OnRenderingEnd(const FSceneNode* Frame)
     //DrawFullscreenQuad(Frame, m_TextureManager.GetFakeTexture());
   }
 
-  m_SpriteMeshes.clear();
 
   m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnRenderingEnd");
   m_renderingScope.reset();
+}
+
+void HighlevelRenderer::DrawPlayerBody(const FSceneNode* Frame)
+{
+  auto& ctx = *g_ContextManager.GetContext();
+  bool renderPlayerBody = (!ctx.frameIsSkybox && !ctx.renderingUI && Frame->Parent == nullptr);
+  if (renderPlayerBody)
+  {
+    //Draw player body.
+    auto player = Frame->Viewport->Actor;
+    if (g_ConfigManager.GetRenderPlayerBody() && !player->bBehindView)
+    {
+      static UBOOL& HasSpecialCoords = []() -> UBOOL& {
+        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+        return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
+        }();
+      static FCoords& SpecialCoords = []() -> FCoords& {
+        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
+        return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
+        }();
+
+
+      BOOL originalHasSpecialCoords = HasSpecialCoords;
+      BITFIELD originalBehindView = player->bBehindView;
+      {
+        HasSpecialCoords = 0;
+        player->bBehindView = 1;
+        GRender->DrawMesh(
+          const_cast<FSceneNode*>(Frame),
+          player,
+          player,
+          nullptr,
+          nullptr,
+          Frame->Coords,
+          nullptr,
+          nullptr,
+          PF_TwoSided|PF_NoMerge
+        );
+      }
+      player->bBehindView = originalBehindView;
+      HasSpecialCoords = originalHasSpecialCoords;
+    }
+  }
 }
 
 //OnSceneBegin is called when Deus Ex starts rendering a specific scene (as determined by a camera)
@@ -259,6 +323,55 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
     }
   };
 
+  bool renderMainPass = true;
+  bool renderSprites = (!ctx.frameIsSkybox && !ctx.renderingUI && Frame->Parent == nullptr);
+  if ((ctx.frameIsSkybox && !g_ConfigManager.GetRenderSkybox()))
+  {
+    renderMainPass = false;
+  }
+
+  if (renderMainPass)
+  {
+    m_LLRenderer->PushDeviceState();
+    ExecuteCommandQueue(RenderCommandQueue::staticGeo);
+    m_LLRenderer->PopDeviceState();
+
+    m_LLRenderer->PushDeviceState();
+    ExecuteCommandQueue(RenderCommandQueue::dynamicGeo);
+    m_LLRenderer->PopDeviceState();
+
+    m_LLRenderer->PushDeviceState();
+    ExecuteCommandQueue(RenderCommandQueue::dynamicMesh);
+    m_LLRenderer->PopDeviceState();
+  }
+  //
+  if (renderSprites)
+  {
+    m_LLRenderer->PushDeviceState();
+    SetViewState(Frame, ViewType::game);
+    SetProjectionState(Frame, ProjectionType::perspective);
+
+    ExecuteCommandQueue(RenderCommandQueue::pfx);
+
+    m_LLRenderer->PopDeviceState();
+  }
+}
+
+#if 0
+void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
+{
+  auto& ctx = *g_ContextManager.GetContext();
+  Utils::ScopedCall scopedCall
+  {
+    [&]() {},
+    [&]()
+    {
+      m_LLRenderer->EndScene();
+      m_LLRenderer->PopDeviceState();
+      m_LLRenderer->EmitDebugText(L"[EchelonRenderer] OnSceneEnd");
+    }
+  };
+
   if (!ctx.frameIsSkybox || (ctx.frameIsSkybox && g_ConfigManager.GetRenderSkybox()))
   {
     UModel* Model = Frame->Level->Model;
@@ -266,6 +379,9 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
     auto& GNodes = Model->Nodes;
     auto& GVerts = Model->Verts;
     auto& GVertPoints = Model->Points;
+
+    ExecuteCommandQueue(RenderCommandQueue::staticGeo);
+    ExecuteCommandQueue(RenderCommandQueue::dynamicGeo);
 
     {  //Render all static geometry
       enum class pass { solid, translucent };
@@ -349,88 +465,30 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
       }
     }
   }
-  //
-  if (!ctx.frameIsSkybox && !ctx.renderingUI && Frame->Parent == nullptr)
-  {
-    //Draw player body.
-    auto player = Frame->Viewport->Actor;
-    if (g_ConfigManager.GetRenderPlayerBody() && !player->bBehindView)
-    {
-      static UBOOL& HasSpecialCoords = []() -> UBOOL& {
-        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
-        return *reinterpret_cast<UBOOL*>(baseAddress + 0x4eb10);
-        }();
-      static FCoords& SpecialCoords = []() -> FCoords& {
-        uint32_t baseAddress = (uint32_t)GetModuleHandle(L"Render.dll");
-        return *reinterpret_cast<FCoords*>(baseAddress + 0x4ea08);
-        }();
-
-
-      BOOL originalHasSpecialCoords = HasSpecialCoords;
-      BITFIELD originalBehindView = player->bBehindView;
-      {
-        HasSpecialCoords = 0;
-        player->bBehindView = 1;
-        GRender->DrawMesh(
-          const_cast<FSceneNode*>(Frame),
-          player,
-          player,
-          nullptr,
-          nullptr,
-          Frame->Coords,
-          nullptr,
-          nullptr,
-          PF_TwoSided|PF_NoMerge
-        );
-      }
-      player->bBehindView = originalBehindView;
-      HasSpecialCoords = originalHasSpecialCoords;
-    }
-  }
-
-  //
-  if (!ctx.frameIsSkybox && !ctx.renderingUI && Frame->Parent == nullptr)
-  {
-    //Render sprites
-    m_LLRenderer->EmitDebugText(L"[EchelonRenderer] Sprites pass");
-    m_LLRenderer->PushDeviceState();
-    SetViewState(Frame, ViewType::game);
-    SetProjectionState(Frame, ProjectionType::perspective);
-
-    for (auto& rc : m_SpriteMeshes)
-    {
-      if (rc.primitiveCount > 0)
-      {
-        SetWorldTransformState(rc.worldmatrix);
-        auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
-        m_TextureManager.BindTexture(rc.flags, textureHandle);
-        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-
-        m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
-      }
-    }
-    m_LLRenderer->PopDeviceState();
-  }
 }
+#endif
 
 void HighlevelRenderer::Draw2DScreenQuad(const FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB/* = 0xFF000000ul*/)
 {
-  const LowlevelRenderer::VertexPos3Color0 quad[] = {
+  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Frame);
+  auto quad = ro->AcquireBuffer<VertexPos3Color0>();
+
+  quad->Assign({
     { { pX+0.0f,    pY+0.0f,    1.0f }, {pARGB} },
     { { pX+pWidth,	pY+pHeight, 1.0f }, {pARGB} },
     { { pX+0.0f,    pY+pHeight, 1.0f }, {pARGB} },
     { { pX+0.0f,    pY+0.0f,    1.0f }, {pARGB} },
     { { pX+pWidth,	pY+0.0f,    1.0f }, {pARGB} },
     { { pX+pWidth,	pY+pHeight, 1.0f }, {pARGB} }
-  };
+  });
 
-  SetWorldTransformStateToIdentity();
-  m_LLRenderer->ConfigureBlendState(0);
-  m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG0, D3DTA_DIFFUSE);
-  m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
-  m_LLRenderer->RenderTriangleList(&quad[0], 2, std::size(quad), 0, 0);
+  AddRenderCommand(RenderCommandQueue::ui, [this, ro]() {
+    SetWorldTransformStateToIdentity();
+    m_LLRenderer->ConfigureBlendState(0);
+    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG0, D3DTA_DIFFUSE);
+    m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+    m_LLRenderer->Render(ro.get());
+  });
 }
 
 void HighlevelRenderer::Draw3DCube(const FSceneNode* Frame, const FVector& Position, DWORD pPrimitiveFlags, const DeusExD3D9TextureHandle& pTexture,float Size/*=1.0f*/)
@@ -440,7 +498,7 @@ void HighlevelRenderer::Draw3DCube(const FSceneNode* Frame, const FVector& Posit
     return;
   }
   m_LLRenderer->PushDeviceState();
-  LowlevelRenderer::VertexPos3Tex0 vertices[] = {
+  VertexPos3Tex0 vertices[] = {
     // Front face
     {{-0.5f, -0.5f, 0.5f}, {0.0f, 1.0f}},  // Bottom left
     {{0.5f, -0.5f, 0.5f}, {1.0f, 1.0f}},   // Bottom right
@@ -487,22 +545,16 @@ void HighlevelRenderer::Draw3DCube(const FSceneNode* Frame, const FVector& Posit
   ));
   SetWorldTransformState(wm);
 
-  uint32_t vtxCount = 0;
-  DebugMeshesVertexBuffer buffer;
+  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Frame);
+  auto buffer = ro->AcquireBuffer<VertexPos3Tex0>();
+
   const auto faces = std::size(indices) / 3;
   for (int i = 0; i < faces; ++i) {
-    LowlevelRenderer::VertexPos3Tex0 vertex0 = vertices[indices[(i * 3) + 0]];
-    LowlevelRenderer::VertexPos3Tex0 vertex1 = vertices[indices[(i * 3) + 1]];
-    LowlevelRenderer::VertexPos3Tex0 vertex2 = vertices[indices[(i * 3) + 2]];
-    buffer.push_back(vertex0);
-    buffer.push_back(vertex1);
-    buffer.push_back(vertex2);
+    buffer->PushFace({vertices[indices[(i * 3) + 0]], vertices[indices[(i * 3) + 1]], vertices[indices[(i * 3) + 2]]});
   }
-  uint32_t hash = 0;
-  MurmurHash3_x86_32(buffer.data(), buffer.size() * sizeof(buffer[0]), 0, &hash);
   if (m_TextureManager.BindTexture(pPrimitiveFlags, pTexture))
   {
-    m_LLRenderer->RenderTriangleList(buffer.data(), faces, buffer.size(), hash, 0);
+    m_LLRenderer->Render(ro.get());
   }
   m_LLRenderer->PopDeviceState();
 }
@@ -554,15 +606,21 @@ void HighlevelRenderer::DrawFullscreenQuad(const FSceneNode* Frame, const DeusEx
 
     D3DXMatrixTranslation(&wm, newOrigin.X, newOrigin.Y, newOrigin.Z);
 
-    GeometryMeshesVertexBuffer buffer;
-    buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
-    buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
-    buffer.push_back({ { -1.0f,  1.0f, 0.0f },  {0.0f, 0.0f} });
-    buffer.push_back({ { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} });
-    buffer.push_back({ {  1.0f,	-1.0f, 0.0f },  {1.0f, 1.0f} });
-    buffer.push_back({ {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} });
-    uint32_t hash = 0;
-    MurmurHash3_x86_32(buffer.data(), buffer.size() * sizeof(buffer[0]), 0, &hash);
+    auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Frame);
+    auto buffer = ro->AcquireBuffer<VertexPos3Tex0>();
+
+    buffer->PushFace({
+        { { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} },
+        { {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} },
+        { { -1.0f,  1.0f, 0.0f },  {0.0f, 0.0f} },
+      });
+
+    buffer->PushFace({
+        { { -1.0f, -1.0f, 0.0f },  {0.0f, 1.0f} },
+        { {  1.0f,	-1.0f, 0.0f },  {1.0f, 1.0f} },
+        { {  1.0f,	 1.0f, 0.0f },  {1.0f, 0.0f} }
+      });
+
     if (m_TextureManager.BindTexture(PF_Unlit, pTexture))
     {
       m_LLRenderer->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
@@ -572,7 +630,7 @@ void HighlevelRenderer::DrawFullscreenQuad(const FSceneNode* Frame, const DeusEx
       m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 
       SetWorldTransformState(wmi);
-      m_LLRenderer->RenderTriangleList(buffer.data(), 2, buffer.size(), hash, 0);
+      m_LLRenderer->Render(ro.get());
     }
   }
   m_LLRenderer->PopDeviceState();
@@ -582,10 +640,7 @@ void HighlevelRenderer::OnLevelChange()
 {
   m_staticGeometryMeshes.clear();
   m_dynamicGeometryMeshes.clear();
-  m_dynamicMeshes.clear();
   for(auto& n : m_DrawnNodes) n.clear();
-  m_UIMeshes.clear();
-  m_SpriteMeshes.clear();
   m_LightManager.OnLevelChange();
 }
 
@@ -723,6 +778,158 @@ void HighlevelRenderer::OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Su
   {
     return;
   }
+
+  if ((Surface.PolyFlags & PF_Mirrored) != 0)
+  {
+    Surface.PolyFlags &= ~PF_Invisible;
+  }
+
+  if ((Surface.PolyFlags & PF_Invisible) != 0)
+  {
+    return;
+  }
+
+  UModel* Model = Frame->Level->Model;
+  auto& GSurfs = Model->Surfs;
+  auto& GNodes = Model->Nodes;
+  auto& GVerts = Model->Verts;
+  auto& GVertPoints = Model->Points;
+  const INT	iNode = Facet.Polys[0].iNode;
+  const auto& Node = GNodes(iNode);
+
+  bool surfaceIsDynamic = [&]() 
+    {
+      if (ctx.frameIsSkybox)
+      {
+        //Consider the skybox dynamic; depth buffering is
+        //turned off, so we can't cache the render calls.
+        return true;
+      }
+
+      if (Frame->Level->BrushTracker != nullptr)
+      {
+        if (Frame->Level->BrushTracker->SurfIsDynamic(Node.iSurf))
+        {
+          return true;
+        }
+      }
+
+      if (Surface.Texture->bRealtimeChanged || Surface.Texture->bRealtime)
+      {
+        return true;
+      }
+
+      if ((Surface.PolyFlags & (PF_AutoUPan | PF_AutoVPan)) != 0)
+      {
+        return true;
+      }
+    return false;
+    }();
+
+  D3DXMATRIX worldMatrix, worldMatrixInverse;
+  FVector localOrigin = GVertPoints(GVerts(Node.iVertPool + 0).pVertex);
+  D3DXMatrixTranslation(&worldMatrix, localOrigin.X, localOrigin.Y, localOrigin.Z);
+  D3DXMatrixInverse(&worldMatrixInverse, nullptr, &worldMatrix);
+
+  DeusExD3D9TextureHandle albedoTextureHandle;
+  DeusExD3D9TextureHandle lightmapTextureHandle;
+  albedoTextureHandle = m_TextureManager.ProcessTexture(Surface.PolyFlags, Surface.Texture);
+  if (Surface.LightMap && ctx.frameIsRasterized)
+  {
+    lightmapTextureHandle = m_TextureManager.ProcessTexture(Surface.PolyFlags, Surface.LightMap);
+  }
+  m_TextureManager.BindTexture(Surface.PolyFlags, albedoTextureHandle, lightmapTextureHandle);
+
+  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject(iNode, surfaceIsDynamic ? RenderObjectLifetime::Frame : RenderObjectLifetime::Level);
+
+  if (roCreated)
+  {
+    auto vtxBuffer = ro->AcquireBuffer<VertexPos3Tex0Tex1>();
+    for (auto Poly = Facet.Polys; Poly; Poly = Poly->Next)
+    {
+      INT	  		polyINode = Poly->iNode;
+      FBspNode* Node = &GNodes(iNode);
+      INT       numPts = Node->NumVertices;
+      FBspSurf* Surf = &GSurfs(Node->iSurf);
+      FCoords   FrameCoords = Frame->Coords;
+      assert(polyINode == iNode);
+      if (numPts < 3)
+      {
+        continue;
+      }
+
+      FLOAT UDot = Facet.MapCoords.XAxis | Facet.MapCoords.Origin;
+      FLOAT VDot = Facet.MapCoords.YAxis | Facet.MapCoords.Origin;
+
+      //TODO: can this be cached? Or delayed until we actually need to calculate it?
+      auto calculateUV = [&Facet, UDot, VDot, iNode](const FVector& pts, const FTextureInfo* pTextureInfo, const DeusExD3D9TextureHandle& pTextureHandle) -> FVector {
+        if (pTextureInfo != nullptr && pTextureHandle != nullptr)
+        {
+          FLOAT U = Facet.MapCoords.XAxis | pts;
+          FLOAT V = Facet.MapCoords.YAxis | pts;
+          FLOAT ucoord = ((U - UDot) - pTextureInfo->Pan.X) * pTextureHandle->md.multU;
+          FLOAT vcoord = ((V - VDot) - pTextureInfo->Pan.Y) * pTextureHandle->md.multV;
+          return FVector(ucoord, vcoord, 0);
+        }
+        return FVector(0, 0, 0);
+        };
+
+      D3DXVECTOR4 point1;
+      D3DXVECTOR4 point2;
+      D3DXVECTOR4 point3;
+
+      FVector localPts[3] = {};
+      FVector projPts[3] = {};
+      localPts[0] = GVertPoints(GVerts(Node->iVertPool + 0).pVertex);
+      projPts[0] = localPts[0].TransformPointBy(FrameCoords);
+      for (INT i = 2; i < numPts; i++)
+      {
+        localPts[1] = GVertPoints(GVerts(Node->iVertPool + i - 1).pVertex);
+        projPts[1] = localPts[1].TransformPointBy(FrameCoords);
+        localPts[2] = GVertPoints(GVerts(Node->iVertPool + i).pVertex);
+        projPts[2] = localPts[2].TransformPointBy(FrameCoords);
+
+        for (int i = 0; i < 3; i++)
+        {
+          const auto uvDiffuse = calculateUV(projPts[i], Surface.Texture, albedoTextureHandle);
+          const auto uvLightmap = calculateUV(projPts[i], Surface.LightMap, lightmapTextureHandle);
+
+#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
+          VertexPos3Tex0Tex1 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
+#else
+          VertexPos3Tex0Tex1 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
+#endif
+
+          D3DXVec3TransformCoord(&vtx.Pos, &vtx.Pos, &worldMatrixInverse);
+          vtxBuffer->PushVertex(std::move(vtx));
+        }
+      }
+    }
+  }
+  
+  {
+    auto flags = Surface.PolyFlags; //??? check original
+    auto debugId = iNode;
+    AddRenderCommand(surfaceIsDynamic ? RenderCommandQueue::dynamicGeo : RenderCommandQueue::staticGeo, [=]() {
+      SetWorldTransformState(worldMatrix);
+      if (m_TextureManager.BindTexture(flags, albedoTextureHandle, lightmapTextureHandle))
+      {
+        m_LLRenderer->EmitDebugTextF(L"Render surface 0x%X with texture 0x%X (0x%X)", debugId, albedoTextureHandle.get(), albedoTextureHandle->textureD3D9);
+        m_LLRenderer->Render(ro.get());
+      }
+    });
+
+  }
+}
+
+void HighlevelRenderer::OnDrawGeometryOld(const FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet)
+{
+  auto& ctx = *g_ContextManager.GetContext();
+
+  if (Facet.Polys == nullptr)
+  {
+    return;
+  }
   if ((Surface.PolyFlags & PF_Mirrored) != 0)
   {
     Surface.PolyFlags &= ~PF_Invisible;
@@ -739,6 +946,8 @@ void HighlevelRenderer::OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Su
   auto& GVertPoints = Model->Points;
   const INT	iNode = Facet.Polys[0].iNode;
   const auto& Node = GNodes(iNode);
+  static INT highestINode = INT32_MIN;
+  highestINode = max(highestINode, iNode);
 
   bool surfaceIsDynamic = false;
 
@@ -906,9 +1115,9 @@ void HighlevelRenderer::OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Su
         const auto uvLightmap = calculateUV(projPts[i], Surface.LightMap, lightmapTextureHandle);
 
 #if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
-        LowlevelRenderer::VertexPos3Tex0Tex1 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
+        VertexPos3Tex0Tex1 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
 #else
-        LowlevelRenderer::VertexPos3Tex0Tex1 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
+        VertexPos3Tex0Tex1 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
 #endif
 
         D3DXVec3TransformCoord(&vtx.Pos, &vtx.Pos, &sharedMesh->worldMatrixInverse);
@@ -941,12 +1150,11 @@ void HighlevelRenderer::OnDrawMeshBegin(const FSceneNode* Frame, AActor* Owner)
   }
 
   renderContext->drawcallInfo->Owner = Owner;
-
-  const auto key = reinterpret_cast<DynamicMeshesKey>(renderContext->drawcallInfo->Owner);
+  DynamicMeshesKey key = DynamicMeshesKey(renderContext->drawcallInfo->Owner);
   for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
   {
     const auto& dynamicMeshInfo = foundIt->second;
-    dynamicMeshInfo.buffer->clear();
+    dynamicMeshInfo.renderObject->Reset();
   }
 }
 
@@ -966,6 +1174,9 @@ void HighlevelRenderer::OnDrawMeshPolygon(const FSceneNode* Frame, FTextureInfo&
     //for now, skip any polygons not draw by DrawMesh
     return;
   }
+  auto owner = renderContext->drawcallInfo->Owner;
+  check(owner != nullptr && owner->DrawScale >= -0.0f);
+
 
   UTexture* prevTexture = renderContext->drawcallInfo->LastTextureInfo;
   if (prevTexture != Info.Texture)
@@ -980,52 +1191,53 @@ void HighlevelRenderer::OnDrawMeshPolygon(const FSceneNode* Frame, FTextureInfo&
     //}
   }
 
-  //This is being called multiple times per mesh. We're splitting up the mesh into submeshes for each permutation of texture+flags.
-  //Once this mesh is done, we'll render all mesh instances. This is done to be able to easily (in RTX Remix) handle things like
-  //translucency (different flags) and textures (90s style multitexturing) if we want to.
-  DynamicMeshesValue& mesh = [&]() -> DynamicMeshesValue& {
-    const auto key = reinterpret_cast<DynamicMeshesKey>(renderContext->drawcallInfo->Owner);
-    for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
-    {
-      auto& dynamicMeshInfo = foundIt->second;
-      if (dynamicMeshInfo.textureInfo.Texture == Info.Texture &&
-        dynamicMeshInfo.flags == PolyFlags)
-      {
-        return dynamicMeshInfo;
-      }
-    }
+  //TODO:
+  //We'll have to figure out if we're going to re-use this mesh as-is, or if it needs to be re-built.
+  //Dynamic meshes will need to be resubmited each frame.
+  //Static meshes can be reused.
 
-    auto it = (m_dynamicMeshes.emplace(key, DynamicMeshesValue{ Info, static_cast<UnrealPolyFlags>(PolyFlags), std::make_unique<DynamicMeshesVertexBuffer>() }));
-    auto& dynamicMeshInfo = it->second;
-    dynamicMeshInfo.buffer->reserve(NumPts);
-    return dynamicMeshInfo;
-    }();
+  //UE's begin-draw-end calls emit a single mesh, but we'd like to split them in seperate buffers with separate render calls.
+  //Some parts might be emissive, for example. We have to perform some bookkeeping here to make sure we're able to find
+  //all buffers for a given mesh.
+  const RenderObjectKey key = Utils::CalculateKey(renderContext->drawcallInfo->Owner, Info.Texture, PolyFlags);
+  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject(key, RenderObjectLifetime::Frame);
+  if (roCreated)
+  {
+    DynamicMeshesValue meshinfo;
+    meshinfo.flags = PolyFlags;
+    meshinfo.renderObject = ro;
+    meshinfo.textureInfo = Info;
+    m_dynamicMeshes.insert({DynamicMeshesKey(renderContext->drawcallInfo->Owner), meshinfo});
+  }
 
-    uint32_t primitiveCount = 0;
-    FTransTexture* firstVertexInfo = Pts[0];
+  auto buffer = ro->AcquireBuffer<VertexPos3Norm3Tex0>();
 
-    const auto& md = (*renderContext->drawcallInfo->LastTextureMetadata);
-    FVector vtx[3]{ firstVertexInfo->Point, {}, {} };
-    FVector nrm[3]{ firstVertexInfo->Normal, {}, {} };
-    for (int i = 2; i < NumPts; i++)
-    {
-      vtx[1] = Pts[i - 1]->Point;
-      vtx[2] = Pts[i]->Point;
-      nrm[1] = Pts[i - 1]->Normal;
-      nrm[2] = Pts[i]->Normal;
+  uint32_t primitiveCount = 0;
+  FTransTexture* firstVertexInfo = Pts[0];
 
-      auto fixSigned0 = [](float& value) {
-        if (value >= 0.0f && std::signbit(value)) { value = std::abs(value); }
-        };
-      auto d3dvtx0 = LowlevelRenderer::VertexPos3Norm3Tex0{ {vtx[0].X, vtx[0].Y, vtx[0].Z}, {nrm[0].X, nrm[0].Y, nrm[0].Z}, {md.multU * Pts[0]->U,			  md.multV * Pts[0]->V } };
-      auto d3dvtx1 = LowlevelRenderer::VertexPos3Norm3Tex0{ {vtx[1].X, vtx[1].Y, vtx[1].Z}, {nrm[1].X, nrm[1].Y, nrm[1].Z}, {md.multU * Pts[i - 1]->U,  md.multV * Pts[i - 1]->V } };
-      auto d3dvtx2 = LowlevelRenderer::VertexPos3Norm3Tex0{ {vtx[2].X, vtx[2].Y, vtx[2].Z}, {nrm[2].X, nrm[2].Y, nrm[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V } };
+  const auto& md = (*renderContext->drawcallInfo->LastTextureMetadata);
+  FVector vtx[3]{ firstVertexInfo->Point, {}, {} };
+  FVector nrm[3]{ firstVertexInfo->Normal, {}, {} };
+  for (int i = 2; i < NumPts; i++)
+  {
+    vtx[1] = Pts[i - 1]->Point;
+    vtx[2] = Pts[i]->Point;
+    nrm[1] = Pts[i - 1]->Normal;
+    nrm[2] = Pts[i]->Normal;
 
-      mesh.buffer->push_back(std::move(d3dvtx0));
-      mesh.buffer->push_back(std::move(d3dvtx1));
-      mesh.buffer->push_back(std::move(d3dvtx2));
-      mesh.primitiveCount++;
-    }
+    auto fixSigned0 = [](float& value) {
+      if (value >= 0.0f && std::signbit(value)) { value = std::abs(value); }
+      };
+    auto d3dvtx0 = VertexPos3Norm3Tex0{ {vtx[0].X, vtx[0].Y, vtx[0].Z}, {nrm[0].X, nrm[0].Y, nrm[0].Z}, {md.multU * Pts[0]->U,			  md.multV * Pts[0]->V } };
+    auto d3dvtx1 = VertexPos3Norm3Tex0{ {vtx[1].X, vtx[1].Y, vtx[1].Z}, {nrm[1].X, nrm[1].Y, nrm[1].Z}, {md.multU * Pts[i - 1]->U,  md.multV * Pts[i - 1]->V } };
+    auto d3dvtx2 = VertexPos3Norm3Tex0{ {vtx[2].X, vtx[2].Y, vtx[2].Z}, {nrm[2].X, nrm[2].Y, nrm[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V } };
+
+    buffer->PushFace({
+      { {vtx[0].X, vtx[0].Y, vtx[0].Z}, {nrm[0].X, nrm[0].Y, nrm[0].Z}, {md.multU * Pts[0]->U,			  md.multV * Pts[0]->V } },
+      { {vtx[1].X, vtx[1].Y, vtx[1].Z}, {nrm[1].X, nrm[1].Y, nrm[1].Z}, {md.multU * Pts[i - 1]->U,    md.multV * Pts[i - 1]->V } },
+      { {vtx[2].X, vtx[2].Y, vtx[2].Z}, {nrm[2].X, nrm[2].Y, nrm[2].Z}, { md.multU * Pts[i]->U,				md.multV * Pts[i]->V } }
+    });
+  }
 }
 
 void HighlevelRenderer::OnDrawMeshEnd(const FSceneNode* Frame, AActor* Actor)
@@ -1065,72 +1277,56 @@ void HighlevelRenderer::OnDrawMeshEnd(const FSceneNode* Frame, AActor* Actor)
   }
   
   D3DXMATRIX wm;
-  SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
-  SetViewState(Frame, ViewType::game);
   wm = UECoordsToMatrix(wmCoords);
-
-  //Override viewport depth to signal rtxremix that we're rendering a viewmodel (weapon).
-  //Otherwise, it will show up in reflections and shadow.
-  Utils::ScopedCall scopedViewmodelDepth {
-    [&]() { if (isPlayerWeapon || actor->bOnlyOwnerSee) { m_LLRenderer->SetViewportDepth(RenderRanges::UI /*viewmodel?*/); } },
-    [&]() { if (isPlayerWeapon || actor->bOnlyOwnerSee) { m_LLRenderer->SetViewportDepth(RenderRanges::FromContext(renderContext)); } }
-  };
 
   //The mesh was split up per texture+flag permutation. We have to render them all.
   bool firstMeshRendered = true;
-  const auto key = reinterpret_cast<DynamicMeshesKey>(callInfo.Owner);
-  for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
+  const auto meshkey = reinterpret_cast<DynamicMeshesKey>(callInfo.Owner);
+  for (auto foundIt = m_dynamicMeshes.find(meshkey); foundIt != m_dynamicMeshes.end() && foundIt->first == meshkey; foundIt++)
   {
     auto& dynamicMeshInfo = foundIt->second;
-    auto buffer = dynamicMeshInfo.buffer.get();
-    if (buffer->empty())
-    {
-      continue;
-    }
-
-    float vertexSum = 0.0f;
-    for (auto& vtx : *buffer)
-    {
-      vertexSum += std::abs(vtx.Pos.x);
-      vertexSum += std::abs(vtx.Pos.y);
-      vertexSum += std::abs(vtx.Pos.z);
-    }
+    auto& ro = foundIt->second.renderObject;
 
     callInfo.worldMatrix = wm;
     const bool isEmissive = (callInfo.PolyFlags & PF_Unlit) != 0;
     for (int i = 0; i < (isEmissive ? 3 : 1); i++)
     {
       const auto meshIndex = actor->Mesh->GetIndex();
-      float diff = std::abs(dynamicMeshInfo.lastVertexSum - vertexSum);
-      bool isAnimating = actor->AnimRate > 0.0f;
+      const auto flags = dynamicMeshInfo.flags;
+      const bool isFirstPerson = (parent == Frame->Viewport->Actor);
+      const FrameContextManager::Context& capturedRenderContext = *renderContext;
+      const auto& capturedFrame = *Frame;
+      AddRenderCommand(isFirstPerson ? RenderCommandQueue::ui: RenderCommandQueue::dynamicGeo, [this, ro, i, wm, dynamicMeshInfo, isFirstPerson, capturedRenderContext, capturedFrame, callInfo]() {
+        SetProjectionState(&capturedFrame, HighlevelRenderer::ProjectionType::perspective);
+        SetViewState(&capturedFrame, ViewType::game);
 
-      if (i >= 1)
-      {
-        const FVector scale = (i == 1) ? FVector{ 0.9999f, 0.9999f, 0.9999f } : FVector{ 1.0001f, 1.0001f, 1.0001f };
-        D3DXMATRIX s;
-        D3DXMatrixScaling(&s, scale.X, scale.Y, scale.Z);
-        D3DXMatrixMultiply(&wm, &callInfo.worldMatrix.value(), &s);
-        SetWorldTransformState(wm);
-        m_TextureManager.BindTexture(dynamicMeshInfo.flags & ~PF_Unlit, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags & ~PF_Unlit, &dynamicMeshInfo.textureInfo));
-      }
-      else
-      {
-        SetWorldTransformState(*callInfo.worldMatrix);
-        m_TextureManager.BindTexture(dynamicMeshInfo.flags, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags, &dynamicMeshInfo.textureInfo));
-      }
-
-      if (diff > 2.0f || isAnimating)
-      {
-        dynamicMeshInfo.lastVertexSum = vertexSum;
-        const uint32_t meshHash = appMemCrc(buffer->data(), buffer->size() * sizeof(LowlevelRenderer::VertexPos3Norm3Tex0));
-        m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
-        dynamicMeshInfo.lastDrawcallHash = meshHash;
-      }
-      else
-      {
-        const uint32_t meshHash = dynamicMeshInfo.lastDrawcallHash;
-        m_LLRenderer->RenderTriangleList(buffer->data(), buffer->size() / 3, buffer->size(), meshHash, meshIndex);
-      }
+        //Override viewport depth to signal rtxremix that we're rendering a viewmodel (weapon).
+        //Otherwise, it will show up in reflections and shadow.
+        Utils::ScopedCall scopedViewmodelDepth {
+          [&]() { if (isFirstPerson) { m_LLRenderer->SetViewportDepth(RenderRanges::UI /*viewmodel?*/); } },
+          [&]() { if (isFirstPerson) { m_LLRenderer->SetViewportDepth(RenderRanges::FromContext(&capturedRenderContext)); } }
+        };
+        if (isFirstPerson)
+        {
+          m_LLRenderer->EmitDebugText(L"Rendering 1st person object");
+        }
+        if (i >= 1)
+        {
+          D3DXMATRIX scaledWorldMatrix;
+          const FVector scale = (i == 1) ? FVector{ 0.9999f, 0.9999f, 0.9999f } : FVector{ 1.0001f, 1.0001f, 1.0001f };
+          D3DXMATRIX s;
+          D3DXMatrixScaling(&s, scale.X, scale.Y, scale.Z);
+          D3DXMatrixMultiply(&scaledWorldMatrix, &wm, &s);
+          SetWorldTransformState(scaledWorldMatrix);
+          m_TextureManager.BindTexture(dynamicMeshInfo.flags & ~PF_Unlit, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags & ~PF_Unlit, &dynamicMeshInfo.textureInfo));
+        }
+        else
+        {
+          SetWorldTransformState(wm);
+          m_TextureManager.BindTexture(dynamicMeshInfo.flags, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags, &dynamicMeshInfo.textureInfo));
+        }
+        m_LLRenderer->Render(ro.get());
+      });
     }
   }
 }
@@ -1154,6 +1350,26 @@ void HighlevelRenderer::PopUERenderObject(uint32_t pSize)
   }
 }
 
+void HighlevelRenderer::AddRenderCommand(RenderCommandQueue pQueue, std::function<void()>&& pCB)
+{
+  m_CommandQueues[static_cast<uint32_t>(pQueue)].emplace_back(std::move(pCB));
+}
+
+void HighlevelRenderer::ExecuteCommandQueue(RenderCommandQueue pQueue)
+{
+  auto& queue = m_CommandQueues[static_cast<uint32_t>(pQueue)];
+  for (auto& cmd : queue)
+  {
+    cmd();
+  }
+}
+
+void HighlevelRenderer::ClearCommandQueue(RenderCommandQueue pQueue)
+{
+  auto& queue = m_CommandQueues[static_cast<uint32_t>(pQueue)];
+  queue.clear();
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void HighlevelRenderer::OnDrawUIBegin(const FSceneNode* Frame)
@@ -1166,17 +1382,7 @@ void HighlevelRenderer::OnDrawUIBegin(const FSceneNode* Frame)
   m_LLRenderer->EmitDebugText(L"[EchelonRenderer] BeginUI");
 
 #if 1
-  m_LLRenderer->PushDeviceState();
   {
-    m_LLRenderer->EmitDebugText(L"[EchelonRenderer] Begin 2D UI");
-    m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-    m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
-    m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-    m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
-    m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
-    SetViewState(Frame, ViewType::identity);
-    SetProjectionState(Frame, ProjectionType::uiorthogonal);
-
     //Render any frame clipping (since it seems rtxremix doesn't do that for us).
     if (true)
     {
@@ -1188,24 +1394,7 @@ void HighlevelRenderer::OnDrawUIBegin(const FSceneNode* Frame)
       Draw2DScreenQuad(Frame, clipRight.Left, clipRight.Top, clipRight.Width, clipRight.Height, 0xFF000000ul);
       Draw2DScreenQuad(Frame, clipBottom.Left, clipBottom.Top, clipBottom.Width, clipBottom.Height, 0xFF000000ul);
     }
-
-    //Render the UI meshes
-    SetWorldTransformStateToIdentity();
-    for (auto& rc : m_UIMeshes)
-    {
-      if (rc.primitiveCount > 0)
-      {
-        auto textureHandle = m_TextureManager.ProcessTexture(rc.flags, &rc.textureInfo);
-        m_TextureManager.BindTexture(rc.flags, textureHandle);
-        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-        //m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        m_LLRenderer->RenderTriangleList(rc.buffer->data(), rc.primitiveCount, rc.buffer->size(), 0, rc.textureKey);
-      }
-    }
-    m_LLRenderer->PopDeviceState();
   }
-  m_UIMeshes.clear();
 #endif
   m_LLRenderer->ClearDepth();
 }
@@ -1219,7 +1408,7 @@ void HighlevelRenderer::OnDrawUIEnd(const FSceneNode* Frame)
     check(Frame->Parent == nullptr);
 
     //Render UI meshes
-
+    //ExecuteCommandQueue(RenderCommandQueue::ui);
   }
   ctx->renderingUI = false;
   g_ContextManager.PopFrameContext();
@@ -1246,7 +1435,7 @@ void HighlevelRenderer::OnDrawSprite(const FSceneNode* Frame, FTextureInfo& Text
       }
     }
     return nullptr;
-  }();
+    }();
   if (sprite == nullptr)
   {
     return;
@@ -1269,24 +1458,24 @@ void HighlevelRenderer::OnDrawSprite(const FSceneNode* Frame, FTextureInfo& Text
     Min(clampedColor.B, maxColor.B),
     Min(clampedColor.A, maxColor.A)
       }.TrueColor() | 0xFF000000);
-  
+
 
   DWORD flags = (pPolyFlags & ~PF_Memorized) | TextureInfo.Texture->PolyFlags;
   if (TextureInfo.Palette && TextureInfo.Palette[128].A != 255 && !(pPolyFlags & PF_Translucent)) {
     flags |= PF_Highlighted;
   }
 
-  D3DXVECTOR3 scaling{TextureInfo.Texture->USize * actorContainer->Actor->DrawScale, 
-                      TextureInfo.Texture->VSize * actorContainer->Actor->DrawScale, 
-                      1.0f};
-  D3DXVECTOR3 translation{sprite->Location.X, sprite->Location.Y, sprite->Location.Z};
+  D3DXVECTOR3 scaling{ TextureInfo.Texture->USize * actorContainer->Actor->DrawScale,
+                      TextureInfo.Texture->VSize * actorContainer->Actor->DrawScale,
+                      1.0f };
+  D3DXVECTOR3 translation{ sprite->Location.X, sprite->Location.Y, sprite->Location.Z };
 
   D3DXQUATERNION rot{};
   D3DXMATRIX viewMatrix;
   this->GetViewMatrix(Frame->Coords, viewMatrix);
   D3DXMatrixInverse(&viewMatrix, NULL, &viewMatrix);
   D3DXQuaternionRotationMatrix(&rot, &viewMatrix);
-  
+
 
 #if 0
   D3DXVECTOR3 depthOffset{ 0.0f, 0.0f, 1.0f };
@@ -1299,48 +1488,45 @@ void HighlevelRenderer::OnDrawSprite(const FSceneNode* Frame, FTextureInfo& Text
   D3DXMATRIX wm;
   D3DXMatrixTransformation(&wm, nullptr, nullptr, &scaling, nullptr, &rot, &translation);
 
-  SpriteMeshesValue* allocatedSpriteMesh = &m_SpriteMeshes.emplace_back();
-  allocatedSpriteMesh->worldmatrix = wm;
-  allocatedSpriteMesh->flags = flags;
-  allocatedSpriteMesh->buffer = std::make_unique<SpriteMeshesVertexBuffer>();
-  allocatedSpriteMesh->primitiveCount = 0;
-  allocatedSpriteMesh->textureInfo = TextureInfo;
-  allocatedSpriteMesh->textureKey = TextureHash::FromTextureInfo(&TextureInfo, allocatedSpriteMesh->flags);
-  allocatedSpriteMesh->sceneNode = std::make_unique<FSceneNode>(*Frame);
+  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject(Utils::CalculateKey(sprite), RenderObjectLifetime::Frame);
+  if (roCreated)
+  {
+    ro->SetTexture(RenderObjectTextureType::Albedo, TextureInfo);
+    ro->SetFlags(flags);
+    ro->SetSceneNode(std::make_unique<FSceneNode>(*Frame));
 
-  allocatedSpriteMesh->buffer->push_back({ {-0.5f, -0.5f, 0.0f, 1.0f }, Clr, {0.0f, 1.0f} });
-  allocatedSpriteMesh->buffer->push_back({ {+0.5f, -0.5f, 0.0f, 1.0f }, Clr, {1.0f, 1.0f} });
-  allocatedSpriteMesh->buffer->push_back({ {+0.5f, +0.5f, 0.0f, 1.0f }, Clr, {1.0f, 0.0f} }); allocatedSpriteMesh->primitiveCount++;
-  allocatedSpriteMesh->buffer->push_back({ {-0.5f, -0.5f, 0.0f, 1.0f }, Clr, {0.0f, 1.0f} });
-  allocatedSpriteMesh->buffer->push_back({ {+0.5f, +0.5f, 0.0f, 1.0f }, Clr, {1.0f, 0.0f} });
-  allocatedSpriteMesh->buffer->push_back({ {-0.5f, +0.5f, 0.0f, 1.0f }, Clr, {0.0f, 0.0f} }); allocatedSpriteMesh->primitiveCount++;
+    AddRenderCommand(RenderCommandQueue::pfx, [this,ro,wm](){
+      const auto flags = ro->GetFlags();
+      auto textureHandle = m_TextureManager.ProcessTexture(flags, &ro->GetTextureInfo(RenderObjectTextureType::Albedo));
+      m_TextureManager.BindTexture(flags, textureHandle);
+      SetWorldTransformState(wm);
+      m_LLRenderer->Render(ro.get());
+    });
+  }
+
+  auto buffer = ro->AcquireBuffer<VertexPos4Color0Tex0>();
+  buffer->PushFace({
+    { {-0.5f, -0.5f, 0.0f, 1.0f }, Clr, {0.0f, 1.0f} },
+    { {+0.5f, -0.5f, 0.0f, 1.0f }, Clr, {1.0f, 1.0f} },
+    { {+0.5f, +0.5f, 0.0f, 1.0f }, Clr, {1.0f, 0.0f} },
+
+    { {-0.5f, -0.5f, 0.0f, 1.0f }, Clr, {0.0f, 1.0f} },
+    { {+0.5f, +0.5f, 0.0f, 1.0f }, Clr, {1.0f, 0.0f} },
+    { {-0.5f, +0.5f, 0.0f, 1.0f }, Clr, {0.0f, 0.0f} }
+   });
 }
 
 void HighlevelRenderer::OnDrawUI(const FSceneNode* Frame, FTextureInfo& TextureInfo, float pX, float pY, float pWidth, float pHeight, float pTexCoordU, float pTexCoordV, float pTexCoordUL, float pTexCoordVL, FSpanBuffer* Span, float pZ, FPlane pColor, FPlane pFog, DWORD pPolyFlags)
 {
   auto& ctx = *g_ContextManager.GetContext();
-  UIMeshesValue* latestUIMesh = (!m_UIMeshes.empty() ? &m_UIMeshes.back() : nullptr);
 
   DWORD flags = (pPolyFlags & ~PF_Memorized) | TextureInfo.Texture->PolyFlags;
   if (TextureInfo.Palette && TextureInfo.Palette[128].A != 255 && !(pPolyFlags & PF_Translucent)) {
     flags |= PF_Highlighted;
   }
 
-  bool allocateNewUIMesh = false;
-  allocateNewUIMesh |= (latestUIMesh == nullptr);
-  allocateNewUIMesh |= (latestUIMesh != nullptr) && (latestUIMesh->flags != flags);
-  allocateNewUIMesh |= (latestUIMesh != nullptr) && (latestUIMesh->textureInfo.Texture != TextureInfo.Texture);
-  if (allocateNewUIMesh)
-  {
-    latestUIMesh = &m_UIMeshes.emplace_back();
-    latestUIMesh->flags = flags;
-    latestUIMesh->buffer = std::make_unique<UIMeshesVertexBuffer>();
-    latestUIMesh->primitiveCount = 0;
-    latestUIMesh->textureInfo = TextureInfo;
-    latestUIMesh->textureKey = TextureHash::FromTextureInfo(&TextureInfo, latestUIMesh->flags);
-    latestUIMesh->sceneNode = std::make_unique<FSceneNode>(*Frame);
-  }
-
+  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(RenderObjectKey(TextureInfo.CacheID), RenderObjectLifetime::Frame);
+  auto vtex = ro->AcquireBuffer<PreTransformedVertexPos4Color0Tex0>();
 
   const float RZ = 1.0f / pZ;
   const float X1 = (pX + Frame->XB - 0.5);
@@ -1348,7 +1534,7 @@ void HighlevelRenderer::OnDrawUI(const FSceneNode* Frame, FTextureInfo& TextureI
   const float	X2 = (X1 + pWidth);
   const float	Y2 = (Y1 + pHeight);
 
-  const auto& md = m_TextureManager.ProcessTexture(latestUIMesh->flags, &TextureInfo)->md;
+  const auto& md = m_TextureManager.ProcessTexture(flags, &TextureInfo)->md;
   const float RZUS = RZ * md.multU;
   const float U1 = (pTexCoordU)*RZUS;
   const float U2 = (pTexCoordU + pTexCoordUL) * RZUS;
@@ -1365,23 +1551,39 @@ void HighlevelRenderer::OnDrawUI(const FSceneNode* Frame, FTextureInfo& TextureI
     maxColor = FColor(0xFF, 0xFF, 0xFF, 0xFF);
   }
 
-      D3DCOLOR Clr = (flags & (PF_Modulated)) ?
-                   (maxColor.TrueColor() | 0xFF000000) :
-                   (FColor{
-                       Min(clampedColor.R, maxColor.R),
-                       Min(clampedColor.G, maxColor.G),
-                       Min(clampedColor.B, maxColor.B),
-                       Min(clampedColor.A, maxColor.A)
-                   }.TrueColor() | 0xFF000000);
+  D3DCOLOR Clr = (flags & (PF_Modulated)) ?
+               (maxColor.TrueColor() | 0xFF000000) :
+               (FColor{
+                   Min(clampedColor.R, maxColor.R),
+                   Min(clampedColor.G, maxColor.G),
+                   Min(clampedColor.B, maxColor.B),
+                   Min(clampedColor.A, maxColor.A)
+               }.TrueColor() | 0xFF000000);
 
-  latestUIMesh->buffer->push_back({ {X1, Y1, pZ, 1.0f}, Clr, {U1, V1} });
-  latestUIMesh->buffer->push_back({ {X2, Y1, pZ, 1.0f}, Clr, {U2, V1} });
-  latestUIMesh->buffer->push_back({ {X2, Y2, pZ, 1.0f}, Clr, {U2, V2} });
-  latestUIMesh->primitiveCount++;
-  latestUIMesh->buffer->push_back({ {X1, Y1, pZ, 1.0f}, Clr, {U1, V1} });
-  latestUIMesh->buffer->push_back({ {X2, Y2, pZ, 1.0f}, Clr, {U2, V2} });
-  latestUIMesh->buffer->push_back({ {X1, Y2, pZ, 1.0f}, Clr, {U1, V2	} });
-  latestUIMesh->primitiveCount++;
+  vtex->PushFace({
+      { {X1, Y1, pZ, 1.0f}, Clr, {U1, V1} },
+      { {X2, Y1, pZ, 1.0f}, Clr, {U2, V1} },
+      { {X2, Y2, pZ, 1.0f}, Clr, {U2, V2} },
+    });
+  vtex->PushFace({
+      { {X1, Y1, pZ, 1.0f}, Clr, {U1, V1} },
+      { {X2, Y2, pZ, 1.0f}, Clr, {U2, V2} },
+      { {X1, Y2, pZ, 1.0f}, Clr, {U1, V2	} },
+    });
+
+  if (roCreated)
+  {
+    ro->SetFlags(flags);
+    ro->SetTexture(RenderObjectTextureType::Albedo, TextureInfo);
+    ro->SetSceneNode(std::make_unique<FSceneNode>(*Frame));
+
+    AddRenderCommand(RenderCommandQueue::ui, [this,ro](){
+      const auto flags = ro->GetFlags();
+      auto textureHandle = m_TextureManager.ProcessTexture(flags, &ro->GetTextureInfo(RenderObjectTextureType::Albedo));
+      m_TextureManager.BindTexture(flags, textureHandle);
+      m_LLRenderer->Render(ro.get());
+    });
+  }
 }
 
 

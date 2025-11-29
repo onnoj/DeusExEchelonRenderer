@@ -7,9 +7,16 @@
 #include "utils/utils.h"
 #include "hacks/misc.h"
 
+#include "rendering/vertexbuffermanager.h"
 #include "rendering/dxtexturemanager.h"
 
 extern bool g_debugAllowCameraJump;
+
+struct RenderContext
+{
+	class LowlevelRenderer* llRenderer = nullptr;
+	class LowlevelRenderer* hlRenderer = nullptr;
+};
 
 template <typename T>
 struct Rect
@@ -68,7 +75,7 @@ namespace RenderRanges
 		/*DepthMax =  */1.0f,
 	};
 
-	extern const RangeDefinition& FromContext(FrameContextManager::Context* pCtx);
+	extern const RangeDefinition& FromContext(const FrameContextManager::Context* pCtx);
 }
 
 class LowlevelRenderer
@@ -76,14 +83,6 @@ class LowlevelRenderer
 	friend class HighlevelRenderer;
 	friend class MaterialDebugger;
 public:
-	struct VertexPos3Tex0;
-	struct VertexPos3Tex0Tex1;
-	struct VertexPos3Norm3Tex0;
-	struct VertexPos3Tex0to4;
-	struct VertexPos4Color0Tex0;
-	struct VertexPos3Color0;
-	struct PreTransformedVertexPos4Color0Tex0;
-
 	struct State;
 public:
 	enum class RenderStateSaveSlot {
@@ -137,20 +136,17 @@ public:
   std::optional<D3DDISPLAYMODE> FindClosestResolution(uint32_t pWidth, uint32_t pHeight) const;
 	void ClearDepth();
 	void ClearDisplaySurface(const Vec4& clearColor);
-	void RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const VertexPos3Tex0to4* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const VertexPos3Norm3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const VertexPos3Tex0* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const VertexPos3Tex0Tex1* pVertices, const uint32_t pPrimitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const PreTransformedVertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
-	void RenderTriangleList(const VertexPos3Color0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+
+	void Render(class RenderObject* pRenderObject);
+	void RenderVertexBuffer(const VertexBufferI* pVertexBuffer, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+
 	void EmitDebugText(const wchar_t* pTxt);
 	void EmitDebugTextF(const wchar_t* pFmt, ...);
 	void DisableLight(int32_t index);
 	void RenderLight(int32_t index, const D3DLIGHT9& pLight);
 	void FlushLights();
 
+	IDirect3DVertexBuffer9* AllocateVertexBuffer(uint32_t pSize, uint32_t pFVF);
 	bool AllocateTexture(DeusExD3D9TextureHandle& pmTexture);
 	bool SetTextureOnDevice(const uint32_t pSlot, const DeusExD3D9Texture* pTexture);
 
@@ -184,6 +180,7 @@ private:
 		std::optional<D3DMATRIX> m_ProjectionMatrixPending;
 	} m_States[16];
 	State* m_CurrentState = &m_States[0];
+	VertexBufferManager m_VertexBufferManager;
 
 	std::optional<State> m_SavedStates[uint32_t(RenderStateSaveSlot::COUNT)];
 
@@ -197,59 +194,6 @@ private:
 	bool m_CanFlushLights = false;
 private:
 	using ResourceMap = std::unordered_multimap<uint32_t, void*>;
-
-#pragma pack(push, 1)
-	struct VertexPos3Tex0
-	{
-		D3DXVECTOR3 Pos;
-		D3DXVECTOR2 Tex0;
-	};
-
-	struct VertexPos3Tex0Tex1
-	{
-		D3DXVECTOR3 Pos;
-		D3DXVECTOR2 Tex0;
-		D3DXVECTOR2 Tex1;
-	};
-
-	struct VertexPos3Norm3Tex0
-	{
-		D3DXVECTOR3 Pos;
-		D3DXVECTOR3 Normal;
-		D3DXVECTOR2 Tex0;
-	};
-
-	struct VertexPos3Tex0to4
-	{
-		D3DXVECTOR3 Pos;
-		//uint32_t Color=0xFFFFFFFF;
-		D3DXVECTOR2 Tex0;
-		D3DXVECTOR2 Tex1;
-		D3DXVECTOR2 Tex2;
-		D3DXVECTOR2 Tex3;
-		D3DXVECTOR2 Tex4;
-	};
-
-	struct VertexPos4Color0Tex0
-	{
-		D3DXVECTOR4 Pos;
-		uint32_t Color=0xFFFFFFFF;
-		D3DXVECTOR2 Tex0;
-	};
-
-	struct PreTransformedVertexPos4Color0Tex0
-	{
-		D3DXVECTOR4 Pos;
-		uint32_t Color=0xFFFFFFFF;
-		D3DXVECTOR2 Tex0;
-	};
-
-	struct VertexPos3Color0
-	{
-		D3DXVECTOR3 Pos;
-		uint32_t Color=0xFFFFFFFF;
-	};
-#pragma pack(pop, 1)
 
 	struct BufferedGeoValue
 	{
@@ -281,3 +225,6 @@ private:
 
 	D3DCAPS9 m_caps = {};
 };
+
+//TODO: move to utils:
+extern void ValidateFVF(const void* pBuffer, DWORD pFVF, const uint32_t pVertexCount);

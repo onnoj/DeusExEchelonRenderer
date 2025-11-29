@@ -10,6 +10,7 @@
 #include <xxhash.h>
 
 #include "rendering/llrenderer.h"
+#include "rendering/renderobjectmanager.h"
 #include "rendering/scenemanager.h"
 #include "utils/configmanager.h"
 #include "utils/debugmenu.h"
@@ -334,215 +335,74 @@ void ValidateFVF(const void* pBuffer, DWORD pFVF, const uint32_t pVertexCount)
       BufferContainingFloats = pFloatBuffer;
     };
 
-  if ((pFVF & D3DFVF_XYZW) == D3DFVF_XYZW) { checkFloats(pBuffer, /*upto?*/4); }
-  else if ((pFVF & D3DFVF_XYZ) == D3DFVF_XYZ) { checkFloats(pBuffer, 3); }
-  else if ((pFVF & D3DFVF_XYZRHW) == D3DFVF_XYZRHW) { checkFloats(pBuffer, 4); }
-  else if ((pFVF & D3DFVF_XYZB1) == D3DFVF_XYZB1) { checkFloats(pBuffer, /*upto?*/3); }
-  else if ((pFVF & D3DFVF_XYZB2) == D3DFVF_XYZB2) { checkFloats(pBuffer, /*upto?*/3); }
-  else if ((pFVF & D3DFVF_XYZB3) == D3DFVF_XYZB3) { checkFloats(pBuffer, /*upto?*/3); }
-  else if ((pFVF & D3DFVF_XYZB4) == D3DFVF_XYZB4) { checkFloats(pBuffer, /*upto?*/3); }
-  else if ((pFVF & D3DFVF_XYZB5) == D3DFVF_XYZB5) { checkFloats(pBuffer, /*upto?*/3); }
+  for (int i = 0; i < pVertexCount; i++)
+  {
+    if ((pFVF & D3DFVF_XYZW) == D3DFVF_XYZW) { checkFloats(pBuffer, /*upto?*/4); }
+    else if ((pFVF & D3DFVF_XYZ) == D3DFVF_XYZ) { checkFloats(pBuffer, 3); }
+    else if ((pFVF & D3DFVF_XYZRHW) == D3DFVF_XYZRHW) { checkFloats(pBuffer, 4); }
+    else if ((pFVF & D3DFVF_XYZB1) == D3DFVF_XYZB1) { checkFloats(pBuffer, /*upto?*/3); }
+    else if ((pFVF & D3DFVF_XYZB2) == D3DFVF_XYZB2) { checkFloats(pBuffer, /*upto?*/3); }
+    else if ((pFVF & D3DFVF_XYZB3) == D3DFVF_XYZB3) { checkFloats(pBuffer, /*upto?*/3); }
+    else if ((pFVF & D3DFVF_XYZB4) == D3DFVF_XYZB4) { checkFloats(pBuffer, /*upto?*/3); }
+    else if ((pFVF & D3DFVF_XYZB5) == D3DFVF_XYZB5) { checkFloats(pBuffer, /*upto?*/3); }
 
-  if ((pFVF & D3DFVF_NORMAL) == D3DFVF_NORMAL) { checkFloats(pBuffer, 3); }
-  else if ((pFVF & D3DFVF_PSIZE) == D3DFVF_PSIZE) { checkFloats(pBuffer, 1);}
-  else if ((pFVF & D3DFVF_DIFFUSE) == D3DFVF_DIFFUSE) { checkDWORD(pBuffer, 1);}
-  else if ((pFVF & D3DFVF_SPECULAR) == D3DFVF_SPECULAR) { checkDWORD(pBuffer, 1);}
+    if ((pFVF & D3DFVF_NORMAL) == D3DFVF_NORMAL) { checkFloats(pBuffer, 3); }
+    else if ((pFVF & D3DFVF_PSIZE) == D3DFVF_PSIZE) { checkFloats(pBuffer, 1); }
+    else if ((pFVF & D3DFVF_DIFFUSE) == D3DFVF_DIFFUSE) { checkDWORD(pBuffer, 1); }
+    else if ((pFVF & D3DFVF_SPECULAR) == D3DFVF_SPECULAR) { checkDWORD(pBuffer, 1); }
 
-  if ((pFVF & D3DFVF_TEX1) == D3DFVF_TEX1) { checkFloats(pBuffer, 2); }
-  else if ((pFVF & D3DFVF_TEX2) == D3DFVF_TEX2) { checkFloats(pBuffer, 2); }
-  else if ((pFVF & D3DFVF_TEX3) == D3DFVF_TEX3) { checkFloats(pBuffer, 2); }
-  else if ((pFVF & D3DFVF_TEX4) == D3DFVF_TEX4) { checkFloats(pBuffer, 2); }
-  else if ((pFVF & D3DFVF_TEX5) == D3DFVF_TEX5) { checkFloats(pBuffer, 2); }
-  else if ((pFVF & D3DFVF_TEX6) == D3DFVF_TEX6) { checkFloats(pBuffer, 2); }
-  else if ((pFVF & D3DFVF_TEX7) == D3DFVF_TEX7) { checkFloats(pBuffer, 2); }
-  else if ((pFVF & D3DFVF_TEX8) == D3DFVF_TEX8) { checkFloats(pBuffer, 2); }
+    if ((pFVF & D3DFVF_TEX1) == D3DFVF_TEX1) { checkFloats(pBuffer, 2 * 1); }
+    else if ((pFVF & D3DFVF_TEX2) == D3DFVF_TEX2) { checkFloats(pBuffer, 2 * 2); }
+    else if ((pFVF & D3DFVF_TEX3) == D3DFVF_TEX3) { checkFloats(pBuffer, 2 * 3); }
+    else if ((pFVF & D3DFVF_TEX4) == D3DFVF_TEX4) { checkFloats(pBuffer, 2 * 4); }
+    else if ((pFVF & D3DFVF_TEX5) == D3DFVF_TEX5) { checkFloats(pBuffer, 2 * 5); }
+    else if ((pFVF & D3DFVF_TEX6) == D3DFVF_TEX6) { checkFloats(pBuffer, 2 * 6); }
+    else if ((pFVF & D3DFVF_TEX7) == D3DFVF_TEX7) { checkFloats(pBuffer, 2 * 7); }
+    else if ((pFVF & D3DFVF_TEX8) == D3DFVF_TEX8) { checkFloats(pBuffer, 2 * 8); }
+  }
 }
 
-
-void LowlevelRenderer::RenderTriangleListBuffer(DWORD pFVF, const void* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pVertexSize, const uint32_t pHash, const uint32_t pDebug)
+void LowlevelRenderer::Render(RenderObject* pRenderObject)
 {
-#if defined(EE_DEBUG)
-  ValidateFVF(pVertices, pFVF, pVertexCount);
-#endif
-  auto& ctx = *g_ContextManager.GetContext();
+  auto buffer = pRenderObject->GetBuffer();
+  if (!buffer->HasCommit())
+  {
+    RenderContext ctx{ this, nullptr };
+    buffer->Commit(ctx);
+  }
+  auto vertexCount = buffer->GetVertexCount();
+  RenderVertexBuffer(buffer, vertexCount / 3, vertexCount, 0, 0);
+}
 
+void LowlevelRenderer::RenderVertexBuffer(const VertexBufferI* pVertexBuffer, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
+{
+  auto& ctx = *g_ContextManager.GetContext();
   g_SceneManager.Validate();
   g_Stats.Writer().DrawCall();
-
-  IDirect3DVertexBuffer9* buffer = nullptr;
-  auto bufferedGeoIterator = (pHash != 0 ? m_bufferedGeo.find(pHash) : m_bufferedGeo.end());
-  if (bufferedGeoIterator != m_bufferedGeo.end())
-  {
-    buffer = (*bufferedGeoIterator).second.buffer;
-  }
-
-  static bool debug = false;
-  if (debug && buffer == nullptr)
-  {
-    return;
-  }
-
-  if (buffer == nullptr)
-  {
-    auto hr = m_Device->CreateVertexBuffer(
-      pVertexCount * pVertexSize,
-      0,
-      pFVF,
-      D3DPOOL_MANAGED,
-      &buffer,
-      nullptr
-    );
-    if (!SUCCEEDED(hr))
-    {
-      GWarn->Logf(L"[EchelonRenderer-WARN]\t D3D failed to create vertex buffer, error 0x%08x", hr);
-      return;
-    }
-    m_vtxBufferAllocations++;
-
-    if (pHash != 0)
-    {
-      m_bufferedGeo[pHash] = { buffer, m_FrameOldResources };
-    }
-    m_FrameOldResources->insert(std::make_pair(pHash, buffer));
-
-    void* recv = nullptr;
-    buffer->Lock(0, pVertexCount * pVertexSize, reinterpret_cast<void**>(&recv), 0);
-    {
-      memcpy(recv, pVertices, pVertexCount * pVertexSize);
-    }
-    buffer->Unlock();
-  }
-  else
-  {
-    auto& bufferedGeoValue = (*bufferedGeoIterator).second;
-    if (pHash != 0 && bufferedGeoValue.resourceAgeTracker != m_FrameOldResources)
-    {
-      m_FrameOldResources->insert(std::make_pair(pHash, buffer));
-      bufferedGeoValue.resourceAgeTracker->erase(pHash);
-      bufferedGeoValue.resourceAgeTracker = m_FrameOldResources;
-    }
-  }
-
   CheckDirtyMatrices();
-
-#if EE_DEBUG
-  if (pDebug != 0)
-  {
-    wchar_t b[256]{ 0 };
-    swprintf_s(b, L"Dbg: %08u", pDebug);
-    D3DPERF_SetMarker(0x00, &b[0]);
-  }
-#endif
-
   RenderStateDebugger::Process(this, pDebug);
   TextureStageStateDebugger::Process(this, pDebug);
   TextureSamplerDebugger::Process(this, pDebug);
-  
 
-  //Commit primitive
+  const auto fvf = pVertexBuffer->GetFVF();
+
+#if defined(EE_DEBUG)
+  ValidateFVF(pVertexBuffer->GetVertexData(), fvf, pVertexCount);
+#endif
+
   {
+    check(pVertexBuffer->HasCommit());
+    const IDirect3DVertexBuffer9* buffer = pVertexBuffer->GetBuffer();
+    const UINT stride = static_cast<UINT>(pVertexBuffer->GetVertexSize());
+
     HRESULT res = S_OK;
-    res = m_Device->SetStreamSource(0, buffer, 0, pVertexSize); check(SUCCEEDED(res));
+    res = m_Device->SetStreamSource(0, const_cast<IDirect3DVertexBuffer9*>(buffer), 0, stride); check(SUCCEEDED(res));
     res = m_Device->SetIndices(nullptr); check(SUCCEEDED(res));
     //m_Device->SetVertexShaderConstantI(pDebug, nullptr, 0);
-    res = m_Device->SetFVF(pFVF); check(SUCCEEDED(res));
+    res = m_Device->SetFVF(fvf); check(SUCCEEDED(res));
     res = m_Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, primitiveCount);
     check(SUCCEEDED(res));
   }
-}
-
-void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
-{
-  return RenderTriangleListBuffer(
-    D3DFVF_XYZ | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
-    pVertices,
-    primitiveCount,
-    pVertexCount,
-    sizeof(LowlevelRenderer::VertexPos3Tex0),
-    pHash,
-    pDebug
-  );
-}
-
-void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0Tex1* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
-{
-  return RenderTriangleListBuffer(
-    D3DFVF_XYZ | /*D3DFVF_DIFFUSE | D3DFVF_TEX1 | */ D3DFVF_TEX2 /*| D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5 */ | D3DFVF_TEXCOORDSIZE2(2) | D3DFVF_TEXCOORDSIZE2(1),
-    pVertices,
-    primitiveCount,
-    pVertexCount,
-    sizeof(LowlevelRenderer::VertexPos3Tex0Tex1),
-    pHash,
-    pDebug
-  );
-}
-
-
-void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Norm3Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
-{
-  return RenderTriangleListBuffer(
-    D3DFVF_XYZ | D3DFVF_NORMAL | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
-    pVertices,
-    primitiveCount,
-    pVertexCount,
-    sizeof(LowlevelRenderer::VertexPos3Norm3Tex0),
-    pHash,
-    pDebug
-  );
-}
-
-void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Tex0to4* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
-{
-  return RenderTriangleListBuffer(
-    D3DFVF_XYZ | /*D3DFVF_DIFFUSE |*/ D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
-    pVertices,
-    primitiveCount,
-    pVertexCount,
-    sizeof(LowlevelRenderer::VertexPos3Tex0to4),
-    pHash,
-    pDebug
-  );
-}
-
-void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::PreTransformedVertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
-{
-
-  return RenderTriangleListBuffer(
-    D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
-    pVertices,
-    primitiveCount,
-    pVertexCount,
-    sizeof(LowlevelRenderer::VertexPos4Color0Tex0),
-    pHash,
-    pDebug
-  );
-}
-
-
-void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos4Color0Tex0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
-{
-  return RenderTriangleListBuffer(
-    D3DFVF_XYZW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1),
-    pVertices,
-    primitiveCount,
-    pVertexCount,
-    sizeof(LowlevelRenderer::VertexPos4Color0Tex0),
-    pHash,
-    pDebug
-  );
-}
-
-void LowlevelRenderer::RenderTriangleList(const LowlevelRenderer::VertexPos3Color0* pVertices, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug)
-{
-  return RenderTriangleListBuffer(
-    D3DFVF_XYZ | D3DFVF_DIFFUSE /*| D3DFVF_TEX1 | D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/,
-    pVertices,
-    primitiveCount,
-    pVertexCount,
-    sizeof(LowlevelRenderer::VertexPos3Color0),
-    pHash,
-    pDebug
-  );
 }
 
 void LowlevelRenderer::DisableLight(int32_t index)
@@ -748,7 +608,7 @@ void LowlevelRenderer::EndFrame()
   //and shouldn't affect our renderer's performance too badly. Ideally, this bug is fixed.
   if (g_ConfigManager.GetHasRemixIssue745WorkaroundEnabled())
   {
-    ::Sleep(1);
+    //::Sleep(1);
   }
   auto res = m_Device->Present(NULL, NULL, NULL, NULL);
 #else
@@ -1087,6 +947,26 @@ void LowlevelRenderer::ClearDisplaySurface(const Vec4& clearColor)
   check(SUCCEEDED(hr));
 }
 
+IDirect3DVertexBuffer9* LowlevelRenderer::AllocateVertexBuffer(uint32_t pSize, uint32_t pFVF)
+{
+  IDirect3DVertexBuffer9* retPtr = nullptr;
+  const HRESULT hr = m_Device->CreateVertexBuffer(
+    pSize,
+    0,
+    pFVF,
+    D3DPOOL_MANAGED,
+    &retPtr,
+    nullptr
+  );
+  if (!SUCCEEDED(hr))
+  {
+    GWarn->Logf(L"[EchelonRenderer-WARN]\t D3D failed to create vertex buffer, error 0x%08x", hr);
+    return nullptr;
+  }
+  m_vtxBufferAllocations++;
+  return retPtr;
+}
+
 bool LowlevelRenderer::AllocateTexture(DeusExD3D9TextureHandle& pmTexture)
 {
   auto result = m_Device->CreateTexture(
@@ -1127,6 +1007,7 @@ bool LowlevelRenderer::SetTextureOnDevice(const uint32_t pSlot, const DeusExD3D9
     if (!m_CurrentState->m_TextureSlots[pSlot] || *m_CurrentState->m_TextureSlots[pSlot] != pTexture->textureD3D9)
     {
       auto hr = m_Device->SetTexture(pSlot, pTexture->textureD3D9);
+      check(SUCCEEDED(hr));
       if (SUCCEEDED(hr))
       {
         m_CurrentState->m_TextureSlots[pSlot] = pTexture->textureD3D9;
@@ -1466,8 +1347,7 @@ void LowlevelRenderer::ApplyDeviceState(LowlevelRenderer::State* pPendingState)
     auto& currentTexSlot = (m_CurrentState->m_TextureSlots[i]);
     if (pendingTexSlot != currentTexSlot)
     {
-      //TODO: when releasing a texture, crawl up through all states and remove it from any slots.
-      //m_Device->SetTexture(i, pendingTexSlot ? *pendingTexSlot : nullptr);
+      m_Device->SetTexture(i, pendingTexSlot ? *pendingTexSlot : nullptr);
     }
   }
 
@@ -1676,7 +1556,7 @@ std::optional<D3DDISPLAYMODE> LowlevelRenderer::FindClosestResolution(uint32_t p
   return {};
 }
 
-const RangeDefinition& RenderRanges::FromContext(FrameContextManager::Context* pCtx)
+const RangeDefinition& RenderRanges::FromContext(const FrameContextManager::Context* pCtx)
 {
   //We play with the ranges to help tweak RTX Remix, but when we're running fully
   //rasterized, we shouldn't care about that.

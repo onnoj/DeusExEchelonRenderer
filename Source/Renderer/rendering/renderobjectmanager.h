@@ -55,6 +55,7 @@ VertexBuffer<TFormat>* RenderObject::AcquireBuffer()
 
 enum class RenderObjectLifetime
 {
+  Instant,
   Frame,
   Level,
   Application,
@@ -66,6 +67,7 @@ class RenderObjectManager
 {
 private:
   std::unordered_map<RenderObjectKey, std::shared_ptr<RenderObject>> m_RenderObjectMap[RenderObjectLifetimeMax];
+  std::vector<std::shared_ptr<RenderObject>> m_InstantObjects;
 public:
   std::pair<std::shared_ptr<RenderObject>, bool/*isNew*/> AcquireRenderObject(RenderObjectKey pKey, RenderObjectLifetime pLifetime);
   void ResetRenderObjects(RenderObjectLifetime pLifetime);

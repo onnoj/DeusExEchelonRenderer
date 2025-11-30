@@ -13,14 +13,15 @@
 enum class RenderCommandQueue
 {
 	main,
-	staticGeo,
-	dynamicGeo,
+	mapGeometry,
+	mapGeometryTransparent,
 	dynamicMesh,
 	ui,
+	uiMesh,
 	pfx,
 	COUNT,
 };
-using RenderCall = std::function<void()>;
+using RenderCall = std::function<void(const FrameContextManager::Context* pContext)>;
 constexpr uint32_t RenderCommandQueueMax = static_cast<uint32_t>(RenderCommandQueue::COUNT);
 
 class HighlevelRenderer
@@ -69,8 +70,8 @@ public:
 	void PushUERenderObject(const void* pData, uint32_t pSize);
 	void PopUERenderObject(uint32_t pSize);
 
-	void AddRenderCommand(RenderCommandQueue pQueue, std::function<void()>&& pCB);
-	void ExecuteCommandQueue(RenderCommandQueue pQueue);
+	void AddRenderCommand(RenderCommandQueue pQueue, RenderCall&& pCB);
+	void ExecuteCommandQueue(const FrameContextManager::Context* pContext, RenderCommandQueue pQueue);
 	void ClearCommandQueue(RenderCommandQueue pQueue);
 
 	template <typename T>

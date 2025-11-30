@@ -11,6 +11,11 @@ uint32_t VertexBuffer<PreTransformedVertexPos4Color0Tex0>::GetFVF() const { retu
 uint32_t VertexBuffer<VertexPos4Color0Tex0>::GetFVF() const { return D3DFVF_XYZW | D3DFVF_DIFFUSE | D3DFVF_TEX1 /*| D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/ | D3DFVF_TEXCOORDSIZE2(1); }
 uint32_t VertexBuffer<VertexPos3Color0>::GetFVF() const { return D3DFVF_XYZ | D3DFVF_DIFFUSE /*| D3DFVF_TEX1 | D3DFVF_TEX2 | D3DFVF_TEX3 | D3DFVF_TEX4 | D3DFVF_TEX5*/; }
 
+VertexBufferI::~VertexBufferI()
+{
+  Release();
+}
+
 void VertexBufferI::Commit(RenderContext& ctx)
 {
   if (!m_Dirty)

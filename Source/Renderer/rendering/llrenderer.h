@@ -87,7 +87,8 @@ public:
 public:
 	enum class RenderStateSaveSlot {
 		Sky = 0,
-		COUNT = 1,
+		Default = 1,
+		COUNT = 2,
 	};
 public:
 	bool Initialize(HWND hWnd, uint32_t pWidth, uint32_t pHeight, uint32_t pColorBytes, bool pFullscreen);

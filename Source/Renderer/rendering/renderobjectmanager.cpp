@@ -5,10 +5,25 @@
 
 std::pair<std::shared_ptr<RenderObject>, bool/*isNew*/> RenderObjectManager::AcquireRenderObject(RenderObjectKey pKey, RenderObjectLifetime pLifetime)
 {
-  auto& map = m_RenderObjectMap[static_cast<uint32_t>(pLifetime)];
-
-  bool isNew = false;
   std::shared_ptr<RenderObject> ro;
+
+  if (pLifetime == RenderObjectLifetime::Instant)
+  {
+    for (auto& it : m_InstantObjects)
+    {
+      if (it->IsClean())
+      {
+        return {it, true};
+      }
+    }
+    ro = std::make_shared<RenderObject>();
+    m_InstantObjects.push_back(ro);
+    return {ro, true};
+  }
+
+  auto& map = m_RenderObjectMap[static_cast<uint32_t>(pLifetime)];
+  check(pKey != 0);
+  bool isNew = false;
   if (auto m = map.find(pKey); m == map.end())
   {
     ro = std::make_shared<RenderObject>();
@@ -25,6 +40,15 @@ std::pair<std::shared_ptr<RenderObject>, bool/*isNew*/> RenderObjectManager::Acq
 
 void RenderObjectManager::ResetRenderObjects(RenderObjectLifetime pLifetime)
 {
+  if (pLifetime == RenderObjectLifetime::Instant)
+  {
+    for (auto& it : m_InstantObjects)
+    {
+      it->Reset();
+    }
+    return;
+  }
+
   auto& map = m_RenderObjectMap[static_cast<uint32_t>(pLifetime)];
   for (auto& it : map)
   {

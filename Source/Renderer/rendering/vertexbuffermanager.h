@@ -13,7 +13,7 @@ public:
   VertexBufferI(VertexBufferI&&) = delete;
   VertexBufferI& operator=(const VertexBufferI&) = delete;
   VertexBufferI& operator=(VertexBufferI&&) = delete;
-  virtual ~VertexBufferI() = default;
+  virtual ~VertexBufferI();
 
   IDirect3DVertexBuffer9* GetBuffer() { return m_HWVertexBuffer; }
   const IDirect3DVertexBuffer9* GetBuffer() const { return m_HWVertexBuffer; }

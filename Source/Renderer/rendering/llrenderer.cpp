@@ -581,6 +581,8 @@ void LowlevelRenderer::BeginFrame()
   //Start rendering
   //auto res = m_Device->BeginScene();	check(SUCCEEDED(res));
   ClearDisplaySurface(Vec4{ 0.0f, 0.0f, 0.0f, 0.0f });
+
+  SaveDeviceState(RenderStateSaveSlot::Default);
 }
 
 void LowlevelRenderer::EndFrame()

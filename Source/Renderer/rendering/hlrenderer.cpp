@@ -172,6 +172,23 @@ void HighlevelRenderer::OnRenderingEnd(const FSceneNode* Frame)
   };
 
   m_LLRenderer->BeginScene();
+    m_LLRenderer->PushDeviceState();
+    {
+      //Override viewport depth to signal rtxremix that we're rendering a viewmodel (weapon).
+      //Otherwise, it will show up in reflections and shadow.
+      m_LLRenderer->EmitDebugText(L"[EchelonRenderer] Begin 3D UI");
+      m_LLRenderer->SetViewportDepth(RenderRanges::UI /*viewmodel?*/);
+      m_LLRenderer->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+      m_LLRenderer->SetRenderState(D3DRS_LIGHTING, false);
+      m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+      m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+      m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
+      m_LLRenderer->ClearDepth();
+      SetViewState(Frame, ViewType::game);
+      SetProjectionState(Frame, ProjectionType::perspective);
+      ExecuteCommandQueue(&ctx, RenderCommandQueue::uiMesh);
+    }
+    m_LLRenderer->PopDeviceState();
   m_LLRenderer->PushDeviceState();
   {
     m_LLRenderer->EmitDebugText(L"[EchelonRenderer] Begin 2D UI");
@@ -180,19 +197,26 @@ void HighlevelRenderer::OnRenderingEnd(const FSceneNode* Frame)
     m_LLRenderer->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
     m_LLRenderer->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
     m_LLRenderer->SetRenderState(D3DRS_DITHERENABLE, TRUE);
+    m_LLRenderer->ClearDepth();
     SetViewState(Frame, ViewType::identity);
     SetProjectionState(Frame, ProjectionType::uiorthogonal);
-    ExecuteCommandQueue(RenderCommandQueue::ui);
+
+
+    ExecuteCommandQueue(&ctx, RenderCommandQueue::ui);
+
   }
+  m_LLRenderer->PopDeviceState();
+
   ClearCommandQueue(RenderCommandQueue::ui);
-  ClearCommandQueue(RenderCommandQueue::staticGeo);
-  ClearCommandQueue(RenderCommandQueue::dynamicGeo);
+  ClearCommandQueue(RenderCommandQueue::uiMesh);
+  ClearCommandQueue(RenderCommandQueue::mapGeometry);
   ClearCommandQueue(RenderCommandQueue::dynamicMesh);
   ClearCommandQueue(RenderCommandQueue::pfx);
+  ClearCommandQueue(RenderCommandQueue::mapGeometryTransparent);
 
+  m_RenderObjectManager.ResetRenderObjects(RenderObjectLifetime::Instant);
   m_RenderObjectManager.ResetRenderObjects(RenderObjectLifetime::Frame);
 
-  m_LLRenderer->PopDeviceState();
   m_LLRenderer->EndScene();
 
   //Render Remix warning screen
@@ -293,8 +317,6 @@ void HighlevelRenderer::OnSceneBegin(const FSceneNode* Frame)
   //  
   m_LLRenderer->PushDeviceState();
   m_LLRenderer->BeginScene();
-  SetViewState(Frame, ViewType::game);
-  SetProjectionState(Frame, ProjectionType::perspective);
 
   if (ctx.frameIsSkybox)
   {
@@ -333,15 +355,21 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
   if (renderMainPass)
   {
     m_LLRenderer->PushDeviceState();
-    ExecuteCommandQueue(RenderCommandQueue::staticGeo);
+    SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
+    SetViewState(Frame, ViewType::game);
+    ExecuteCommandQueue(&ctx, RenderCommandQueue::mapGeometry);
     m_LLRenderer->PopDeviceState();
 
     m_LLRenderer->PushDeviceState();
-    ExecuteCommandQueue(RenderCommandQueue::dynamicGeo);
+    SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
+    SetViewState(Frame, ViewType::game);
+    ExecuteCommandQueue(&ctx, RenderCommandQueue::mapGeometryTransparent);
     m_LLRenderer->PopDeviceState();
 
     m_LLRenderer->PushDeviceState();
-    ExecuteCommandQueue(RenderCommandQueue::dynamicMesh);
+    SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
+    SetViewState(Frame, ViewType::game);
+    ExecuteCommandQueue(&ctx,RenderCommandQueue::dynamicMesh);
     m_LLRenderer->PopDeviceState();
   }
   //
@@ -350,9 +378,7 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
     m_LLRenderer->PushDeviceState();
     SetViewState(Frame, ViewType::game);
     SetProjectionState(Frame, ProjectionType::perspective);
-
-    ExecuteCommandQueue(RenderCommandQueue::pfx);
-
+    ExecuteCommandQueue(&ctx,RenderCommandQueue::pfx);
     m_LLRenderer->PopDeviceState();
   }
 }
@@ -381,7 +407,7 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
     auto& GVertPoints = Model->Points;
 
     ExecuteCommandQueue(RenderCommandQueue::staticGeo);
-    ExecuteCommandQueue(RenderCommandQueue::dynamicGeo);
+    ExecuteCommandQueue(RenderCommandQueue::mapGeometry);
 
     {  //Render all static geometry
       enum class pass { solid, translucent };
@@ -470,7 +496,7 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
 
 void HighlevelRenderer::Draw2DScreenQuad(const FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB/* = 0xFF000000ul*/)
 {
-  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Frame);
+  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Instant);
   auto quad = ro->AcquireBuffer<VertexPos3Color0>();
 
   quad->Assign({
@@ -482,7 +508,7 @@ void HighlevelRenderer::Draw2DScreenQuad(const FSceneNode* Frame, float pX, floa
     { { pX+pWidth,	pY+pHeight, 1.0f }, {pARGB} }
   });
 
-  AddRenderCommand(RenderCommandQueue::ui, [this, ro]() {
+  AddRenderCommand(RenderCommandQueue::ui, [this, ro](const FrameContextManager::Context* pContext) {
     SetWorldTransformStateToIdentity();
     m_LLRenderer->ConfigureBlendState(0);
     m_LLRenderer->SetTextureStageState(0, D3DTSS_COLORARG0, D3DTA_DIFFUSE);
@@ -545,7 +571,7 @@ void HighlevelRenderer::Draw3DCube(const FSceneNode* Frame, const FVector& Posit
   ));
   SetWorldTransformState(wm);
 
-  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Frame);
+  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Instant);
   auto buffer = ro->AcquireBuffer<VertexPos3Tex0>();
 
   const auto faces = std::size(indices) / 3;
@@ -606,7 +632,7 @@ void HighlevelRenderer::DrawFullscreenQuad(const FSceneNode* Frame, const DeusEx
 
     D3DXMatrixTranslation(&wm, newOrigin.X, newOrigin.Y, newOrigin.Z);
 
-    auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Frame);
+    auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Instant);
     auto buffer = ro->AcquireBuffer<VertexPos3Tex0>();
 
     buffer->PushFace({
@@ -640,6 +666,8 @@ void HighlevelRenderer::OnLevelChange()
 {
   m_staticGeometryMeshes.clear();
   m_dynamicGeometryMeshes.clear();
+  m_RenderObjectManager.ResetRenderObjects(RenderObjectLifetime::Frame);
+  m_RenderObjectManager.ResetRenderObjects(RenderObjectLifetime::Level);
   for(auto& n : m_DrawnNodes) n.clear();
   m_LightManager.OnLevelChange();
 }
@@ -840,7 +868,7 @@ void HighlevelRenderer::OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Su
   }
   m_TextureManager.BindTexture(Surface.PolyFlags, albedoTextureHandle, lightmapTextureHandle);
 
-  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject(iNode, surfaceIsDynamic ? RenderObjectLifetime::Frame : RenderObjectLifetime::Level);
+  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject(Utils::CalculateKey(iNode), surfaceIsDynamic ? RenderObjectLifetime::Frame : RenderObjectLifetime::Level);
 
   if (roCreated)
   {
@@ -910,228 +938,53 @@ void HighlevelRenderer::OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Su
   {
     auto flags = Surface.PolyFlags; //??? check original
     auto debugId = iNode;
-    AddRenderCommand(surfaceIsDynamic ? RenderCommandQueue::dynamicGeo : RenderCommandQueue::staticGeo, [=]() {
-      SetWorldTransformState(worldMatrix);
-      if (m_TextureManager.BindTexture(flags, albedoTextureHandle, lightmapTextureHandle))
-      {
-        m_LLRenderer->EmitDebugTextF(L"Render surface 0x%X with texture 0x%X (0x%X)", debugId, albedoTextureHandle.get(), albedoTextureHandle->textureD3D9);
-        m_LLRenderer->Render(ro.get());
-      }
-    });
+    const bool isTranslucent = (flags & PF_Translucent) != 0;
+    const bool isUnlitEmissive = ((flags & PF_Unlit) != 0);
 
-  }
-}
-
-void HighlevelRenderer::OnDrawGeometryOld(const FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet)
-{
-  auto& ctx = *g_ContextManager.GetContext();
-
-  if (Facet.Polys == nullptr)
-  {
-    return;
-  }
-  if ((Surface.PolyFlags & PF_Mirrored) != 0)
-  {
-    Surface.PolyFlags &= ~PF_Invisible;
-  }
-
-  if ((Surface.PolyFlags & PF_Invisible) != 0)
-  {
-    return;
-  }
-  UModel* Model = Frame->Level->Model;
-  auto& GSurfs = Model->Surfs;
-  auto& GNodes = Model->Nodes;
-  auto& GVerts = Model->Verts;
-  auto& GVertPoints = Model->Points;
-  const INT	iNode = Facet.Polys[0].iNode;
-  const auto& Node = GNodes(iNode);
-  static INT highestINode = INT32_MIN;
-  highestINode = max(highestINode, iNode);
-
-  bool surfaceIsDynamic = false;
-
-  if (ctx.frameIsSkybox)
-  {
-    //Consider the skybox dynamic; depth buffering is
-    //turned off, so we can't cache the render calls.
-    surfaceIsDynamic = true;
-  }
-
-  if (Frame->Level->BrushTracker != nullptr)
-  {
-    if (Frame->Level->BrushTracker->SurfIsDynamic(Node.iSurf))
+    if (!isTranslucent)
     {
-      surfaceIsDynamic = true;
-    }
-  }
-
-  if (Surface.Texture->bRealtimeChanged || Surface.Texture->bRealtime)
-  {
-    surfaceIsDynamic = true;
-  }
-
-  if ((Surface.PolyFlags & (PF_AutoUPan | PF_AutoVPan)) != 0)
-  {
-    surfaceIsDynamic = true;
-  }
-
-  //1. Check if node is in the cached node bin, if it is, skip.
-  if (!surfaceIsDynamic)
-  {
-    auto& drawnNodes = m_DrawnNodes[Frame->ZoneNumber];
-    if (drawnNodes.find(iNode) != drawnNodes.end())
-    {
-      return;
-    }
-    drawnNodes.insert(iNode);
-  }
-
-  //2. Build a key that is (textureSetHash + PolyFlags + NodeFlags)
-  DeusExD3D9TextureHandle albedoTextureHandle;
-  DeusExD3D9TextureHandle lightmapTextureHandle;
-
-  albedoTextureHandle = m_TextureManager.ProcessTexture(Surface.PolyFlags, Surface.Texture);
-  if (Surface.LightMap && ctx.frameIsRasterized)
-  {
-    lightmapTextureHandle = m_TextureManager.ProcessTexture(Surface.PolyFlags, Surface.LightMap);
-  }
-  m_TextureManager.BindTexture(Surface.PolyFlags, albedoTextureHandle, lightmapTextureHandle);
-
-  uint32_t key = 0;
-  auto nodeFlags = Node.NodeFlags & ~NF_BoxOccluded & ~NF_PolyOccluded;
-  MurmurHash3_x86_32(&albedoTextureHandle->md.cacheID, sizeof(albedoTextureHandle->md.cacheID), key, &key);
-  if (lightmapTextureHandle)
-  {
-    MurmurHash3_x86_32(&lightmapTextureHandle->md.cacheID, sizeof(lightmapTextureHandle->md.cacheID), key, &key);
-  }
-  MurmurHash3_x86_32(&Surface.PolyFlags, sizeof(Surface.PolyFlags), key, &key);
-  MurmurHash3_x86_32(&nodeFlags, sizeof(nodeFlags), key, &key);
-
-  //Make each node unique:
-  if (g_options.clusterNodes)
-  {
-    if (g_options.clusterNodesWithSameParent)
-    {
-      for (int i = 0; i < 3; i++)
-      {
-        for (FBspDrawList* list = &Frame->Draw[i][0]; list != nullptr; list = list->Next)
+      AddRenderCommand(RenderCommandQueue::mapGeometry, [=](const FrameContextManager::Context* pContext) {
+        auto renderFlags = flags;
+        renderFlags &= ~PF_Unlit;
+        SetWorldTransformState(worldMatrix);
+        if (m_TextureManager.BindTexture(renderFlags, albedoTextureHandle, lightmapTextureHandle))
         {
-          if (iNode == list->iNode)
+          m_LLRenderer->EmitDebugTextF(L"Render surface 0x%X with texture 0x%X (0x%X)", debugId, albedoTextureHandle.get(), albedoTextureHandle->textureD3D9);
+          m_LLRenderer->Render(ro.get());
+        }
+      });
+    }
+
+    if (isTranslucent || isUnlitEmissive)
+    {
+      AddRenderCommand(RenderCommandQueue::mapGeometryTransparent, [=](const FrameContextManager::Context* pContext) {
+        auto renderFlags = flags;
+        D3DXMATRIX wm = worldMatrix;
+        if (!pContext->frameIsSkybox)
+        {
+          D3DXMATRIX s;
+          D3DXMatrixScaling(&s, 1.0001f, 1.0001f, 1.0001f);
+          D3DXMatrixMultiply(&wm, &worldMatrix, &s);
+          SetWorldTransformState(wm);
+          if (m_TextureManager.BindTexture(renderFlags, albedoTextureHandle, lightmapTextureHandle))
           {
-            MurmurHash3_x86_32(&list->Key, sizeof(list->Key), key, &key);
+            m_LLRenderer->EmitDebugTextF(L"Render surface 0x%X with texture 0x%X (0x%X)", debugId, albedoTextureHandle.get(), albedoTextureHandle->textureD3D9);
+            m_LLRenderer->Render(ro.get());
+          }
+
+          D3DXMatrixScaling(&s, 0.9999f, 0.9999f, 0.9999f);
+          D3DXMatrixMultiply(&wm, &worldMatrix, &s);
+          SetWorldTransformState(wm);
+          if (m_TextureManager.BindTexture(renderFlags, albedoTextureHandle, lightmapTextureHandle))
+          {
+            m_LLRenderer->EmitDebugTextF(L"Render surface 0x%X with texture 0x%X (0x%X)", debugId, albedoTextureHandle.get(), albedoTextureHandle->textureD3D9);
+            m_LLRenderer->Render(ro.get());
           }
         }
-      }
-    }
-  }
-  else
-  {
-    MurmurHash3_x86_32(&iNode, sizeof(iNode), key, &key);
-  }
-
-  //3. Find static mesh for key. If it does not exist, create one. 
-  GeometryMeshesValue* sharedMesh = nullptr;
-  auto& meshBucket = (surfaceIsDynamic ? m_dynamicGeometryMeshes : m_staticGeometryMeshes);
-  if (auto it = meshBucket.find(key); it != meshBucket.end())
-  {
-    sharedMesh = &it->second;
-    if (sharedMesh->primitiveCount == 0)
-    {
-      sharedMesh->hash = 0;
-      sharedMesh->buffer->clear();
-    }
-  }
-  else
-  {
-    GeometryMeshesValue mesh;
-    mesh.buffer = std::make_unique<GeometryMeshesVertexBuffer>();
-    mesh.flags = Surface.PolyFlags;
-    mesh.primitiveCount = 0;
-    mesh.albedoTextureHandle = albedoTextureHandle;
-    mesh.lightmapTextureHandle = lightmapTextureHandle;
-    FVector localOrigin = GVertPoints(GVerts(Node.iVertPool + 0).pVertex);
-    D3DXMatrixTranslation(&mesh.worldMatrix, localOrigin.X, localOrigin.Y, localOrigin.Z);
-    D3DXMatrixInverse(&mesh.worldMatrixInverse, nullptr, &mesh.worldMatrix);
-    it = meshBucket.insert(std::make_pair(key, std::move(mesh)));
-    sharedMesh = &it->second;
-  }
-  
-
-  //4. Append to mesh vertex buffer.
-  // for (auto Poly = Facet.Polys; Poly; Poly = Poly->Next)
-  INT iSurf = -1;
-  uint32_t hash = 0;
-  sharedMesh->debug = max(sharedMesh->debug, iNode);
-  sharedMesh->zoneIndices.set(Frame->ZoneNumber);
-
-  for (auto Poly = Facet.Polys; Poly; Poly = Poly->Next)
-  {
-    INT	  		polyINode = Poly->iNode;
-    FBspNode* Node = &GNodes(iNode);
-    INT       numPts = Node->NumVertices;
-    FBspSurf* Surf = &GSurfs(Node->iSurf);
-    FCoords   FrameCoords = Frame->Coords;
-    assert(polyINode == iNode);
-    if (numPts < 3)
-    {
-      continue;
+      });
     }
 
-    FLOAT UDot = Facet.MapCoords.XAxis | Facet.MapCoords.Origin;
-    FLOAT VDot = Facet.MapCoords.YAxis | Facet.MapCoords.Origin;
-
-    //TODO: can this be cached? Or delayed until we actually need to calculate it?
-    auto calculateUV = [&Facet, UDot, VDot, iNode](const FVector& pts, const FTextureInfo* pTextureInfo, const DeusExD3D9TextureHandle& pTextureHandle) -> FVector {
-      if (pTextureInfo != nullptr && pTextureHandle != nullptr)
-      {
-        FLOAT U = Facet.MapCoords.XAxis | pts;
-        FLOAT V = Facet.MapCoords.YAxis | pts;
-        FLOAT ucoord = ((U - UDot) - pTextureInfo->Pan.X) * pTextureHandle->md.multU;
-        FLOAT vcoord = ((V - VDot) - pTextureInfo->Pan.Y) * pTextureHandle->md.multV;
-        return FVector(ucoord, vcoord, 0);
-      }
-      return FVector(0, 0, 0);
-    };
-
-    D3DXVECTOR4 point1;
-    D3DXVECTOR4 point2;
-    D3DXVECTOR4 point3;
-
-    FVector localPts[3] = {};
-    FVector projPts[3] = {};
-    localPts[0] = GVertPoints(GVerts(Node->iVertPool + 0).pVertex);
-    projPts[0] = localPts[0].TransformPointBy(FrameCoords);
-    for (INT i = 2; i < numPts; i++)
-    {
-      localPts[1] = GVertPoints(GVerts(Node->iVertPool + i - 1).pVertex);
-      projPts[1] = localPts[1].TransformPointBy(FrameCoords);
-      localPts[2] = GVertPoints(GVerts(Node->iVertPool + i).pVertex);
-      projPts[2] = localPts[2].TransformPointBy(FrameCoords);
-
-      for (int i = 0; i < 3; i++)
-      {
-        const auto uvDiffuse = calculateUV(projPts[i], Surface.Texture, albedoTextureHandle);
-        const auto uvLightmap = calculateUV(projPts[i], Surface.LightMap, lightmapTextureHandle);
-
-#if defined(CONVERT_TO_LEFTHANDED_COORDINATES) && CONVERT_TO_LEFTHANDED_COORDINATES==1
-        VertexPos3Tex0Tex1 vtx = { { -localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
-#else
-        VertexPos3Tex0Tex1 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
-#endif
-
-        D3DXVec3TransformCoord(&vtx.Pos, &vtx.Pos, &sharedMesh->worldMatrixInverse);
-
-        //note: mesh hashes in Deus Ex are not stable between frames
-        MurmurHash3_x86_32(&vtx.Pos, sizeof(vtx.Pos), hash, &hash);
-        MurmurHash3_x86_32(&vtx.Tex0, sizeof(vtx.Tex0), hash, &hash);
-        MurmurHash3_x86_32(&vtx.Tex1, sizeof(vtx.Tex1), hash, &hash);
-        sharedMesh->buffer->push_back(std::move(vtx));
-      }
-      sharedMesh->primitiveCount++;
-    }
   }
-  sharedMesh->hash ^= hash;
 }
 
 void HighlevelRenderer::OnDrawGeometryEnd(const FSceneNode* Frame)
@@ -1261,7 +1114,7 @@ void HighlevelRenderer::OnDrawMeshEnd(const FSceneNode* Frame, AActor* Actor)
 
   auto wmCoords = GMath.UnitCoords;
   wmCoords = wmCoords * actor->Location * actor->Rotation;
-
+  
   if (renderContext->drawcallInfo->SpecialCoords && isWeapon)
   {
     if (parent != nullptr && !isPlayerWeapon)
@@ -1296,20 +1149,7 @@ void HighlevelRenderer::OnDrawMeshEnd(const FSceneNode* Frame, AActor* Actor)
       const bool isFirstPerson = (parent == Frame->Viewport->Actor);
       const FrameContextManager::Context& capturedRenderContext = *renderContext;
       const auto& capturedFrame = *Frame;
-      AddRenderCommand(isFirstPerson ? RenderCommandQueue::ui: RenderCommandQueue::dynamicGeo, [this, ro, i, wm, dynamicMeshInfo, isFirstPerson, capturedRenderContext, capturedFrame, callInfo]() {
-        SetProjectionState(&capturedFrame, HighlevelRenderer::ProjectionType::perspective);
-        SetViewState(&capturedFrame, ViewType::game);
-
-        //Override viewport depth to signal rtxremix that we're rendering a viewmodel (weapon).
-        //Otherwise, it will show up in reflections and shadow.
-        Utils::ScopedCall scopedViewmodelDepth {
-          [&]() { if (isFirstPerson) { m_LLRenderer->SetViewportDepth(RenderRanges::UI /*viewmodel?*/); } },
-          [&]() { if (isFirstPerson) { m_LLRenderer->SetViewportDepth(RenderRanges::FromContext(&capturedRenderContext)); } }
-        };
-        if (isFirstPerson)
-        {
-          m_LLRenderer->EmitDebugText(L"Rendering 1st person object");
-        }
+      AddRenderCommand(isFirstPerson ? RenderCommandQueue::uiMesh: RenderCommandQueue::dynamicMesh, [=](const FrameContextManager::Context* pContext) {
         if (i >= 1)
         {
           D3DXMATRIX scaledWorldMatrix;
@@ -1350,17 +1190,17 @@ void HighlevelRenderer::PopUERenderObject(uint32_t pSize)
   }
 }
 
-void HighlevelRenderer::AddRenderCommand(RenderCommandQueue pQueue, std::function<void()>&& pCB)
+void HighlevelRenderer::AddRenderCommand(RenderCommandQueue pQueue, RenderCall&& pCB)
 {
   m_CommandQueues[static_cast<uint32_t>(pQueue)].emplace_back(std::move(pCB));
 }
 
-void HighlevelRenderer::ExecuteCommandQueue(RenderCommandQueue pQueue)
+void HighlevelRenderer::ExecuteCommandQueue(const FrameContextManager::Context* pContext, RenderCommandQueue pQueue)
 {
   auto& queue = m_CommandQueues[static_cast<uint32_t>(pQueue)];
   for (auto& cmd : queue)
   {
-    cmd();
+    cmd(pContext);
   }
 }
 
@@ -1374,7 +1214,6 @@ void HighlevelRenderer::ClearCommandQueue(RenderCommandQueue pQueue)
 
 void HighlevelRenderer::OnDrawUIBegin(const FSceneNode* Frame)
 {
-  m_LLRenderer->ClearDepth();
   g_ContextManager.PushFrameContext();
   auto ctx = g_ContextManager.GetContext();
   ctx->renderingUI = true;
@@ -1386,6 +1225,8 @@ void HighlevelRenderer::OnDrawUIBegin(const FSceneNode* Frame)
     //Render any frame clipping (since it seems rtxremix doesn't do that for us).
     if (true)
     {
+      m_LLRenderer->ClearDepth();
+
       UIntRect clipLeft, clipTop, clipRight, clipBottom;
       m_LLRenderer->GetClipRects(clipLeft, clipTop, clipRight, clipBottom);
 
@@ -1393,10 +1234,10 @@ void HighlevelRenderer::OnDrawUIBegin(const FSceneNode* Frame)
       Draw2DScreenQuad(Frame, clipTop.Left, clipTop.Top, clipTop.Width, clipTop.Height, 0xFF000000ul);
       Draw2DScreenQuad(Frame, clipRight.Left, clipRight.Top, clipRight.Width, clipRight.Height, 0xFF000000ul);
       Draw2DScreenQuad(Frame, clipBottom.Left, clipBottom.Top, clipBottom.Width, clipBottom.Height, 0xFF000000ul);
+      m_LLRenderer->ClearDepth();
     }
   }
 #endif
-  m_LLRenderer->ClearDepth();
 }
 
 void HighlevelRenderer::OnDrawUIEnd(const FSceneNode* Frame)
@@ -1495,7 +1336,7 @@ void HighlevelRenderer::OnDrawSprite(const FSceneNode* Frame, FTextureInfo& Text
     ro->SetFlags(flags);
     ro->SetSceneNode(std::make_unique<FSceneNode>(*Frame));
 
-    AddRenderCommand(RenderCommandQueue::pfx, [this,ro,wm](){
+    AddRenderCommand(RenderCommandQueue::pfx, [=](const FrameContextManager::Context* pContext){
       const auto flags = ro->GetFlags();
       auto textureHandle = m_TextureManager.ProcessTexture(flags, &ro->GetTextureInfo(RenderObjectTextureType::Albedo));
       m_TextureManager.BindTexture(flags, textureHandle);
@@ -1525,7 +1366,7 @@ void HighlevelRenderer::OnDrawUI(const FSceneNode* Frame, FTextureInfo& TextureI
     flags |= PF_Highlighted;
   }
 
-  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(RenderObjectKey(TextureInfo.CacheID), RenderObjectLifetime::Frame);
+  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Instant);
   auto vtex = ro->AcquireBuffer<PreTransformedVertexPos4Color0Tex0>();
 
   const float RZ = 1.0f / pZ;
@@ -1564,8 +1405,7 @@ void HighlevelRenderer::OnDrawUI(const FSceneNode* Frame, FTextureInfo& TextureI
       { {X1, Y1, pZ, 1.0f}, Clr, {U1, V1} },
       { {X2, Y1, pZ, 1.0f}, Clr, {U2, V1} },
       { {X2, Y2, pZ, 1.0f}, Clr, {U2, V2} },
-    });
-  vtex->PushFace({
+    
       { {X1, Y1, pZ, 1.0f}, Clr, {U1, V1} },
       { {X2, Y2, pZ, 1.0f}, Clr, {U2, V2} },
       { {X1, Y2, pZ, 1.0f}, Clr, {U1, V2	} },
@@ -1577,7 +1417,7 @@ void HighlevelRenderer::OnDrawUI(const FSceneNode* Frame, FTextureInfo& TextureI
     ro->SetTexture(RenderObjectTextureType::Albedo, TextureInfo);
     ro->SetSceneNode(std::make_unique<FSceneNode>(*Frame));
 
-    AddRenderCommand(RenderCommandQueue::ui, [this,ro](){
+    AddRenderCommand(RenderCommandQueue::ui, [=](const FrameContextManager::Context* pContext){
       const auto flags = ro->GetFlags();
       auto textureHandle = m_TextureManager.ProcessTexture(flags, &ro->GetTextureInfo(RenderObjectTextureType::Albedo));
       m_TextureManager.BindTexture(flags, textureHandle);

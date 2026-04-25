@@ -16,6 +16,7 @@ namespace Hacks
 {
   bool URenderHacksInstalled = false;
   std::vector<std::shared_ptr<PLH::IHook>> URenderDetours;
+  std::vector<std::tuple<FVector, FVector, FColor>> g_lines; //debug lines, kept globally.
   namespace URenderFuncs
   {
     HookableFunction OccludeBsp = &URender::OccludeBsp;
@@ -213,12 +214,11 @@ namespace Hacks
       auto originalSpan = Frame->Span;
       auto originalBrushTracker = Frame->Level->BrushTracker;
       //Frame->Level->BrushTracker = nullptr;
-      static std::vector<std::tuple<FVector, FVector, FColor>> lines;
       bool drawLines = true;
       g_DebugMenu.DebugVar("Debug", "Update culling frustrum lines", DebugMenuUniqueID(), drawLines);
       if (drawLines)
       {
-        lines.clear();
+        g_lines.clear();
       }
 
       for (int i = 0; i < std::size(angles); i++)
@@ -284,11 +284,11 @@ namespace Hacks
 #endif
           if (drawLines)
           {
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + newRotation.Vector() * 100.0f, angleColors[i] });
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[0] * 1000.0f), angleColors[i] });
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[1] * 1000.0f), angleColors[i] });
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[2] * 1000.0f), angleColors[i] });
-            lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[3] * 1000.0f), angleColors[i] });
+            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + newRotation.Vector() * 100.0f, angleColors[i] });
+            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[0] * 1000.0f), angleColors[i] });
+            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[1] * 1000.0f), angleColors[i] });
+            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[2] * 1000.0f), angleColors[i] });
+            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[3] * 1000.0f), angleColors[i] });
           }
           (GRender->*URenderFuncs::OccludeFrame)(Frame);
         }

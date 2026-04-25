@@ -39,6 +39,12 @@ class VertexBuffer : public VertexBufferI
 private:
   std::vector<TVertexFormat> m_Data;
 public:
+  VertexBuffer() = default;
+  VertexBuffer(const VertexBuffer&) = delete;
+  VertexBuffer(VertexBuffer&&) = delete;
+  VertexBuffer& operator=(const VertexBuffer&) = delete;
+  VertexBuffer& operator=(VertexBuffer&&) = delete;
+
   template <size_t TSize>
   void Assign(const TVertexFormat (&&pArgs)[TSize])
   {
@@ -70,7 +76,7 @@ public:
     return hash;
   }
 
-  virtual void Reset()
+  virtual void Reset() override
   {
     m_Data.clear();
   }
@@ -79,7 +85,10 @@ public:
   virtual std::size_t GetVertexSize() const { return sizeof(TVertexFormat); }
   virtual std::size_t GetVertexCount() const { return m_Data.size(); }
 
-  virtual uint32_t GetFVF() const;
+  virtual uint32_t GetFVF() const
+  {
+    return TVertexFormat::GetFVF();
+  }
 };
 
 class VertexBufferManager
@@ -96,3 +105,5 @@ public:
     m_Storage.insert({key, std::move(ptr)});
   }
 };
+
+

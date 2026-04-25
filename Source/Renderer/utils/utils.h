@@ -7,6 +7,7 @@ public:
   {
     const FSceneNode* frameSceneNode = nullptr;
 
+    std::vector<std::shared_ptr<class RenderObject>> renderObjects;
     std::shared_ptr<FSceneNode> skyframeSceneNode;
     bool frameIsRasterized = false;
     bool frameIsSkybox = false;

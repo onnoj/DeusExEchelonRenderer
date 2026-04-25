@@ -47,12 +47,17 @@ namespace Utils
   }
 
   template<typename... TArgs>
-  uint32_t CalculateKey(const TArgs&... args)
+  uint64_t CalculateKey(const TArgs&... args)
   {
-    uint32_t seed = 0;
+    union
+    {
+      uint64_t u64[2];
+      uint32_t u32[4];
+    } seed{ 0 };
+
     (void)std::initializer_list<int>{
-      ([&](){ ::MurmurHash3_x86_32(&args, sizeof(args), seed, &seed); }(), 0)...
+      ([&](){ ::MurmurHash3_x86_128(&args, sizeof(args), seed.u32[0], (void*)&seed.u32[0]); }(), 0)...
     };
-    return seed;
+    return seed.u64[0]^seed.u64[1];
   }
 }

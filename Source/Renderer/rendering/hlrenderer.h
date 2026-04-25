@@ -158,7 +158,6 @@ private:
 	DebugMeshValue m_DebugMesh;
 	GeometryMeshesMap m_staticGeometryMeshes;
 	GeometryMeshesMap m_dynamicGeometryMeshes;
-	std::unordered_multimap<DynamicMeshesKey, DynamicMeshesValue> m_dynamicMeshes;
 	std::unordered_set<uint32_t> m_DrawnNodes[FBspNode::MAX_ZONES];
 	std::unique_ptr<FrameContextManager::ScopedContext> m_renderingScope;
 	std::deque<std::pair<uint32_t, const void*>> m_RenderObjectStack;

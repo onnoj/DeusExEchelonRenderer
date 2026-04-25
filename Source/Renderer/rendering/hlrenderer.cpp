@@ -1,6 +1,8 @@
 #include "DeusExEchelonRenderer_PCH.h"
 #pragma hdrstop
+
 #include "hlrenderer.h"
+#include "renderobjectmanager.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -37,7 +39,6 @@ void HighlevelRenderer::Shutdown()
   for(auto& n : m_DrawnNodes) n.clear();
   m_staticGeometryMeshes.clear();
   m_dynamicGeometryMeshes.clear();
-  m_dynamicMeshes.clear();
   m_DebugMesh = {};
   m_LightManager.Shutdown();
   m_TextureManager.Shutdown();
@@ -125,8 +126,6 @@ void HighlevelRenderer::OnRenderingEnd(const FSceneNode* Frame)
     for(auto& n : m_DrawnNodes) n.clear();
   }
   m_dynamicGeometryMeshes.clear();
-
-  m_dynamicMeshes.clear();
 
 #if 0
   //axis widget
@@ -496,7 +495,7 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
 
 void HighlevelRenderer::Draw2DScreenQuad(const FSceneNode* Frame, float pX, float pY, float pWidth, float pHeight, uint32_t pARGB/* = 0xFF000000ul*/)
 {
-  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Instant);
+  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject<VertexPos3Color0>(0, RenderObjectLifetime::Instant);
   auto quad = ro->AcquireBuffer<VertexPos3Color0>();
 
   quad->Assign({
@@ -571,7 +570,7 @@ void HighlevelRenderer::Draw3DCube(const FSceneNode* Frame, const FVector& Posit
   ));
   SetWorldTransformState(wm);
 
-  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Instant);
+  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject<VertexPos3Tex0>(0, RenderObjectLifetime::Instant);
   auto buffer = ro->AcquireBuffer<VertexPos3Tex0>();
 
   const auto faces = std::size(indices) / 3;
@@ -632,7 +631,7 @@ void HighlevelRenderer::DrawFullscreenQuad(const FSceneNode* Frame, const DeusEx
 
     D3DXMatrixTranslation(&wm, newOrigin.X, newOrigin.Y, newOrigin.Z);
 
-    auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Instant);
+    auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject<VertexPos3Tex0>(0, RenderObjectLifetime::Instant);
     auto buffer = ro->AcquireBuffer<VertexPos3Tex0>();
 
     buffer->PushFace({
@@ -868,7 +867,7 @@ void HighlevelRenderer::OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Su
   }
   m_TextureManager.BindTexture(Surface.PolyFlags, albedoTextureHandle, lightmapTextureHandle);
 
-  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject(Utils::CalculateKey(iNode), surfaceIsDynamic ? RenderObjectLifetime::Frame : RenderObjectLifetime::Level);
+  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject<VertexPos3Tex0Tex1>(Utils::CalculateKey(iNode), surfaceIsDynamic ? RenderObjectLifetime::Frame : RenderObjectLifetime::Level);
 
   if (roCreated)
   {
@@ -1003,12 +1002,6 @@ void HighlevelRenderer::OnDrawMeshBegin(const FSceneNode* Frame, AActor* Owner)
   }
 
   renderContext->drawcallInfo->Owner = Owner;
-  DynamicMeshesKey key = DynamicMeshesKey(renderContext->drawcallInfo->Owner);
-  for (auto foundIt = m_dynamicMeshes.find(key); foundIt != m_dynamicMeshes.end() && foundIt->first == key; foundIt++)
-  {
-    const auto& dynamicMeshInfo = foundIt->second;
-    dynamicMeshInfo.renderObject->Reset();
-  }
 }
 
 void HighlevelRenderer::OnDrawMeshPolygon(const FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, int NumPts, DWORD PolyFlags, FSpanBuffer* Span)
@@ -1052,15 +1045,13 @@ void HighlevelRenderer::OnDrawMeshPolygon(const FSceneNode* Frame, FTextureInfo&
   //UE's begin-draw-end calls emit a single mesh, but we'd like to split them in seperate buffers with separate render calls.
   //Some parts might be emissive, for example. We have to perform some bookkeeping here to make sure we're able to find
   //all buffers for a given mesh.
-  const RenderObjectKey key = Utils::CalculateKey(renderContext->drawcallInfo->Owner, Info.Texture, PolyFlags);
-  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject(key, RenderObjectLifetime::Frame);
+  const RenderObjectKey key = Utils::CalculateKey(renderContext->drawcallInfo->Owner, Info.CacheID, PolyFlags);
+  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject<VertexPos3Norm3Tex0>(key, RenderObjectLifetime::Frame);
   if (roCreated)
   {
-    DynamicMeshesValue meshinfo;
-    meshinfo.flags = PolyFlags;
-    meshinfo.renderObject = ro;
-    meshinfo.textureInfo = Info;
-    m_dynamicMeshes.insert({DynamicMeshesKey(renderContext->drawcallInfo->Owner), meshinfo});
+    ro->SetTexture(RenderObjectTextureType::Albedo, Info);
+    ro->SetFlags(PolyFlags);
+    renderContext->renderObjects.push_back(ro);
   }
 
   auto buffer = ro->AcquireBuffer<VertexPos3Norm3Tex0>();
@@ -1133,23 +1124,19 @@ void HighlevelRenderer::OnDrawMeshEnd(const FSceneNode* Frame, AActor* Actor)
   wm = UECoordsToMatrix(wmCoords);
 
   //The mesh was split up per texture+flag permutation. We have to render them all.
-  bool firstMeshRendered = true;
-  const auto meshkey = reinterpret_cast<DynamicMeshesKey>(callInfo.Owner);
-  for (auto foundIt = m_dynamicMeshes.find(meshkey); foundIt != m_dynamicMeshes.end() && foundIt->first == meshkey; foundIt++)
+  for (auto& ro : renderContext->renderObjects)
   {
-    auto& dynamicMeshInfo = foundIt->second;
-    auto& ro = foundIt->second.renderObject;
-
     callInfo.worldMatrix = wm;
+    const auto flags = ro->GetFlags();
     const bool isEmissive = (callInfo.PolyFlags & PF_Unlit) != 0;
     for (int i = 0; i < (isEmissive ? 3 : 1); i++)
     {
       const auto meshIndex = actor->Mesh->GetIndex();
-      const auto flags = dynamicMeshInfo.flags;
       const bool isFirstPerson = (parent == Frame->Viewport->Actor);
       const FrameContextManager::Context& capturedRenderContext = *renderContext;
       const auto& capturedFrame = *Frame;
-      AddRenderCommand(isFirstPerson ? RenderCommandQueue::uiMesh: RenderCommandQueue::dynamicMesh, [=](const FrameContextManager::Context* pContext) {
+      AddRenderCommand(isFirstPerson ? RenderCommandQueue::uiMesh : RenderCommandQueue::dynamicMesh, [=](const FrameContextManager::Context* pContext) {
+        FTextureInfo* textureInfo = &ro->GetTextureInfo(RenderObjectTextureType::Albedo);
         if (i >= 1)
         {
           D3DXMATRIX scaledWorldMatrix;
@@ -1158,17 +1145,18 @@ void HighlevelRenderer::OnDrawMeshEnd(const FSceneNode* Frame, AActor* Actor)
           D3DXMatrixScaling(&s, scale.X, scale.Y, scale.Z);
           D3DXMatrixMultiply(&scaledWorldMatrix, &wm, &s);
           SetWorldTransformState(scaledWorldMatrix);
-          m_TextureManager.BindTexture(dynamicMeshInfo.flags & ~PF_Unlit, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags & ~PF_Unlit, &dynamicMeshInfo.textureInfo));
+          m_TextureManager.BindTexture(flags & ~PF_Unlit, m_TextureManager.ProcessTexture(flags & ~PF_Unlit, textureInfo));
         }
         else
         {
           SetWorldTransformState(wm);
-          m_TextureManager.BindTexture(dynamicMeshInfo.flags, m_TextureManager.ProcessTexture(dynamicMeshInfo.flags, &dynamicMeshInfo.textureInfo));
+          m_TextureManager.BindTexture(flags, m_TextureManager.ProcessTexture(flags, textureInfo));
         }
         m_LLRenderer->Render(ro.get());
-      });
+        });
     }
   }
+  renderContext->renderObjects.clear();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1329,7 +1317,7 @@ void HighlevelRenderer::OnDrawSprite(const FSceneNode* Frame, FTextureInfo& Text
   D3DXMATRIX wm;
   D3DXMatrixTransformation(&wm, nullptr, nullptr, &scaling, nullptr, &rot, &translation);
 
-  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject(Utils::CalculateKey(sprite), RenderObjectLifetime::Frame);
+  auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject<VertexPos4Color0Tex0>(Utils::CalculateKey(sprite), RenderObjectLifetime::Frame);
   if (roCreated)
   {
     ro->SetTexture(RenderObjectTextureType::Albedo, TextureInfo);
@@ -1366,7 +1354,7 @@ void HighlevelRenderer::OnDrawUI(const FSceneNode* Frame, FTextureInfo& TextureI
     flags |= PF_Highlighted;
   }
 
-  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject(0, RenderObjectLifetime::Instant);
+  auto [ro,roCreated] = m_RenderObjectManager.AcquireRenderObject<PreTransformedVertexPos4Color0Tex0>(0, RenderObjectLifetime::Instant);
   auto vtex = ro->AcquireBuffer<PreTransformedVertexPos4Color0Tex0>();
 
   const float RZ = 1.0f / pZ;

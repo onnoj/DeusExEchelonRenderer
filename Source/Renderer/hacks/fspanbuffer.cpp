@@ -47,16 +47,8 @@ namespace Hacks
     auto ctx = g_ContextManager.GetContext();
     if (ctx->overrides.bypassSpanBufferRasterization && !ctx->frameIsRasterized)
     {
-      auto pThis = reinterpret_cast<FSpanBuffer*>(this);
-      if (pThis->ValidLines == 0)
-      {
-        pThis->AllocIndexForScreen(ctx->frameSceneNode->X, 1, pThis->Mem);
-        return 1;
-      }
-
-      assert(false); //unexpected to land here. Isn't this always being fed new buffers?
-      auto ret = (reinterpret_cast<FSpanBuffer*>(this)->*FSpanBufferFuncs::CopyFromRaster)(Screen, RasterStartY, RasterEndY, Raster);
-      return ret;
+      (reinterpret_cast<FSpanBuffer*>(this)->*FSpanBufferFuncs::CopyFromRaster)(Screen, RasterStartY, RasterEndY, Raster);
+      return 1;
     }
     return (reinterpret_cast<FSpanBuffer*>(this)->*FSpanBufferFuncs::CopyFromRaster)(Screen, RasterStartY, RasterEndY, Raster);
 
@@ -116,14 +108,8 @@ namespace Hacks
 
     if (ctx->overrides.bypassSpanBufferRasterization && !ctx->frameIsRasterized)
     {
-      auto pThis = reinterpret_cast<FSpanBuffer*>(this);
-
-      if (pThis->ValidLines == 0)
-      { //We need to always have one valid (writable) line, otherwise we get culled
-        pThis->AllocIndexForScreen(ctx->frameSceneNode->X, 1, pThis->Mem);
-        return 1;
-      }
-      assert(false); //Isn't this always being called with validLines=0?
+      (reinterpret_cast<FSpanBuffer*>(this)->*FSpanBufferFuncs::CopyFromRasterUpdate)(Screen, RasterStartY, RasterEndY, Raster);
+      return 1;
     }
 
     return (reinterpret_cast<FSpanBuffer*>(this)->*FSpanBufferFuncs::CopyFromRasterUpdate)(Screen, RasterStartY, RasterEndY, Raster);

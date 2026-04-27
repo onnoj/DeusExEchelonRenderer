@@ -90,7 +90,49 @@ public:
 	}
 
 	TextureManager& GetTextureManager() { return m_TextureManager; }
+	bool IsNodeCached(INT iNode) const { return m_bspCachedNodes.count(iNode) > 0; }
 private:
+	struct BSPSurfaceEntry {
+		std::shared_ptr<RenderObject> ro;
+		DeusExD3D9TextureHandle albedoHandle;
+		DeusExD3D9TextureHandle lightmapHandle;
+		D3DXMATRIX worldMatrix;
+		UnrealPolyFlags flags = 0;
+		bool isTranslucent = false;
+		bool isUnlitEmissive = false;
+	};
+
+	struct BSPBatchKey {
+		const void* albedoPtr = nullptr;
+		const void* lightmapPtr = nullptr;
+		UnrealPolyFlags flags = 0;
+		bool operator==(const BSPBatchKey& o) const {
+			return albedoPtr == o.albedoPtr && lightmapPtr == o.lightmapPtr && flags == o.flags;
+		}
+	};
+	struct BSPBatchKeyHash {
+		size_t operator()(const BSPBatchKey& k) const {
+			size_t h = std::hash<const void*>{}(k.albedoPtr);
+			h ^= std::hash<const void*>{}(k.lightmapPtr) + 0x9e3779b9u + (h << 6) + (h >> 2);
+			h ^= std::hash<uint32_t>{}(uint32_t(k.flags))  + 0x9e3779b9u + (h << 6) + (h >> 2);
+			return h;
+		}
+	};
+	struct BSPBatchAccumEntry {
+		std::vector<VertexPos3Tex0Tex1> vertices;
+		DeusExD3D9TextureHandle albedoHandle;
+		DeusExD3D9TextureHandle lightmapHandle;
+		int32_t batchIndex = -1; // index into m_bspOpaqueBatches; -1 = not yet built
+		bool dirty = false;      // new vertices appended since last VB build
+	};
+	struct BSPBatch {
+		IDirect3DVertexBuffer9* vb = nullptr;
+		uint32_t primitiveCount = 0;
+		DWORD renderFlags = 0;
+		DeusExD3D9TextureHandle albedoHandle;
+		DeusExD3D9TextureHandle lightmapHandle;
+	};
+
 	using DynamicMeshesKey = uint32_t;
 	using GeometryMeshesKey = uint32_t;
 	//using UIMeshesVertexBuffer = std::vector<PreTransformedVertexPos4Color0Tex0>;
@@ -162,4 +204,18 @@ private:
 	std::unique_ptr<FrameContextManager::ScopedContext> m_renderingScope;
 	std::deque<std::pair<uint32_t, const void*>> m_RenderObjectStack;
 	std::vector<RenderCall> m_CommandQueues[RenderCommandQueueMax];
+
+	// Static BSP geometry cache — grows incrementally as surfaces become visible, replayed each frame
+	std::vector<BSPSurfaceEntry> m_bspSurfaceCache;
+	std::unordered_set<INT> m_bspCachedNodes;
+	bool m_bspCacheValid = false;
+	bool m_bspCachePending = false;
+
+	// Batch VBs: opaque static surfaces grouped by texture — one DrawPrimitive per texture group
+	std::vector<BSPBatch> m_bspOpaqueBatches;
+	std::unordered_map<BSPBatchKey, BSPBatchAccumEntry, BSPBatchKeyHash> m_bspBatchAccum;
+	// Batch VBs: transparent/emissive static surfaces — drawn 2× with global scale for RTX Remix detection
+	std::vector<BSPBatch> m_bspTransparentBatches;
+	std::unordered_map<BSPBatchKey, BSPBatchAccumEntry, BSPBatchKeyHash> m_bspTransparentAccum;
+	bool m_bspCacheDirty = false;
 };

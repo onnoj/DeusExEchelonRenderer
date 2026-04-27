@@ -405,6 +405,17 @@ void LowlevelRenderer::RenderVertexBuffer(const VertexBufferI* pVertexBuffer, co
   }
 }
 
+void LowlevelRenderer::RenderBatchVertexBuffer(IDirect3DVertexBuffer9* pVB, uint32_t primitiveCount, DWORD pFVF, UINT stride)
+{
+  g_SceneManager.Validate();
+  g_Stats.Writer().DrawCall();
+  CheckDirtyMatrices();
+  m_Device->SetStreamSource(0, pVB, 0, stride);
+  m_Device->SetIndices(nullptr);
+  m_Device->SetFVF(pFVF);
+  m_Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, primitiveCount);
+}
+
 void LowlevelRenderer::DisableLight(int32_t index)
 {
   if (!g_options.hasLights)
@@ -493,6 +504,8 @@ void LowlevelRenderer::FlushLights()
 
 void LowlevelRenderer::BeginFrame()
 {
+  m_frameBeginTime = std::chrono::high_resolution_clock::now();
+  g_Stats.sceneFlushTimeMs = 0.0f;
   g_SceneManager.Validate();
   g_Stats.Writer().BeginFrame();
 
@@ -608,11 +621,24 @@ void LowlevelRenderer::EndFrame()
   //management is done in RTX Remix's runtime. The fact that a DMA pagefault can happen is probably
   //a synchronisation or lifetime bug in RTX Remix. Adding a 1ms sleep seems to step around the bug,
   //and shouldn't affect our renderer's performance too badly. Ideally, this bug is fixed.
+  {
+    auto cpuDone = std::chrono::high_resolution_clock::now();
+    g_Stats.frameRenderTimeMs = std::chrono::duration<float, std::milli>(cpuDone - m_frameBeginTime).count();
+  }
+
   if (g_ConfigManager.GetHasRemixIssue745WorkaroundEnabled())
   {
     //::Sleep(1);
   }
   auto res = m_Device->Present(NULL, NULL, NULL, NULL);
+  {
+    auto presentDone = std::chrono::high_resolution_clock::now();
+    g_Stats.frameTotalTimeMs = std::chrono::duration<float, std::milli>(presentDone - m_frameBeginTime).count();
+    g_DebugMenu.DebugVar("Timing", "CPU work (ms)",    DebugMenuUniqueID(), g_Stats.frameRenderTimeMs);
+    g_DebugMenu.DebugVar("Timing", "Total frame (ms)", DebugMenuUniqueID(), g_Stats.frameTotalTimeMs);
+    g_DebugMenu.DebugVar("Timing", "Scene flush (ms)", DebugMenuUniqueID(), g_Stats.sceneFlushTimeMs);
+    g_DebugMenu.DebugVar("Timing", "Draw calls",       DebugMenuUniqueID(), g_Stats.drawCallCount);
+  }
 #else
   HRESULT res = D3D_OK;
   static std::mutex presentMutex;

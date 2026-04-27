@@ -154,4 +154,8 @@ struct Stats
   uint32_t mainFrameCount = 0;
   uint32_t mainFrameCountTotal = 0;
 
+  float frameRenderTimeMs = 0.0f;   // BeginFrame → before Present (CPU work only)
+  float frameTotalTimeMs = 0.0f;    // BeginFrame → after Present (full frame cycle)
+  float sceneFlushTimeMs = 0.0f;    // Sum of all ExecuteCommandQueue time per frame
+
 } extern g_Stats;

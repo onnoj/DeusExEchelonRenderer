@@ -92,7 +92,7 @@ void InstallBytePatches()
         {0x109E3, { 0xC6, 0x41, 0x0C, 0x00, 0x90 }}, //?DrawLodMesh@URender@@QAEXPAUFSceneNode@@PAVAActor@@1PAVFSpanBuffer@@PAVAZoneInfo@@ABVFCoords@@PAUFVolActorLink@@PAUFActorLink@@K@Z_0	or      al, bl
         {0x1C701, { 0xC6, 0x41, 0x0C, 0x00, 0x90 }}, //?ClipDecal@URender@@QAEHPAUFSceneNode@@PAVFDecal@@PAVUModel@@PAVFBspSurf@@PAUFSavedPoly@@AAPAPAUFTransTexture@@AAH@Z_0	or      al, bl
 
-#if 0 //causes flickering... why? Maybe there's a limit to the amount of geometry that can be emitted?
+#if 0 //dead code path while ClipBspSurf detour is active; historically caused flickering
         {0x14EE6, { 0xC6, 0x41, 0x0C, 0x00, 0x90 }}, //?ClipBspSurf@URender@@QAEHHAAPAPAUFTransform@@@Z_0	or      al, bl
 #endif
       };
@@ -138,6 +138,13 @@ void InstallBytePatches()
         {0x0000FC57, 0x90},
         {0x0000FC58, 0x90},
         {0x0000FC59, 0x90},
+        {0x00017f8a, 0x90}, /* bypass frustum plane PopStack in OccludeBsp (jz loc_10B19BE9 → nop×6) */
+        {0x00017f8b, 0x90},
+        {0x00017f8c, 0x90},
+        {0x00017f8d, 0x90},
+        {0x00017f8e, 0x90},
+        {0x00017f8f, 0x90},
+        {0x00018376, 0xEB}, /* bypass CopyFromRaster return-0 PopStack in OccludeBsp (jnz → jmp) */
       };
       DWORD oldProtect = 0;
       for (auto patch : patches)

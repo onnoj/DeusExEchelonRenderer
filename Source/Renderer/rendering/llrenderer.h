@@ -140,6 +140,7 @@ public:
 
 	void Render(class RenderObject* pRenderObject);
 	void RenderVertexBuffer(const VertexBufferI* pVertexBuffer, const uint32_t primitiveCount, const uint32_t pVertexCount, const uint32_t pHash, const uint32_t pDebug);
+	void RenderBatchVertexBuffer(IDirect3DVertexBuffer9* pVB, uint32_t primitiveCount, DWORD pFVF, UINT stride);
 
 	void EmitDebugText(const wchar_t* pTxt);
 	void EmitDebugTextF(const wchar_t* pFmt, ...);
@@ -215,6 +216,7 @@ private:
 	IDirect3DVertexBuffer9* m_fakeLightBuffer = nullptr;
 	bool m_IsInFrame = false;
 	int32_t m_IsInScene = 0;
+	std::chrono::high_resolution_clock::time_point m_frameBeginTime{};
 	struct
 	{
 		uint32_t width = 0;

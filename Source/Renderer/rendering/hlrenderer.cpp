@@ -40,6 +40,14 @@ void HighlevelRenderer::Shutdown()
   m_staticGeometryMeshes.clear();
   m_dynamicGeometryMeshes.clear();
   m_DebugMesh = {};
+  for (auto& batch : m_bspOpaqueBatches) { if (batch.vb) batch.vb->Release(); }
+  m_bspOpaqueBatches.clear();
+  m_bspBatchAccum.clear();
+  for (auto& batch : m_bspTransparentBatches) { if (batch.vb) batch.vb->Release(); }
+  m_bspTransparentBatches.clear();
+  m_bspTransparentAccum.clear();
+  m_bspSurfaceCache.clear();
+  m_bspCachedNodes.clear();
   m_LightManager.Shutdown();
   m_TextureManager.Shutdown();
   m_LLRenderer = nullptr;
@@ -62,6 +70,7 @@ void HighlevelRenderer::OnRenderingBegin(const FSceneNode* Frame)
   {
     lastLevel = currentLevel;
     OnLevelChange();
+    m_bspCachePending = true;
   }
 
   ctx.overrides.bypassSpanBufferRasterization = levelChanged;
@@ -126,6 +135,67 @@ void HighlevelRenderer::OnRenderingEnd(const FSceneNode* Frame)
     for(auto& n : m_DrawnNodes) n.clear();
   }
   m_dynamicGeometryMeshes.clear();
+
+  if (m_bspCachePending && !m_bspCacheValid)
+  {
+    m_bspCacheValid   = true;
+    m_bspCachePending = false;
+  }
+
+  if (m_bspCacheDirty)
+  {
+    auto rebuildDirtyBatches = [&](
+      std::unordered_map<BSPBatchKey, BSPBatchAccumEntry, BSPBatchKeyHash>& accum,
+      std::vector<BSPBatch>& batches) -> int
+    {
+      int count = 0;
+      for (auto& [key, entry] : accum)
+      {
+        if (!entry.dirty || entry.vertices.empty()) continue;
+        entry.dirty = false;
+
+        const uint32_t sz = uint32_t(entry.vertices.size()) * sizeof(VertexPos3Tex0Tex1);
+        IDirect3DVertexBuffer9* newVb = m_LLRenderer->AllocateVertexBuffer(sz, VertexPos3Tex0Tex1::GetFVF());
+        if (!newVb) continue;
+
+        void* data = nullptr;
+        if (SUCCEEDED(newVb->Lock(0, sz, &data, 0)))
+        {
+          memcpy(data, entry.vertices.data(), sz);
+          newVb->Unlock();
+        }
+
+        if (entry.batchIndex >= 0)
+        {
+          auto& batch = batches[entry.batchIndex];
+          if (batch.vb) batch.vb->Release();
+          batch.vb             = newVb;
+          batch.primitiveCount = uint32_t(entry.vertices.size()) / 3;
+        }
+        else
+        {
+          entry.batchIndex = int32_t(batches.size());
+          BSPBatch batch;
+          batch.vb             = newVb;
+          batch.primitiveCount = uint32_t(entry.vertices.size()) / 3;
+          batch.renderFlags    = key.flags & ~(DWORD)PF_Unlit;
+          batch.albedoHandle   = entry.albedoHandle;
+          batch.lightmapHandle = entry.lightmapHandle;
+          batches.push_back(std::move(batch));
+        }
+        ++count;
+      }
+      return count;
+    };
+
+    int opaqueRebuilt      = rebuildDirtyBatches(m_bspBatchAccum,       m_bspOpaqueBatches);
+    int transparentRebuilt = rebuildDirtyBatches(m_bspTransparentAccum, m_bspTransparentBatches);
+    m_bspCacheDirty = false;
+    GLog->Logf(L"[EchelonRenderer]\t BSP batches updated: %d/%d opaque, %d/%d transparent, %d surfaces",
+               opaqueRebuilt, int(m_bspOpaqueBatches.size()),
+               transparentRebuilt, int(m_bspTransparentBatches.size()),
+               int(m_bspSurfaceCache.size()));
+  }
 
 #if 0
   //axis widget
@@ -351,17 +421,100 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
     renderMainPass = false;
   }
 
+  auto flushStart = std::chrono::high_resolution_clock::now();
+
   if (renderMainPass)
   {
     m_LLRenderer->PushDeviceState();
     SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
     SetViewState(Frame, ViewType::game);
+    // Opaque static BSP surfaces — batch VBs when stable, per-entry on transition frames
+    if (!ctx.frameIsSkybox)
+    {
+      if (!m_bspCacheDirty && !m_bspOpaqueBatches.empty())
+      {
+        // Stable frame: one BindTexture + DrawPrimitive per texture group (~50-200 calls)
+        D3DXMATRIX identity;
+        D3DXMatrixIdentity(&identity);
+        SetWorldTransformState(identity);
+        for (auto& batch : m_bspOpaqueBatches)
+        {
+          if (m_TextureManager.BindTexture(batch.renderFlags, batch.albedoHandle, batch.lightmapHandle))
+          {
+            m_LLRenderer->RenderBatchVertexBuffer(batch.vb, batch.primitiveCount,
+                                                  VertexPos3Tex0Tex1::GetFVF(), sizeof(VertexPos3Tex0Tex1));
+          }
+        }
+      }
+      else
+      {
+        // Transition frame (new surfaces discovered this frame): per-entry fallback
+        for (auto& entry : m_bspSurfaceCache)
+        {
+          if (!entry.isTranslucent)
+          {
+            DWORD renderFlags = entry.flags & ~(DWORD)PF_Unlit;
+            SetWorldTransformState(entry.worldMatrix);
+            if (m_TextureManager.BindTexture(renderFlags, entry.albedoHandle, entry.lightmapHandle))
+            {
+              m_LLRenderer->Render(entry.ro.get());
+            }
+          }
+        }
+      }
+    }
     ExecuteCommandQueue(&ctx, RenderCommandQueue::mapGeometry);
     m_LLRenderer->PopDeviceState();
 
     m_LLRenderer->PushDeviceState();
     SetProjectionState(Frame, HighlevelRenderer::ProjectionType::perspective);
     SetViewState(Frame, ViewType::game);
+    // Transparent/emissive static BSP — batch VBs with global scale for RTX Remix detection
+    // Scale is applied from world origin (vs. per-surface-origin in per-entry path), delta is 0.01% — acceptable.
+    if (!ctx.frameIsSkybox)
+    {
+      if (!m_bspCacheDirty && !m_bspTransparentBatches.empty())
+      {
+        auto drawTransparentBatches = [&](float scale)
+        {
+          D3DXMATRIX s; D3DXMatrixScaling(&s, scale, scale, scale);
+          SetWorldTransformState(s);
+          for (auto& batch : m_bspTransparentBatches)
+          {
+            if (m_TextureManager.BindTexture(batch.renderFlags, batch.albedoHandle, batch.lightmapHandle))
+            {
+              m_LLRenderer->RenderBatchVertexBuffer(batch.vb, batch.primitiveCount,
+                                                    VertexPos3Tex0Tex1::GetFVF(), sizeof(VertexPos3Tex0Tex1));
+            }
+          }
+        };
+        drawTransparentBatches(1.0001f);
+        drawTransparentBatches(0.9999f);
+      }
+      else
+      {
+        // Transition frame fallback
+        for (auto& entry : m_bspSurfaceCache)
+        {
+          if (entry.isTranslucent || entry.isUnlitEmissive)
+          {
+            auto drawEntry = [&](float scale)
+            {
+              D3DXMATRIX wm, s;
+              D3DXMatrixScaling(&s, scale, scale, scale);
+              D3DXMatrixMultiply(&wm, &entry.worldMatrix, &s);
+              SetWorldTransformState(wm);
+              if (m_TextureManager.BindTexture(entry.flags, entry.albedoHandle, entry.lightmapHandle))
+              {
+                m_LLRenderer->Render(entry.ro.get());
+              }
+            };
+            drawEntry(1.0001f);
+            drawEntry(0.9999f);
+          }
+        }
+      }
+    }
     ExecuteCommandQueue(&ctx, RenderCommandQueue::mapGeometryTransparent);
     m_LLRenderer->PopDeviceState();
 
@@ -380,6 +533,8 @@ void HighlevelRenderer::OnSceneEnd(const FSceneNode* Frame)
     ExecuteCommandQueue(&ctx,RenderCommandQueue::pfx);
     m_LLRenderer->PopDeviceState();
   }
+
+  g_Stats.sceneFlushTimeMs += std::chrono::duration<float, std::milli>(std::chrono::high_resolution_clock::now() - flushStart).count();
 }
 
 #if 0
@@ -669,6 +824,18 @@ void HighlevelRenderer::OnLevelChange()
   m_RenderObjectManager.ResetRenderObjects(RenderObjectLifetime::Level);
   for(auto& n : m_DrawnNodes) n.clear();
   m_LightManager.OnLevelChange();
+
+  for (auto& batch : m_bspOpaqueBatches) { if (batch.vb) batch.vb->Release(); }
+  m_bspOpaqueBatches.clear();
+  m_bspBatchAccum.clear();
+  for (auto& batch : m_bspTransparentBatches) { if (batch.vb) batch.vb->Release(); }
+  m_bspTransparentBatches.clear();
+  m_bspTransparentAccum.clear();
+  m_bspCacheDirty   = false;
+  m_bspSurfaceCache.clear();
+  m_bspCachedNodes.clear();
+  m_bspCacheValid   = false;
+  m_bspCachePending = false;
 }
 
 void HighlevelRenderer::GetViewMatrix(const FCoords& FrameCoords, D3DXMATRIX& viewMatrix)
@@ -869,6 +1036,12 @@ void HighlevelRenderer::OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Su
 
   auto [ro, roCreated] = m_RenderObjectManager.AcquireRenderObject<VertexPos3Tex0Tex1>(Utils::CalculateKey(iNode), surfaceIsDynamic ? RenderObjectLifetime::Frame : RenderObjectLifetime::Level);
 
+  // For new opaque static surfaces: accumulate world-space vertices for batch VB building
+  const bool isNewStaticNode = roCreated && !surfaceIsDynamic && !ctx.frameIsSkybox && m_bspCachedNodes.count(iNode) == 0;
+  const bool shouldBatchAccum       = isNewStaticNode && !(Surface.PolyFlags & (PF_Translucent | PF_Unlit));
+  const bool shouldBatchTransparent = isNewStaticNode &&  (Surface.PolyFlags & (PF_Translucent | PF_Unlit));
+  std::vector<VertexPos3Tex0Tex1> batchVerts;
+
   if (roCreated)
   {
     auto vtxBuffer = ro->AcquireBuffer<VertexPos3Tex0Tex1>();
@@ -926,14 +1099,59 @@ void HighlevelRenderer::OnDrawGeometry(const FSceneNode* Frame, FSurfaceInfo& Su
 #else
           VertexPos3Tex0Tex1 vtx = { {  localPts[i].X, localPts[i].Y, localPts[i].Z }, /*0xFF00FF00,*/{ uvDiffuse.X, uvDiffuse.Y }, {uvLightmap.X, uvLightmap.Y} };
 #endif
-
+          if (shouldBatchAccum || shouldBatchTransparent) { batchVerts.push_back(vtx); } // capture world-space pos before local-origin shift
           D3DXVec3TransformCoord(&vtx.Pos, &vtx.Pos, &worldMatrixInverse);
           vtxBuffer->PushVertex(std::move(vtx));
         }
       }
     }
   }
-  
+
+  // Insert world-space vertices into the per-texture batch accumulator for batch VB building
+  if (!batchVerts.empty())
+  {
+    auto insertIntoAccum = [&](std::unordered_map<BSPBatchKey, BSPBatchAccumEntry, BSPBatchKeyHash>& accum)
+    {
+      BSPBatchKey key{ albedoTextureHandle.get(), lightmapTextureHandle.get(), UnrealPolyFlags(Surface.PolyFlags) };
+      auto& entry = accum[key];
+      if (!entry.albedoHandle)
+      {
+        entry.albedoHandle   = albedoTextureHandle;
+        entry.lightmapHandle = lightmapTextureHandle;
+      }
+      entry.vertices.insert(entry.vertices.end(), batchVerts.begin(), batchVerts.end());
+      entry.dirty = true;
+      m_bspCacheDirty = true;
+    };
+    if (shouldBatchAccum)       insertIntoAccum(m_bspBatchAccum);
+    if (shouldBatchTransparent) insertIntoAccum(m_bspTransparentAccum);
+  }
+
+  // Record static surfaces to the cache the first time they are seen.
+  // ClipBspSurf returns 0 for already-cached nodes so this block only runs on first encounter.
+  if (!surfaceIsDynamic && !ctx.frameIsSkybox && m_bspCachedNodes.count(iNode) == 0)
+  {
+    BSPSurfaceEntry cacheEntry;
+    cacheEntry.ro             = ro;
+    cacheEntry.albedoHandle   = albedoTextureHandle;
+    cacheEntry.lightmapHandle = lightmapTextureHandle;
+    cacheEntry.worldMatrix    = worldMatrix;
+    cacheEntry.flags          = Surface.PolyFlags;
+    cacheEntry.isTranslucent  = (Surface.PolyFlags & PF_Translucent) != 0;
+    cacheEntry.isUnlitEmissive = (Surface.PolyFlags & PF_Unlit) != 0;
+    m_bspSurfaceCache.push_back(cacheEntry);
+    m_bspCachedNodes.insert(iNode);
+    // OnSceneEnd replays all cached surfaces — no lambda needed for this frame.
+    return;
+  }
+
+  // Surface is already cached: ClipBspSurf should have returned 0 before reaching here.
+  // Guard against direct calls that bypass ClipBspSurf.
+  if (!surfaceIsDynamic && !ctx.frameIsSkybox)
+  {
+    return;
+  }
+
   {
     auto flags = Surface.PolyFlags; //??? check original
     auto debugId = iNode;

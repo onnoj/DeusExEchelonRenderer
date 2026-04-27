@@ -155,17 +155,9 @@ namespace Hacks
 
   void URenderOverride::OccludeFrame(FSceneNode* Frame)
   {
-    auto ctx = g_ContextManager.GetContext();
     Frame->Viewport->ExtraPolyFlags |= PF_NoMerge;
 
-    bool markTwoSided = false;
-    {
-      g_DebugMenu.DebugVar("Culling", "Flag all geo as twosided", DebugMenuUniqueID(), markTwoSided, {});
-      if (markTwoSided)
-      {
-        Frame->Viewport->ExtraPolyFlags |= PF_TwoSided;
-      }
-    }
+    Frame->Viewport->ExtraPolyFlags |= PF_TwoSided;
 
     bool markForceViewZone = false;
     {
@@ -193,122 +185,10 @@ namespace Hacks
 #endif
     }
 
-    FSceneNode origFrame = *Frame;
-    FCoords origCoords = origFrame.Coords;
-    FVector origPos = origCoords.Origin;
-    FRotator origRot = Frame->Viewport->Actor->ViewRotation;
-    float origFovAngle = Frame->Viewport->Actor->FovAngle;
-
-
-    ADeusExPlayer* player = CastChecked<ADeusExPlayer>(Frame->Viewport->Actor);
-    const bool isInCutscene = (player->ConPlay != nullptr && player->bBehindView == 1);
-
-    g_DebugMenu.DebugVar("Culling", "Backwards Occlusion Enabled", DebugMenuUniqueID(), g_options.backwardsOcclusionPass);
-    if (g_options.backwardsOcclusionPass && /*Frame->Parent == nullptr &&*/ !isInCutscene  && !ctx->frameIsRasterized)
-    {
-      const FColor angleColors[] = { FColor(255,0,0), FColor(0,255,0), FColor(0,0,255) };
-      //constexpr float angles[] = {0.66f, 0.33f, 0.0f};
-      constexpr float angles[] = { 0.50f, 0.0f };
-      //constexpr float angles[] = {0.0f};
-
-      auto originalSpan = Frame->Span;
-      auto originalBrushTracker = Frame->Level->BrushTracker;
-      //Frame->Level->BrushTracker = nullptr;
-      bool drawLines = true;
-      g_DebugMenu.DebugVar("Debug", "Update culling frustrum lines", DebugMenuUniqueID(), drawLines);
-      if (drawLines)
-      {
-        g_lines.clear();
-      }
-
-      for (int i = 0; i < std::size(angles); i++)
-      {
-        const bool isLast = ((i + 1) == std::size(angles));
-        const float& angle = angles[i];
-        FrameContextManager::ScopedContext ctx;
-        {
-          ctx->frameSceneNode = Frame;
-          ctx->overrides.skipDynamicFiltering = false; //keep off; otherwise meshes are culled from reflections as well.
-          ctx->overrides.bypassSetupDynamics =  false; //!isLast; //gives a perf boost when disabled, but we lose reflections of actors behind us.
-
-          float fov = 155.0f;
-          g_DebugMenu.DebugVar("Culling", "Backwards Occlusion FOV", DebugMenuUniqueID(), fov, { DebugMenuValueOptions::editor::slider, 0.0f, 179.999f });
-
-          Frame->Viewport->Actor->FovAngle = fov;
-          if (!isLast)
-          {
-            Frame->Span = New<FSpanBuffer>(GSceneMem);
-            Frame->Span->AllocIndexForScreen(Frame->Viewport->SizeX, Frame->Viewport->SizeY, &GSceneMem);
-          }
-          else
-          {
-            Frame->Span = originalSpan;
-          }
-
-          float backwardsAdjustment = 100.0f;
-          g_DebugMenu.DebugVar("Culling", "Backwards Occlusion Adjustment", DebugMenuUniqueID(), backwardsAdjustment, { DebugMenuValueOptions::editor::slider, -100.0f, 1000.0f });
-          auto newRotation = origRot + FRotator(0.0f, 65536.0f * angle, 0.0f);
-
-          auto newPosition = origPos;
-          if (!isLast)
-          {
-            newRotation.Pitch = 0;
-            newPosition -= (newRotation.Vector() * backwardsAdjustment);
-          }
-          Frame->ComputeRenderCoords(newPosition, newRotation);
-
-#if 0
-          //TODO: get a node id and track it through the system to see where it gets culled
-          FLOAT TempSigns[2] = { -1.0,+1.0 };
-          for (INT i = 0; i < 2; i++)
-          {
-            for (INT j = 0; j < 2; j++)
-            {
-              Frame->ViewSides[i * 2 + j] = FVector(TempSigns[i] * Frame->FX2, TempSigns[j] * Frame->FY2, 0.0f).UnsafeNormal().TransformVectorBy(Frame->Uncoords);
-            }
-            Frame->ViewPlanes[i] = FPlane
-            (
-              Frame->Coords.Origin,
-              FVector(0, TempSigns[i] / Frame->FY2, 0.0f).UnsafeNormal().TransformVectorBy(Frame->Uncoords)
-            );
-            Frame->ViewPlanes[i + 2] = FPlane
-            (
-              Frame->Coords.Origin,
-              FVector(TempSigns[i] / Frame->FX2, 0, 0.0f).UnsafeNormal().TransformVectorBy(Frame->Uncoords)
-            );
-          }
-          Frame->PrjXM = (0 - Frame->FX2) * (-Frame->RProj.Z);
-          Frame->PrjXP = (Frame->FX - Frame->FX2) * (+Frame->RProj.Z);
-          Frame->PrjYM = (0 - Frame->FY2) * (-Frame->RProj.Z);
-          Frame->PrjYP = (Frame->FY - Frame->FY2) * (+Frame->RProj.Z);
-#endif
-          if (drawLines)
-          {
-            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + newRotation.Vector() * 100.0f, angleColors[i] });
-            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[0] * 1000.0f), angleColors[i] });
-            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[1] * 1000.0f), angleColors[i] });
-            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[2] * 1000.0f), angleColors[i] });
-            g_lines.push_back({ Frame->Coords.Origin, Frame->Coords.Origin + (Frame->ViewSides[3] * 1000.0f), angleColors[i] });
-          }
-          (GRender->*URenderFuncs::OccludeFrame)(Frame);
-        }
-      }
-
-      Frame->Level->BrushTracker = originalBrushTracker;
-      Frame->Span = originalSpan;
-      Frame->Viewport->Actor->FovAngle = origFovAngle;
-      Frame->ComputeRenderCoords(origPos, origRot);
-      //for (auto& l : lines)
-      //{
-      //  ::Misc::g_Facade->GetHLRenderer()->Draw3DLine(Frame, std::get<0>(l), std::get<1>(l), std::get<2>(l));
-      //}
-    }
-    else
-    {
-      FrameContextManager::ScopedContext ctx;
-      ctx->frameSceneNode = Frame;
-      (GRender->*URenderFuncs::OccludeFrame)(Frame);
-    }
+    FrameContextManager::ScopedContext ctx;
+    ctx->frameSceneNode = Frame;
+    ctx->overrides.bypassSpanBufferRasterization = true;
+    (GRender->*URenderFuncs::OccludeFrame)(Frame);
   }
 
   void URenderOverride::ComputeRenderSize(FSceneNode* Frame)
@@ -375,6 +255,9 @@ namespace Hacks
 
       g_SceneManager.PushScene(Frame);
       (GRender->*URenderFuncs::DrawFrame)(Frame);
+      // Ensure OnSceneBegin is called even when all BSP surfaces are cached
+      // (cached surfaces skip ClipBspSurf → no Render() calls → Validate() never triggered)
+      g_SceneManager.Validate();
       facade->GetHLRenderer()->DrawPlayerBody(Frame);
       g_SceneManager.PopScene(Frame);
     }
@@ -395,6 +278,12 @@ namespace Hacks
 
   INT URenderOverride::ClipBspSurf(INT iNode, FTransform**& Result)
   {
+    // Short-circuit for nodes already in the static BSP cache — OnSceneEnd replays them from batches
+    if (auto* facade = Misc::g_Facade; facade && facade->GetHLRenderer()->IsNodeCached(iNode))
+    {
+      return 0;
+    }
+
     auto ctx = g_ContextManager.GetContext();
     auto Model = ctx->frameSceneNode->Level->Model;
     auto& GSurfs = Model->Surfs;
